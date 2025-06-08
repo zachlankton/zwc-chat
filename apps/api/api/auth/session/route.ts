@@ -33,6 +33,8 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 			state: returnPath ?? "",
 		});
 
+		console.log({ authorizationUrl });
+
 		return Response.json({ authorizationUrl }, { status: 302 });
 	}
 
