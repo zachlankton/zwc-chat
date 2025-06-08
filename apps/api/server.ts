@@ -7,8 +7,11 @@ const serverStartTime = performance.now();
 
 console.log("Warming up database connection...");
 
+const dev = process.env.DEV === "TRUE";
+const https = process.env.HTTPS === "TRUE";
+
 const server = Bun.serve({
-	development: process.env.DEV === "TRUE",
+	development: dev,
 	static: {
 		"/favicon.ico": new Response(
 			await Bun.file("./static/favicon.ico").bytes(),
@@ -27,10 +30,12 @@ const server = Bun.serve({
 	},
 	websocket: bunWebsocketHandlers,
 
-	tls: {
-		key: Bun.file("./key.pem"),
-		cert: Bun.file("./cert.pem"),
-	},
+	tls: https
+		? {
+				key: Bun.file("./key.pem"),
+				cert: Bun.file("./cert.pem"),
+			}
+		: undefined,
 });
 
 await Promise.allSettled(routeImportPromises);
