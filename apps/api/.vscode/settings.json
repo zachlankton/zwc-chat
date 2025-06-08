@@ -1,0 +1,7 @@
+{
+	"thunder-client.saveToWorkspace": true,
+	"[sql]": {
+		"editor.formatOnSave": false,
+		"editor.formatOnPaste": false
+	}
+}

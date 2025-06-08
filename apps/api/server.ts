@@ -1,0 +1,39 @@
+import "lib/logging";
+import { handleRequest, routeImportPromises } from "lib/router";
+import type { ExtendedRequest } from "lib/server-types";
+import { bunWebsocketHandlers } from "lib/websockets";
+
+const serverStartTime = performance.now();
+
+console.log("Warming up database connection...");
+
+const server = Bun.serve({
+	development: process.env.DEV === "TRUE",
+	static: {
+		"/favicon.ico": new Response(
+			await Bun.file("./static/favicon.ico").bytes(),
+			{
+				headers: {
+					"Content-Type": "image/x-icon",
+				},
+			}
+		),
+	},
+
+	async fetch(_req: any, server) {
+		const req = _req as ExtendedRequest;
+		req.performance_start = performance.now();
+		return handleRequest(req, server);
+	},
+	websocket: bunWebsocketHandlers,
+
+	tls: {
+		key: Bun.file("./key.pem"),
+		cert: Bun.file("./cert.pem"),
+	},
+});
+
+await Promise.allSettled(routeImportPromises);
+
+console.log(`All routes ready in ${performance.now() - serverStartTime}ms`);
+console.log("Server ready:", server.url.href);

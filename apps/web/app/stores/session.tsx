@@ -1,0 +1,40 @@
+import { useQuery, type FetchQueryOptions } from "@tanstack/react-query";
+import { queryClient } from "~/providers/queryClient";
+import { get, post } from "~/lib/fetchWrapper";
+
+export interface SessionData {
+  userId: string;
+  email: string;
+  name: string | null;
+  imgSrc: string | null;
+  roles: string[];
+  token: string;
+  expiresAt: Date;
+  requestTimestampHistory: number[];
+  requestPerSecondLimit: string;
+}
+
+const ONE_MINUTE = 1000 * 60;
+export const SESSION_Q_KEY = "SESSION";
+export const SESSION_Q_FUN = () => get<SessionData>(`/auth/session`);
+export const SESSION_Q_STALETIME = ONE_MINUTE;
+
+export function getSession() {
+  return queryClient.getQueryData([SESSION_Q_KEY]) as SessionData | undefined;
+}
+
+export const sessionQuery: FetchQueryOptions<SessionData> = {
+  queryKey: [SESSION_Q_KEY],
+  queryFn: SESSION_Q_FUN,
+  staleTime: ONE_MINUTE * 5,
+};
+
+export function useSession() {
+  const q = useQuery(sessionQuery);
+  return q.data;
+}
+
+export function logOut() {
+  post("/auth/logout", {});
+  localStorage.removeItem("pulse_session");
+}

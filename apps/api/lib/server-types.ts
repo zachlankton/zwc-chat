@@ -1,0 +1,27 @@
+import type {
+	RequestWithSession,
+	SessionData,
+} from "api/auth/session/sessionCache";
+import type { Server } from "bun";
+
+export interface ExtendedRequest extends RequestWithSession {
+	cookies: Map<string, string>;
+	ip: string | undefined;
+	server_id: string;
+	id: string;
+	path: string;
+	performance_start: number;
+	requestCloneInCaseOfError: Request;
+	logCount?: number;
+	eventName?: string;
+	eventData?: any;
+	eventErrorAlreadyLogged?: boolean;
+	session: SessionData;
+	accountId: string;
+	rateLogged: boolean;
+}
+
+export type RouteHandler = (
+	req: ExtendedRequest,
+	ctx: { server: Server; params: Record<string, string> }
+) => Promise<Response> | Response;

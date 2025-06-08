@@ -1,0 +1,3 @@
+.terraform
+thunder-tests/**/*.json
+drizzle
