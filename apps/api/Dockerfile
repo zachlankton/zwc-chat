@@ -7,8 +7,8 @@ WORKDIR /usr/src/app
 # this will cache them and speed up future builds
 FROM --platform=$BUILDPLATFORM build AS install
 RUN mkdir -p /temp/dev
-COPY package.json bun.lock /temp/dev/
-RUN cd /temp/dev && bun install --frozen-lockfile
+COPY package.json /temp/dev/
+RUN cd /temp/dev && bun install
 
 # copy node_modules from temp directory
 # then copy all (non-ignored) project files into the image
@@ -30,4 +30,4 @@ COPY --from=prerelease /usr/src/app/static ./static
 
 # run the app
 EXPOSE 3000/tcp
-ENTRYPOINT [ "bun", "run", "server.js" ]
+ENTRYPOINT [ "bun", "run", "dev" ]
