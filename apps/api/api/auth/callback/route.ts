@@ -35,9 +35,10 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 		clientId,
 	});
 
-	if (auth.organizationId !== orgId) {
-		return new Response("Invalid Org", { status: 400 });
-	}
+	// will allow the user to login, and we will limit their abilities
+	//if (auth.organizationId !== orgId) {
+	//	return new Response("Invalid Org", { status: 400 });
+	//}
 
 	const session: SessionData = {
 		token: randomBytes(32).toString("hex"),
