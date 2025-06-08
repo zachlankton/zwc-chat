@@ -4,7 +4,7 @@ import { updateSessionExpiry, sessionCache } from "./sessionCache";
 import { internalServerError, rateLimitError } from "lib/utils";
 import { asyncLocalStorage } from "lib/asyncLocalStore";
 
-export const userDefaultRateLimit = "20:5";
+export const userDefaultRateLimit = "5:1";
 
 export async function createSession(user: any) {
 	const userSession: SessionData = {

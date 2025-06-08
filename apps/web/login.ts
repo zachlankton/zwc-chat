@@ -1,4 +1,5 @@
 import { LS_REDIRECTED_TO_LOGIN, LS_TOKEN } from "~/lib/fetchWrapper";
+import { setSession, type SessionData } from "~/stores/session";
 
 const api_url = import.meta.env.VITE_API_URL;
 
@@ -6,6 +7,8 @@ if (api_url === undefined) console.error("VITE_API_URL env var is not defined");
 
 export async function checkLogin() {
   if (typeof window === "undefined") return;
+  if (location.pathname === "/auth") return;
+  if (location.pathname === "/logged-out") return;
 
   const url = new URL(location.href);
   const code = url.searchParams.get("code");
@@ -13,24 +16,24 @@ export async function checkLogin() {
   if (code) {
     const response = await fetch(`${api_url}/auth/callback?code=${code}`);
     if (response.status === 201) {
-      const token = await response.text();
+      const session = (await response.json()) as SessionData;
+      setSession(session);
       localStorage.removeItem(LS_REDIRECTED_TO_LOGIN);
-      localStorage.setItem(LS_TOKEN, token);
-      return state;
+      localStorage.setItem(LS_TOKEN, session.token);
+      return { state };
     }
 
     if (
       response.status !== 201 &&
       localStorage.getItem(LS_REDIRECTED_TO_LOGIN)
     ) {
-      alert("There was a problem attempting to login, please try again later.");
       localStorage.removeItem(LS_REDIRECTED_TO_LOGIN);
+      location.assign("/auth");
       return;
     }
   }
 
   const token = localStorage.getItem(LS_TOKEN);
-
   const newUrl = new URL(location.href);
   newUrl.searchParams.delete("code");
   const originalUrlPath = encodeURIComponent(
@@ -47,6 +50,6 @@ export async function checkLogin() {
     localStorage.setItem(LS_REDIRECTED_TO_LOGIN, "true");
     // we are redirecting to login
     const { authorizationUrl } = await response.json();
-    location.assign(authorizationUrl);
+    return { authorizationUrl, originalUrlPath };
   }
 }

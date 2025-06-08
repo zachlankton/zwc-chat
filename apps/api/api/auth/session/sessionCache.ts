@@ -12,7 +12,9 @@ export interface SessionData {
 	name: string | null;
 	imgSrc: string | null;
 	roles: string[];
+	isSubscribed: boolean;
 	token: string;
+	data: string;
 	expiresAt: Date;
 	requestTimestampHistory: number[];
 	requestPerSecondLimit: string;

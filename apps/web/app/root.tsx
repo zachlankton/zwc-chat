@@ -51,8 +51,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export async function clientLoader() {
-  const state = await checkLogin();
-  if (state) redirect(state);
+  const ret = await checkLogin();
+  if (ret === undefined) return;
+  if (ret.state) location.assign(ret.state);
+  if (ret.authorizationUrl) {
+    const newUrl = new URL(location.origin);
+    newUrl.pathname = "/auth";
+    newUrl.searchParams.set("authorizationUrl", ret.authorizationUrl);
+    location.assign(newUrl.toString());
+  }
 }
 
 export default function App() {

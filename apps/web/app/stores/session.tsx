@@ -8,6 +8,7 @@ export interface SessionData {
   name: string | null;
   imgSrc: string | null;
   roles: string[];
+  isSubscribed: boolean;
   token: string;
   expiresAt: Date;
   requestTimestampHistory: number[];
@@ -21,6 +22,10 @@ export const SESSION_Q_STALETIME = ONE_MINUTE;
 
 export function getSession() {
   return queryClient.getQueryData([SESSION_Q_KEY]) as SessionData | undefined;
+}
+
+export function setSession(sess: SessionData) {
+  return queryClient.setQueryData([SESSION_Q_KEY], sess);
 }
 
 export const sessionQuery: FetchQueryOptions<SessionData> = {
