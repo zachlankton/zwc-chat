@@ -20,16 +20,36 @@ function CodeBlock({
   children,
   className,
 }: {
-  children: string;
+  children: React.ReactNode;
   className?: string;
 }) {
   const [copied, setCopied] = React.useState(false);
-  const language = className?.replace("language-", "") || "text";
+  const codeRef = React.useRef<HTMLElement>(null);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(children);
+  const handleCopy = async () => {
+    navigator.clipboard.writeText(codeRef?.current?.textContent ?? "");
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+
+    if (navigator?.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(
+          codeRef?.current?.textContent ?? "",
+        );
+        setCopied(true);
+      } catch (_) {
+        /* noop – could toast */
+      }
+    } else {
+      // fallback for http / older browsers
+      const textarea = document.createElement("textarea");
+      textarea.value = codeRef?.current?.textContent ?? "";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      setCopied(true);
+    }
   };
 
   return (
@@ -50,7 +70,7 @@ function CodeBlock({
       </div>
       <div className="overflow-x-auto">
         <pre className={cn("hljs", className)}>
-          <code>{children}</code>
+          <code ref={codeRef}>{children}</code>
         </pre>
       </div>
     </div>
@@ -343,43 +363,20 @@ Is there anything specific you'd like to know?`,
                         remarkPlugins={[remarkGfm]}
                         rehypePlugins={[rehypeHighlight]}
                         components={{
-                          pre: ({ children, ...props }) => (
-                            <pre {...props} className="not-prose">
-                              {children}
-                            </pre>
-                          ),
-                          code: ({ children, className, ...props }) => {
+                          code: ({ children, className }) => {
                             const isInline = !className;
-                            
-                            // Extract text content from children
-                            const getTextContent = (node: React.ReactNode): string => {
-                              if (typeof node === 'string') return node;
-                              if (typeof node === 'number') return String(node);
-                              if (Array.isArray(node)) return node.map(getTextContent).join('');
-                              if (React.isValidElement(node)) {
-                                const element = node as React.ReactElement<{children?: React.ReactNode}>;
-                                if (element.props?.children) {
-                                  return getTextContent(element.props.children);
-                                }
-                              }
-                              return '';
-                            };
-                            
+
                             if (isInline) {
                               return (
-                                <code
-                                  className="px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-sm"
-                                  {...props}
-                                >
+                                <code className="px-1 py-0.5 bg-primary text-primary-foreground rounded text-sm">
                                   {children}
                                 </code>
                               );
                             }
-                            
-                            const codeContent = getTextContent(children).replace(/\n$/, "");
+
                             return (
                               <CodeBlock className={className}>
-                                {codeContent}
+                                {children}
                               </CodeBlock>
                             );
                           },
@@ -463,4 +460,3 @@ Is there anything specific you'd like to know?`,
     </div>
   );
 }
-

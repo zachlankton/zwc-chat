@@ -56,13 +56,14 @@
   margin-top: 1em;
   margin-bottom: 1em;
   border-radius: 0.5rem;
-  background-color: #1a1b26;
+  background-color: var(--color-code-bg);
   padding: 1rem;
   overflow-x: auto;
 }
 
 .prose pre code {
   background: transparent;
+	color: var(--color-foreground);
   padding: 0;
   font-size: 0.875rem;
   line-height: 1.5;
@@ -91,22 +92,13 @@
   font-weight: 600;
 }
 
-/* Dark mode adjustments */
-.dark .prose pre {
-  background-color: #1a1b26;
-}
-
-.dark .prose code {
-  color: #e9ecef;
-}
-
 /* Syntax highlighting adjustments */
 .hljs {
   display: block;
   overflow-x: auto;
   padding: 1em;
-  background: #1a1b26;
-  color: #a9b1d6;
+	background: var(--color-background);
+  color: var(--color-foreground);
   border-radius: 0.5rem;
 }
 
@@ -115,7 +107,7 @@
 .hljs-literal,
 .hljs-section,
 .hljs-link {
-  color: #bb9af7;
+  color: var(--color-syntax-keyword);
 }
 
 .hljs-string,
@@ -123,13 +115,13 @@
 .hljs-regexp,
 .hljs-attribute,
 .hljs-addition {
-  color: #9ece6a;
+  color: var(--color-syntax-string);
 }
 
 .hljs-comment,
 .hljs-quote,
 .hljs-meta {
-  color: #565f89;
+  color: var(--color-syntax-comment);
 }
 
 .hljs-variable,
@@ -140,7 +132,7 @@
 .hljs-selector-class,
 .hljs-type,
 .hljs-title {
-  color: #7aa2f7;
+  color: var(--color-syntax-variable);
 }
 
 .hljs-symbol,
@@ -148,5 +140,5 @@
 .hljs-number,
 .hljs-params,
 .hljs-built_in {
-  color: #ff9e64;
+  color: var(--color-syntax-number);
 }
