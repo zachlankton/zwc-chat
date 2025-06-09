@@ -18,7 +18,19 @@ export interface SessionData {
 const ONE_MINUTE = 1000 * 60;
 export const SESSION_Q_KEY = "SESSION";
 export const SESSION_Q_FUN = () => get<SessionData>(`/auth/session`);
+export const SESSION_Q_FUN_W_PATH = (path: string) =>
+  get<SessionData & { status: number; authorizationUrl: string }>(
+    `/auth/session?return=${path}`,
+  );
 export const SESSION_Q_STALETIME = ONE_MINUTE;
+
+export function fetchSession(originalUrlPath: string) {
+  return queryClient.fetchQuery({
+    queryKey: [SESSION_Q_KEY],
+    queryFn: () => SESSION_Q_FUN_W_PATH(originalUrlPath),
+    staleTime: ONE_MINUTE * 5,
+  });
+}
 
 export function getSession() {
   return queryClient.getQueryData([SESSION_Q_KEY]) as SessionData | undefined;

@@ -1,4 +1,7 @@
-import { sessionCache, type SessionData } from "../api/auth/session/sessionCache";
+import {
+	sessionCache,
+	type SessionData,
+} from "../api/auth/session/sessionCache";
 import { getSessionsCollection } from "./database";
 
 export async function getSession(token: string): Promise<SessionData | null> {
@@ -13,7 +16,7 @@ export async function getSession(token: string): Promise<SessionData | null> {
 	try {
 		const sessions = await getSessionsCollection();
 		const dbSession = await sessions.findOne({ token });
-		
+
 		if (dbSession) {
 			console.log("Session found in MongoDB:", dbSession.email);
 			// Restore session to cache
@@ -27,18 +30,17 @@ export async function getSession(token: string): Promise<SessionData | null> {
 	return null;
 }
 
-export async function setSession(token: string, session: SessionData): Promise<void> {
+export async function setSession(
+	token: string,
+	session: SessionData
+): Promise<void> {
 	// Set in cache
 	sessionCache.set(token, session);
 
 	// Also save to MongoDB
 	try {
 		const sessions = await getSessionsCollection();
-		await sessions.replaceOne(
-			{ token },
-			session,
-			{ upsert: true }
-		);
+		await sessions.replaceOne({ token }, session, { upsert: true });
 		console.log("Session saved to MongoDB:", session.email);
 	} catch (error) {
 		console.error("Error saving session to MongoDB:", error);
@@ -59,6 +61,9 @@ export async function deleteSession(token: string): Promise<void> {
 	}
 }
 
-export async function updateSessionInStorage(session: SessionData): Promise<void> {
+export async function updateSessionInStorage(
+	session: SessionData
+): Promise<void> {
 	await setSession(session.token, session);
 }
+

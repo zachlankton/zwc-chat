@@ -1,19 +1,35 @@
 import { MongoClient, Db, Collection } from "mongodb";
 import type { SessionData } from "../api/auth/session/sessionCache";
 
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://zwc-chat:asdfasdf@localhost:27017/zwc-chat?authSource=admin";
-const DB_NAME = process.env.MONGODB_DB_NAME || "zwc-chat";
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+	throw new Error("MONGODB_URI environment variable is not set");
+}
+const DB_NAME = process.env.MONGODB_DB_NAME;
+if (!DB_NAME) {
+	throw new Error("MONGODB_DB_NAME environment variable is not set");
+}
 
-let client: MongoClient | null = null;
-let db: Db | null = null;
+export let db: Db | null = null;
+export let sessionCollection: Collection<SessionData> | null = null;
+
+let client: MongoClient | null = new MongoClient(MONGODB_URI, {
+	minPoolSize: 5,
+	maxPoolSize: 100,
+	maxConnecting: 10,
+	serverSelectionTimeoutMS: 5000,
+	socketTimeoutMS: 45000,
+});
 
 export async function connectToDatabase(): Promise<Db> {
 	if (db) return db;
 
 	try {
-		client = new MongoClient(MONGODB_URI);
+		if (!client) throw "client is null";
 		await client.connect();
 		db = client.db(DB_NAME);
+		sessionCollection = db.collection<SessionData>("sessions");
+		createIndexes();
 		console.log("Connected to MongoDB");
 		return db;
 	} catch (error) {
@@ -22,17 +38,9 @@ export async function connectToDatabase(): Promise<Db> {
 	}
 }
 
-export async function getSessionsCollection(): Promise<Collection<SessionData>> {
-	const database = await connectToDatabase();
-	const collection = database.collection<SessionData>("sessions");
-	
-	// Create index on token field for faster lookups
-	await collection.createIndex({ token: 1 }, { unique: true });
-	
-	// Create TTL index on expiresAt to automatically remove expired sessions
-	await collection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-	
-	return collection;
+export async function getSessionsCollection() {
+	if (!sessionCollection) throw "sessionCollection is null";
+	return sessionCollection;
 }
 
 export async function closeDatabase() {
@@ -42,3 +50,18 @@ export async function closeDatabase() {
 		db = null;
 	}
 }
+
+async function createIndexes() {
+	console.log("Creating Indexes");
+	if (sessionCollection) {
+		// Create index on token field for faster lookups
+		await sessionCollection.createIndex({ token: 1 }, { unique: true });
+
+		// Create TTL index on expiresAt to automatically remove expired sessions
+		await sessionCollection.createIndex(
+			{ expiresAt: 1 },
+			{ expireAfterSeconds: 0 }
+		);
+	}
+}
+

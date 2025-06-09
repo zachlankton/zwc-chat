@@ -4,7 +4,6 @@ import {
   Links,
   Meta,
   Outlet,
-  redirect,
   Scripts,
   ScrollRestoration,
 } from "react-router";
@@ -52,6 +51,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
 export async function clientLoader() {
   const ret = await checkLogin();
+  console.log(ret);
   if (ret === undefined) return;
   if (ret.state) location.assign(ret.state);
   if (ret.authorizationUrl) {

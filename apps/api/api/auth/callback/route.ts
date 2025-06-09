@@ -3,7 +3,6 @@ import { apiHandler } from "lib/utils";
 
 import { WorkOS } from "@workos-inc/node";
 import {
-	sessionCache,
 	type RequestWithSession,
 	type SessionData,
 } from "../session/sessionCache";
