@@ -313,11 +313,21 @@ This example demonstrates:
   ]);
 
   const textRef = React.useRef<HTMLTextAreaElement>(null);
+  const streamingRef = React.useRef<NodeJS.Timeout | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [streamingMessageId, setStreamingMessageId] = React.useState<
     string | null
   >(null);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+
+  // Add cleanup effect
+  React.useEffect(() => {
+    return () => {
+      if (streamingRef.current) {
+        clearInterval(streamingRef.current);
+      }
+    };
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -387,10 +397,13 @@ This example demonstrates:
       } else {
         // Streaming complete
         clearInterval(streamInterval);
+        streamingRef.current = null;
         setIsLoading(false);
         setStreamingMessageId(null);
       }
     }, 50); // 50ms between tokens for smooth streaming effect
+
+    streamingRef.current = streamInterval;
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
