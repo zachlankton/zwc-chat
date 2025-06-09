@@ -2,7 +2,10 @@ import {
 	userIsSuperAdmin,
 	type RequestWithSession,
 } from "api/auth/session/sessionCache";
-import { getCurrentSession } from "api/auth/session/utils";
+import {
+	getCurrentSession,
+	validateAdminKeyHeader,
+} from "api/auth/session/utils";
 import { runtimeOptions } from "lib/logging";
 import { apiHandler, noPermission, notAuthorized } from "lib/utils";
 
@@ -15,22 +18,8 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 	return Response.json(runtimeOptions);
 });
 
-/*
-This current setup assumes only one container is running.
-If multiple containers are running, we need to come up with
-a way to distribute these POST requests to all containers.
-Thinking of having each server register itself at start up
-with the postgres db and store it private subnet address.
-Then we can send the POST request to the private subnet address
-and it will be routed to the correct server.
-Lots to think about here tho... like how to handle removing
-stale servers from the db, etc...
-*/
 export const POST = apiHandler(async (req: RequestWithSession) => {
-	await getCurrentSession(req);
-	if (!req.session) throw notAuthorized();
-	const isSuperAdmin = userIsSuperAdmin(req);
-	if (!isSuperAdmin) throw noPermission("Only super admins can set options");
+	validateAdminKeyHeader(req);
 
 	const body = await req.json().catch(() => {});
 

@@ -1,7 +1,7 @@
 import { randomBytes } from "crypto";
 import type { RequestWithSession, SessionData } from "./sessionCache";
 import { updateSessionExpiry, sessionCache } from "./sessionCache";
-import { internalServerError, rateLimitError } from "lib/utils";
+import { internalServerError, notAuthorized, rateLimitError } from "lib/utils";
 import { asyncLocalStorage } from "lib/asyncLocalStore";
 
 export const userDefaultRateLimit = "5:1";
@@ -34,6 +34,20 @@ export async function updateSession(sess: SessionData, user: any) {
 
 export async function deleteSession(sessionId: string) {
 	sessionCache.delete(sessionId);
+}
+
+const adminKey = process.env.ADMIN_KEY;
+if (!adminKey) throw "ADMIN_KEY env var is not set";
+
+export function validateAdminKeyHeader(req: RequestWithSession) {
+	const authHeader = req.headers.get("authorization");
+	if (!authHeader) {
+		return null;
+	}
+
+	const authorization = authHeader?.slice(7);
+
+	if (authorization !== adminKey) throw notAuthorized();
 }
 
 export async function getCurrentSession(req: RequestWithSession) {
