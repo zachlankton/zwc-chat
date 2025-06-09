@@ -33,6 +33,7 @@ function CodeBlock({
           codeRef?.current?.textContent ?? "",
         );
         setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
       } catch (_) {
         /* noop – could toast */
       }
@@ -45,6 +46,7 @@ function CodeBlock({
       document.execCommand("copy");
       document.body.removeChild(textarea);
       setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -449,7 +451,7 @@ This example demonstrates:
                         rehypePlugins={[rehypeHighlight]}
                         components={{
                           code: ({ children, className }) => {
-                            const isInline = !className;
+                            const isInline = !className?.includes("language-");
 
                             if (isInline) {
                               return (
