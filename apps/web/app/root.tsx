@@ -10,6 +10,7 @@ import {
 
 import type { Route } from "./+types/root";
 import "./app.css";
+import "./styles/markdown.css";
 import { LoadingPage } from "~/components/loading-page";
 import { checkLogin } from "../login";
 import { ThemeProvider } from "./providers/theme-provider.js";

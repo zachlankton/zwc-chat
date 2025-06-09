@@ -1,9 +1,13 @@
 import * as React from "react";
-import { Send, Paperclip, Mic, MoreVertical } from "lucide-react";
+import { Send, Paperclip, Mic, Copy, Check } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Textarea } from "~/components/ui/textarea";
 import { cn } from "~/lib/utils";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
+import "highlight.js/styles/github-dark.css";
 
 interface Message {
   id: string;
@@ -12,29 +16,342 @@ interface Message {
   timestamp: Date;
 }
 
+function CodeBlock({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const [copied, setCopied] = React.useState(false);
+  const codeRef = React.useRef<HTMLElement>(null);
+
+  const handleCopy = async () => {
+    if (navigator?.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(
+          codeRef?.current?.textContent ?? "",
+        );
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (_) {
+        /* noop – could toast */
+      }
+    } else {
+      // fallback for http / older browsers
+      const textarea = document.createElement("textarea");
+      textarea.value = codeRef?.current?.textContent ?? "";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <div className="relative group">
+      <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          aria-label={
+            copied ? "Code copied to clipboard" : "Copy code to clipboard"
+          }
+          title={copied ? "Copied!" : "Copy code"}
+          onClick={handleCopy}
+        >
+          {copied ? (
+            <Check className="h-4 w-4" />
+          ) : (
+            <Copy className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+      <div className="overflow-x-auto">
+        <pre className={cn("hljs", className)}>
+          <code ref={codeRef}>{children}</code>
+        </pre>
+      </div>
+    </div>
+  );
+}
+
+// Streaming demo content
+const DEMO_STREAMING_MESSAGE = `I'll analyze this for you! Here's a comprehensive example with **markdown**, code, and more:
+
+## Understanding React Hooks
+
+React hooks are functions that let you "hook into" React features. Here are the most common ones:
+
+### 1. useState Hook
+The \`useState\` hook lets you add state to functional components:
+
+\`\`\`javascript
+import React, { useState } from 'react';
+
+function Counter() {
+  const [count, setCount] = useState(0);
+  
+  return (
+    <div>
+      <p>You clicked {count} times</p>
+      <button onClick={() => setCount(count + 1)}>
+        Click me
+      </button>
+    </div>
+  );
+}
+\`\`\`
+
+### 2. useEffect Hook
+The \`useEffect\` hook lets you perform side effects:
+
+\`\`\`javascript
+useEffect(() => {
+  // This runs after every render
+  document.title = \`Count: \${count}\`;
+  
+  // Cleanup function (optional)
+  return () => {
+    console.log('Cleanup!');
+  };
+}, [count]); // Only re-run if count changes
+\`\`\`
+
+### Key Benefits:
+- **Simpler code** - No need for class components
+- **Better logic reuse** - Custom hooks share stateful logic
+- **Easier testing** - Functions are easier to test than classes
+
+> **Pro tip:** Always follow the Rules of Hooks - only call hooks at the top level and only from React functions!
+
+Would you like me to explain any specific hook in more detail?`;
+
 export function ChatInterface() {
   const [messages, setMessages] = React.useState<Message[]>([
     {
       id: "1",
-      content: "Hello! How can I help you today?",
+      content:
+        "Hello! I can help you with **programming**, *markdown formatting*, and more. What would you like to know?",
       role: "assistant",
-      timestamp: new Date(),
+      timestamp: new Date(Date.now() - 3600000),
+    },
+    {
+      id: "2",
+      content:
+        "Can you show me how to create a React component with TypeScript?",
+      role: "user",
+      timestamp: new Date(Date.now() - 3000000),
+    },
+    {
+      id: "3",
+      content: `Sure! Here's a complete example of a React component with TypeScript:
+
+## Basic Function Component
+
+\`\`\`typescript
+import React from 'react';
+
+interface ButtonProps {
+  label: string;
+  onClick: () => void;
+  variant?: 'primary' | 'secondary';
+  disabled?: boolean;
+}
+
+const Button: React.FC<ButtonProps> = ({ 
+  label, 
+  onClick, 
+  variant = 'primary',
+  disabled = false 
+}) => {
+  return (
+    <button
+      className={\`btn btn-\${variant}\`}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {label}
+    </button>
+  );
+};
+
+export default Button;
+\`\`\`
+
+### Key Features:
+1. **Type Safety** - Props are fully typed
+2. **Default Values** - Using ES6 default parameters
+3. **Optional Props** - marked with \`?\`
+
+### Usage Example:
+
+\`\`\`tsx
+<Button 
+  label="Click me!" 
+  onClick={() => console.log('Clicked!')}
+  variant="primary"
+/>
+\`\`\`
+
+You can also create more complex components with hooks:
+
+\`\`\`typescript
+import React, { useState, useEffect } from 'react';
+
+const Counter: React.FC = () => {
+  const [count, setCount] = useState<number>(0);
+  
+  useEffect(() => {
+    document.title = \`Count: \${count}\`;
+  }, [count]);
+  
+  return (
+    <div>
+      <p>Count: {count}</p>
+      <button onClick={() => setCount(count + 1)}>
+        Increment
+      </button>
+    </div>
+  );
+};
+\`\`\``,
+      role: "assistant",
+      timestamp: new Date(Date.now() - 2400000),
+    },
+    {
+      id: "4",
+      content:
+        "That's helpful! Can you also show me a Python example with some data analysis?",
+      role: "user",
+      timestamp: new Date(Date.now() - 1800000),
+    },
+    {
+      id: "5",
+      content: `Of course! Here's a Python data analysis example using pandas and matplotlib:
+
+## Data Analysis with Python
+
+\`\`\`python
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Create sample data
+data = {
+    'Month': ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+    'Sales': [45000, 52000, 48000, 61000, 58000, 67000],
+    'Expenses': [35000, 38000, 36000, 42000, 40000, 45000]
+}
+
+# Create DataFrame
+df = pd.DataFrame(data)
+
+# Calculate profit
+df['Profit'] = df['Sales'] - df['Expenses']
+
+# Basic statistics
+print("Sales Statistics:")
+print(df['Sales'].describe())
+print("\\nProfit Margin:")
+df['Profit_Margin'] = (df['Profit'] / df['Sales']) * 100
+print(df[['Month', 'Profit_Margin']])
+
+# Visualization
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+# Bar chart
+ax1.bar(df['Month'], df['Sales'], label='Sales', alpha=0.7)
+ax1.bar(df['Month'], df['Expenses'], label='Expenses', alpha=0.7)
+ax1.set_title('Monthly Sales vs Expenses')
+ax1.set_ylabel('Amount ($)')
+ax1.legend()
+
+# Line chart
+ax2.plot(df['Month'], df['Profit'], marker='o', linewidth=2)
+ax2.set_title('Monthly Profit Trend')
+ax2.set_ylabel('Profit ($)')
+ax2.grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.show()
+\`\`\`
+
+### Output Example:
+\`\`\`
+Sales Statistics:
+count        6.000000
+mean     55166.666667
+std       7943.280813
+min      45000.000000
+25%      48750.000000
+50%      55000.000000
+75%      60250.000000
+max      67000.000000
+
+Profit Margin:
+  Month  Profit_Margin
+0   Jan      22.222222
+1   Feb      26.923077
+2   Mar      25.000000
+3   Apr      31.147541
+4   May      31.034483
+5   Jun      32.835821
+\`\`\`
+
+This example demonstrates:
+- **Data manipulation** with pandas
+- **Statistical analysis** using describe()
+- **Data visualization** with matplotlib
+- **Profit calculation** and margin analysis`,
+      role: "assistant",
+      timestamp: new Date(Date.now() - 600000),
     },
   ]);
-  const [input, setInput] = React.useState("");
+
+  const textRef = React.useRef<HTMLTextAreaElement>(null);
+  const streamingRef = React.useRef<NodeJS.Timeout | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [streamingMessageId, setStreamingMessageId] = React.useState<
+    string | null
+  >(null);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+
+  // Add cleanup effect
+  React.useEffect(() => {
+    return () => {
+      if (streamingRef.current) {
+        clearInterval(streamingRef.current);
+      }
+    };
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  const scrollNewMessage = () => {
+    // Get all elements with the class and take the last one
+    const elements = document.querySelectorAll(".user-message");
+    const lastElement = elements[elements.length - 1];
+    if (!lastElement) return;
+    lastElement.parentElement?.parentElement?.parentElement?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
   React.useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!textRef.current) return;
+    const input = textRef.current.value ?? "";
     if (!input.trim() || isLoading) return;
 
     const userMessage: Message = {
@@ -45,20 +362,48 @@ export function ChatInterface() {
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    setInput("");
+    textRef.current.value = "";
     setIsLoading(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: "I'm a demo response. In a real app, this would be connected to an AI service.",
-        role: "assistant",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
-      setIsLoading(false);
-    }, 1000);
+    // Create empty assistant message to start streaming
+    const assistantMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      content: "",
+      role: "assistant",
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, assistantMessage]);
+    setStreamingMessageId(assistantMessage.id);
+    setTimeout(scrollNewMessage, 100);
+
+    // Simulate streaming response
+    const tokens = DEMO_STREAMING_MESSAGE.split(" ");
+    let currentIndex = 0;
+
+    const streamInterval = setInterval(() => {
+      if (currentIndex < tokens.length) {
+        // Add next token
+        const nextToken =
+          tokens[currentIndex] + (currentIndex < tokens.length - 1 ? " " : "");
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMessage.id
+              ? { ...msg, content: msg.content + nextToken }
+              : msg,
+          ),
+        );
+        currentIndex++;
+      } else {
+        // Streaming complete
+        clearInterval(streamInterval);
+        streamingRef.current = null;
+        setIsLoading(false);
+        setStreamingMessageId(null);
+      }
+    }, 50); // 50ms between tokens for smooth streaming effect
+
+    streamingRef.current = streamInterval;
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -78,7 +423,7 @@ export function ChatInterface() {
               key={message.id}
               className={cn(
                 "flex gap-3 py-4",
-                message.role === "user" ? "flex-row-reverse" : ""
+                message.role === "user" ? "flex-row-reverse" : "",
               )}
             >
               <Avatar className="h-8 w-8">
@@ -97,7 +442,7 @@ export function ChatInterface() {
               <div
                 className={cn(
                   "flex-1 space-y-2",
-                  message.role === "user" ? "flex flex-col items-end" : ""
+                  message.role === "user" ? "flex flex-col items-end" : "",
                 )}
               >
                 <div
@@ -105,33 +450,66 @@ export function ChatInterface() {
                     "rounded-lg px-4 py-2 max-w-[80%]",
                     message.role === "user"
                       ? "bg-primary text-primary-foreground"
-                      : "bg-muted"
+                      : "bg-muted",
                   )}
                 >
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  {message.role === "user" ? (
+                    <p className="text-sm whitespace-pre-wrap user-message">
+                      {message.content}
+                    </p>
+                  ) : (
+                    <div className="prose prose-sm max-w-none">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        rehypePlugins={[rehypeHighlight]}
+                        components={{
+                          code: ({ children, className }) => {
+                            const isInline = !className?.includes("language-");
+
+                            if (isInline) {
+                              return (
+                                <code className="px-1 py-0.5 bg-primary text-primary-foreground rounded text-sm">
+                                  {children}
+                                </code>
+                              );
+                            }
+
+                            return (
+                              <CodeBlock className={className}>
+                                {children}
+                              </CodeBlock>
+                            );
+                          },
+                        }}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                      {isLoading && streamingMessageId === message.id ? (
+                        <div className="flex gap-3 py-4">
+                          <div className="flex-1">
+                            <div className="bg-muted rounded-lg px-4 py-2 max-w-[80%]">
+                              <div className="flex space-x-1">
+                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" />
+                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-100" />
+                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-200" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {message.timestamp.toLocaleTimeString()}
                 </p>
+                {isLoading && streamingMessageId === message.id ? (
+                  <div className="h-lvh" />
+                ) : null}
               </div>
             </div>
           ))}
-          {isLoading && (
-            <div className="flex gap-3 py-4">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback>AI</AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <div className="bg-muted rounded-lg px-4 py-2 max-w-[80%]">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" />
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-100" />
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-200" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+
           <div ref={messagesEndRef} />
         </div>
       </div>
@@ -150,8 +528,7 @@ export function ChatInterface() {
             </Button>
             <div className="flex-1 relative">
               <Textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
+                ref={textRef}
                 onKeyDown={handleKeyDown}
                 placeholder="Type your message..."
                 className="min-h-[60px] max-h-[200px] pr-12 resize-none"
@@ -161,7 +538,7 @@ export function ChatInterface() {
                 type="submit"
                 size="icon"
                 className="absolute bottom-2 right-2 h-8 w-8"
-                disabled={!input.trim() || isLoading}
+                disabled={isLoading}
               >
                 <Send className="h-4 w-4" />
               </Button>
