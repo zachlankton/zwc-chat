@@ -1,0 +1,152 @@
+/* Markdown styling for chat messages */
+.prose {
+  color: inherit;
+}
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+  margin-top: 1.5em;
+  margin-bottom: 0.75em;
+  font-weight: 600;
+}
+
+.prose h1:first-child,
+.prose h2:first-child,
+.prose h3:first-child {
+  margin-top: 0;
+}
+
+.prose p {
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+}
+
+.prose p:first-child {
+  margin-top: 0;
+}
+
+.prose p:last-child {
+  margin-bottom: 0;
+}
+
+.prose ul,
+.prose ol {
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+  padding-left: 1.5em;
+}
+
+.prose li {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+.prose blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 1em;
+  margin-left: 0;
+  font-style: italic;
+}
+
+.prose pre {
+  margin-top: 1em;
+  margin-bottom: 1em;
+  border-radius: 0.5rem;
+  background-color: #1a1b26;
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+.prose pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.prose code {
+  font-size: 0.875em;
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+.prose th,
+.prose td {
+  border: 1px solid var(--border);
+  padding: 0.5em;
+  text-align: left;
+}
+
+.prose th {
+  background-color: var(--muted);
+  font-weight: 600;
+}
+
+/* Dark mode adjustments */
+.dark .prose pre {
+  background-color: #1a1b26;
+}
+
+.dark .prose code {
+  color: #e9ecef;
+}
+
+/* Syntax highlighting adjustments */
+.hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 1em;
+  background: #1a1b26;
+  color: #a9b1d6;
+  border-radius: 0.5rem;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-section,
+.hljs-link {
+  color: #bb9af7;
+}
+
+.hljs-string,
+.hljs-subst,
+.hljs-regexp,
+.hljs-attribute,
+.hljs-addition {
+  color: #9ece6a;
+}
+
+.hljs-comment,
+.hljs-quote,
+.hljs-meta {
+  color: #565f89;
+}
+
+.hljs-variable,
+.hljs-template-variable,
+.hljs-attr,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-type,
+.hljs-title {
+  color: #7aa2f7;
+}
+
+.hljs-symbol,
+.hljs-bullet,
+.hljs-number,
+.hljs-params,
+.hljs-built_in {
+  color: #ff9e64;
+}
