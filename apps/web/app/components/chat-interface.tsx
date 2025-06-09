@@ -27,10 +27,6 @@ function CodeBlock({
   const codeRef = React.useRef<HTMLElement>(null);
 
   const handleCopy = async () => {
-    navigator.clipboard.writeText(codeRef?.current?.textContent ?? "");
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-
     if (navigator?.clipboard?.writeText) {
       try {
         await navigator.clipboard.writeText(
@@ -59,6 +55,10 @@ function CodeBlock({
           variant="ghost"
           size="icon"
           className="h-8 w-8"
+          aria-label={
+            copied ? "Code copied to clipboard" : "Copy code to clipboard"
+          }
+          title={copied ? "Copied!" : "Copy code"}
           onClick={handleCopy}
         >
           {copied ? (
