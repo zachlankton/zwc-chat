@@ -3,6 +3,7 @@ import type { RequestWithSession, SessionData } from "./sessionCache";
 import { updateSessionExpiry, sessionCache } from "./sessionCache";
 import { internalServerError, notAuthorized, rateLimitError } from "lib/utils";
 import { asyncLocalStorage } from "lib/asyncLocalStore";
+import { getSession, setSession, deleteSession as deleteSessionFromStorage } from "lib/sessionStorage";
 
 export const userDefaultRateLimit = "5:1";
 
@@ -14,7 +15,7 @@ export async function createSession(user: any) {
 		requestPerSecondLimit: user.requestPerSecondLimit ?? userDefaultRateLimit,
 	};
 
-	sessionCache.set(userSession.token, userSession);
+	await setSession(userSession.token, userSession);
 
 	return userSession;
 }
@@ -27,13 +28,13 @@ export async function updateSession(sess: SessionData, user: any) {
 
 	// update session in db
 	console.log("Updating Session into DB", user.email);
-	sessionCache.set(userSession.token, userSession);
+	await setSession(userSession.token, userSession);
 
 	return userSession;
 }
 
 export async function deleteSession(sessionId: string) {
-	sessionCache.delete(sessionId);
+	await deleteSessionFromStorage(sessionId);
 }
 
 const adminKey = process.env.ADMIN_KEY;
@@ -57,16 +58,16 @@ export async function getCurrentSession(req: RequestWithSession) {
 	}
 	const authorization = authHeader?.slice(7);
 
-	//attempt cache first
-	const cacheSession = sessionCache.get(authorization);
+	//attempt cache first, then MongoDB
+	const session = await getSession(authorization);
 
 	// if empty return early
-	if (!cacheSession) {
+	if (!session) {
 		console.log("No Session Found for token: ", authorization);
 		return null;
 	}
 
-	req.session = cacheSession;
+	req.session = session;
 	await updateSessionExpiry(req.session);
 
 	const reqCtx = asyncLocalStorage.getStore();

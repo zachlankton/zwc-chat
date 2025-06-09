@@ -1,4 +1,5 @@
 import { notAuthorized } from "lib/utils";
+import { updateSessionInStorage } from "lib/sessionStorage";
 
 export const sessionCache = new Map<string, SessionData>();
 
@@ -42,7 +43,7 @@ export async function updateSessionExpiry(sess: SessionData) {
 	if (timeLeft < 1000 * 60 * 50) {
 		sess.expiresAt = new Date(Date.now() + 1000 * 60 * 60);
 
-		sessionCache.set(sess.token, sess);
+		await updateSessionInStorage(sess);
 		console.log("Updated session expiry", sess.email, sess.token);
 	}
 }

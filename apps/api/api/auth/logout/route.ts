@@ -2,6 +2,7 @@ import { apiHandler, notAuthorized } from "lib/utils";
 import { getCurrentSession } from "../session/utils";
 import { sessionCache } from "../session/sessionCache";
 import { WorkOS } from "@workos-inc/node";
+import { deleteSession } from "lib/sessionStorage";
 
 const workosApiKey = process.env.WORKOS_API_KEY;
 const clientId = process.env.WORKOS_CLIENT_ID;
@@ -33,7 +34,7 @@ export const POST = apiHandler(async (req: any) => {
 	const logOutUrl = await workOsSession.getLogoutUrl();
 
 	// delete session
-	sessionCache.delete(authorization);
+	await deleteSession(authorization);
 
 	return Response.json({ logOutUrl });
 });

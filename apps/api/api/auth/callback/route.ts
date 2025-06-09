@@ -8,6 +8,7 @@ import {
 	type SessionData,
 } from "../session/sessionCache";
 import { userDefaultRateLimit } from "../session/utils";
+import { setSession } from "lib/sessionStorage";
 
 const workosApiKey = process.env.WORKOS_API_KEY;
 const clientId = process.env.WORKOS_CLIENT_ID;
@@ -53,7 +54,7 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 		requestTimestampHistory: [],
 	};
 
-	sessionCache.set(session.token, session);
+	await setSession(session.token, session);
 
 	// Redirect the user to the homepage
 	return Response.json(
