@@ -77,6 +77,57 @@ function CodeBlock({
   );
 }
 
+// Streaming demo content
+const DEMO_STREAMING_MESSAGE = `I'll analyze this for you! Here's a comprehensive example with **markdown**, code, and more:
+
+## Understanding React Hooks
+
+React hooks are functions that let you "hook into" React features. Here are the most common ones:
+
+### 1. useState Hook
+The \`useState\` hook lets you add state to functional components:
+
+\`\`\`javascript
+import React, { useState } from 'react';
+
+function Counter() {
+  const [count, setCount] = useState(0);
+  
+  return (
+    <div>
+      <p>You clicked {count} times</p>
+      <button onClick={() => setCount(count + 1)}>
+        Click me
+      </button>
+    </div>
+  );
+}
+\`\`\`
+
+### 2. useEffect Hook
+The \`useEffect\` hook lets you perform side effects:
+
+\`\`\`javascript
+useEffect(() => {
+  // This runs after every render
+  document.title = \`Count: \${count}\`;
+  
+  // Cleanup function (optional)
+  return () => {
+    console.log('Cleanup!');
+  };
+}, [count]); // Only re-run if count changes
+\`\`\`
+
+### Key Benefits:
+- **Simpler code** - No need for class components
+- **Better logic reuse** - Custom hooks share stateful logic
+- **Easier testing** - Functions are easier to test than classes
+
+> **Pro tip:** Always follow the Rules of Hooks - only call hooks at the top level and only from React functions!
+
+Would you like me to explain any specific hook in more detail?`;
+
 export function ChatInterface() {
   const [messages, setMessages] = React.useState<Message[]>([
     {
@@ -258,20 +309,37 @@ This example demonstrates:
       timestamp: new Date(Date.now() - 600000),
     },
   ]);
-  const [input, setInput] = React.useState("");
+
+  const textRef = React.useRef<HTMLTextAreaElement>(null);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [streamingMessageId, setStreamingMessageId] = React.useState<
+    string | null
+  >(null);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  const scrollNewMessage = () => {
+    // Get all elements with the class and take the last one
+    const elements = document.querySelectorAll(".user-message");
+    const lastElement = elements[elements.length - 1];
+    if (!lastElement) return;
+    lastElement.parentElement?.parentElement?.parentElement?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
   React.useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!textRef.current) return;
+    const input = textRef.current.value ?? "";
     if (!input.trim() || isLoading) return;
 
     const userMessage: Message = {
@@ -282,28 +350,45 @@ This example demonstrates:
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    setInput("");
+    textRef.current.value = "";
     setIsLoading(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: `I'll help you with that! Here's a quick example:
+    // Create empty assistant message to start streaming
+    const assistantMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      content: "",
+      role: "assistant",
+      timestamp: new Date(),
+    };
 
-\`\`\`javascript
-// Example code
-const greeting = "Hello, World!";
-console.log(greeting);
-\`\`\`
+    setMessages((prev) => [...prev, assistantMessage]);
+    setStreamingMessageId(assistantMessage.id);
+    setTimeout(scrollNewMessage, 100);
 
-Is there anything specific you'd like to know?`,
-        role: "assistant",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
-      setIsLoading(false);
-    }, 1000);
+    // Simulate streaming response
+    const tokens = DEMO_STREAMING_MESSAGE.split("");
+    let currentIndex = 0;
+
+    const streamInterval = setInterval(() => {
+      if (currentIndex < tokens.length) {
+        // Add next token
+        const nextToken =
+          tokens[currentIndex] + (currentIndex < tokens.length - 1 ? "" : "");
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMessage.id
+              ? { ...msg, content: msg.content + nextToken }
+              : msg,
+          ),
+        );
+        currentIndex++;
+      } else {
+        // Streaming complete
+        clearInterval(streamInterval);
+        setIsLoading(false);
+        setStreamingMessageId(null);
+      }
+    }, 50); // 50ms between tokens for smooth streaming effect
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -354,11 +439,11 @@ Is there anything specific you'd like to know?`,
                   )}
                 >
                   {message.role === "user" ? (
-                    <p className="text-sm whitespace-pre-wrap">
+                    <p className="text-sm whitespace-pre-wrap user-message">
                       {message.content}
                     </p>
                   ) : (
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                    <div className="prose prose-sm max-w-none">
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
                         rehypePlugins={[rehypeHighlight]}
@@ -384,31 +469,32 @@ Is there anything specific you'd like to know?`,
                       >
                         {message.content}
                       </ReactMarkdown>
+                      {isLoading && streamingMessageId === message.id ? (
+                        <div className="flex gap-3 py-4">
+                          <div className="flex-1">
+                            <div className="bg-muted rounded-lg px-4 py-2 max-w-[80%]">
+                              <div className="flex space-x-1">
+                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" />
+                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-100" />
+                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-200" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {message.timestamp.toLocaleTimeString()}
                 </p>
+                {isLoading && streamingMessageId === message.id ? (
+                  <div className="h-lvh" />
+                ) : null}
               </div>
             </div>
           ))}
-          {isLoading && (
-            <div className="flex gap-3 py-4">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback>AI</AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <div className="bg-muted rounded-lg px-4 py-2 max-w-[80%]">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" />
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-100" />
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-200" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+
           <div ref={messagesEndRef} />
         </div>
       </div>
@@ -427,8 +513,7 @@ Is there anything specific you'd like to know?`,
             </Button>
             <div className="flex-1 relative">
               <Textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
+                ref={textRef}
                 onKeyDown={handleKeyDown}
                 placeholder="Type your message..."
                 className="min-h-[60px] max-h-[200px] pr-12 resize-none"
@@ -438,7 +523,7 @@ Is there anything specific you'd like to know?`,
                 type="submit"
                 size="icon"
                 className="absolute bottom-2 right-2 h-8 w-8"
-                disabled={!input.trim() || isLoading}
+                disabled={isLoading}
               >
                 <Send className="h-4 w-4" />
               </Button>
