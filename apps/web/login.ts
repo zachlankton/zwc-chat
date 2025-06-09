@@ -1,5 +1,5 @@
 import { LS_REDIRECTED_TO_LOGIN, LS_TOKEN } from "~/lib/fetchWrapper";
-import { setSession, type SessionData } from "~/stores/session";
+import { fetchSession, setSession, type SessionData } from "~/stores/session";
 
 const api_url = import.meta.env.VITE_API_URL;
 
@@ -33,23 +33,17 @@ export async function checkLogin() {
     }
   }
 
-  const token = localStorage.getItem(LS_TOKEN);
   const newUrl = new URL(location.href);
   newUrl.searchParams.delete("code");
   const originalUrlPath = encodeURIComponent(
     `${newUrl.pathname}${newUrl.search}`,
   );
 
-  const response = await fetch(
-    `${api_url}/auth/session?return=${originalUrlPath}`,
-    {
-      headers: { Authorization: `Bearer ${token}` },
-    },
-  );
+  const response = await fetchSession(originalUrlPath);
   if (response.status === 302) {
     localStorage.setItem(LS_REDIRECTED_TO_LOGIN, "true");
     // we are redirecting to login
-    const { authorizationUrl } = await response.json();
+    const { authorizationUrl } = response;
     return { authorizationUrl, originalUrlPath };
   }
 }

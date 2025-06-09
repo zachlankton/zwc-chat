@@ -1,7 +1,7 @@
 import { apiHandler, notAuthorized } from "lib/utils";
 import { getCurrentSession } from "../session/utils";
-import { sessionCache } from "../session/sessionCache";
 import { WorkOS } from "@workos-inc/node";
+import { deleteSession } from "lib/sessionStorage";
 
 const workosApiKey = process.env.WORKOS_API_KEY;
 const clientId = process.env.WORKOS_CLIENT_ID;
@@ -25,15 +25,21 @@ export const POST = apiHandler(async (req: any) => {
 
 	const authorization = authHeader.slice(7);
 
-	const workOsSession = workos.userManagement.loadSealedSession({
-		sessionData: req.session.data!,
-		cookiePassword: cookiePW,
-	});
+	let logOutUrl = "";
 
-	const logOutUrl = await workOsSession.getLogoutUrl();
+	try {
+		const workOsSession = workos.userManagement.loadSealedSession({
+			sessionData: req.session.data!,
+			cookiePassword: cookiePW,
+		});
+
+		logOutUrl = await workOsSession.getLogoutUrl();
+	} catch (e) {
+		console.error(e);
+	}
 
 	// delete session
-	sessionCache.delete(authorization);
+	await deleteSession(authorization);
 
 	return Response.json({ logOutUrl });
 });

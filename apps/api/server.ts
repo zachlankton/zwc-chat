@@ -2,10 +2,27 @@ import "lib/logging";
 import { handleRequest, routeImportPromises } from "lib/router";
 import type { ExtendedRequest } from "lib/server-types";
 import { bunWebsocketHandlers } from "lib/websockets";
+import { closeDatabase, connectToDatabase } from "lib/database";
 
 const serverStartTime = performance.now();
 
+process.on("SIGINT", async () => {
+	await closeDatabase();
+	process.exit(0);
+});
+
+process.on("SIGTERM", async () => {
+	await closeDatabase();
+	process.exit(0);
+});
+
 console.log("Warming up database connection...");
+
+// Initialize MongoDB connection
+connectToDatabase().catch((error) => {
+	console.error("Failed to connect to MongoDB:", error);
+	// Continue running without MongoDB - will use in-memory cache only
+});
 
 const dev = process.env.DEV === "TRUE";
 const https = process.env.HTTPS === "TRUE";

@@ -34,7 +34,7 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 
 		console.log({ authorizationUrl });
 
-		return Response.json({ authorizationUrl }, { status: 302 });
+		return Response.json({ status: 302, authorizationUrl });
 	}
 
 	return Response.json(req.session);
