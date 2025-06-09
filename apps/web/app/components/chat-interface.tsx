@@ -366,14 +366,14 @@ This example demonstrates:
     setTimeout(scrollNewMessage, 100);
 
     // Simulate streaming response
-    const tokens = DEMO_STREAMING_MESSAGE.split("");
+    const tokens = DEMO_STREAMING_MESSAGE.split(" ");
     let currentIndex = 0;
 
     const streamInterval = setInterval(() => {
       if (currentIndex < tokens.length) {
         // Add next token
         const nextToken =
-          tokens[currentIndex] + (currentIndex < tokens.length - 1 ? "" : "");
+          tokens[currentIndex] + (currentIndex < tokens.length - 1 ? " " : "");
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMessage.id
