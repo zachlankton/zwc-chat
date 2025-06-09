@@ -1,5 +1,5 @@
 import { notAuthorized } from "lib/utils";
-import { updateSessionInStorage } from "lib/sessionStorage";
+import { deleteSession, updateSessionInStorage } from "lib/sessionStorage";
 
 export const sessionCache = new Map<string, SessionData>();
 
@@ -34,8 +34,7 @@ export async function updateSessionExpiry(sess: SessionData) {
 	const timeLeft = new Date(sess.expiresAt).getTime() - Date.now();
 
 	if (timeLeft < 0) {
-		//await db.delete(session).where(eq(session.id, sess.token));
-		sessionCache.delete(sess.token);
+		await deleteSession(sess.token);
 		throw notAuthorized("Session Expired");
 	}
 

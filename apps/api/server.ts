@@ -11,6 +11,11 @@ process.on("SIGINT", async () => {
 	process.exit(0);
 });
 
+process.on("SIGTERM", async () => {
+	await closeDatabase();
+	process.exit(0);
+});
+
 console.log("Warming up database connection...");
 
 // Initialize MongoDB connection

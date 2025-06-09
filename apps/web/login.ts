@@ -40,7 +40,6 @@ export async function checkLogin() {
   );
 
   const response = await fetchSession(originalUrlPath);
-  console.log(response);
   if (response.status === 302) {
     localStorage.setItem(LS_REDIRECTED_TO_LOGIN, "true");
     // we are redirecting to login

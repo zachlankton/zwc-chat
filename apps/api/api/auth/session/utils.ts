@@ -3,7 +3,11 @@ import type { RequestWithSession, SessionData } from "./sessionCache";
 import { updateSessionExpiry, sessionCache } from "./sessionCache";
 import { internalServerError, notAuthorized, rateLimitError } from "lib/utils";
 import { asyncLocalStorage } from "lib/asyncLocalStore";
-import { getSession, setSession, deleteSession as deleteSessionFromStorage } from "lib/sessionStorage";
+import {
+	getSession,
+	setSession,
+	deleteSession as deleteSessionFromStorage,
+} from "lib/sessionStorage";
 
 export const userDefaultRateLimit = "5:1";
 
@@ -63,7 +67,10 @@ export async function getCurrentSession(req: RequestWithSession) {
 
 	// if empty return early
 	if (!session) {
-		console.log("No Session Found for token: ", authorization);
+		console.log(
+			"No Session Found for token: ",
+			authorization.substring(0, 8) + "..."
+		);
 		return null;
 	}
 

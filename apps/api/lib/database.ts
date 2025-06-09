@@ -21,15 +21,20 @@ let client: MongoClient | null = new MongoClient(MONGODB_URI, {
 	socketTimeoutMS: 45000,
 });
 
+let indexesCreated = false;
+
 export async function connectToDatabase(): Promise<Db> {
 	if (db) return db;
 
 	try {
-		if (!client) throw "client is null";
+		if (!client) throw new Error("MongoDB client is not initialized");
 		await client.connect();
 		db = client.db(DB_NAME);
 		sessionCollection = db.collection<SessionData>("sessions");
-		createIndexes();
+		if (!indexesCreated) {
+			createIndexes();
+			indexesCreated = true;
+		}
 		console.log("Connected to MongoDB");
 		return db;
 	} catch (error) {
@@ -39,7 +44,9 @@ export async function connectToDatabase(): Promise<Db> {
 }
 
 export async function getSessionsCollection() {
-	if (!sessionCollection) throw "sessionCollection is null";
+	if (!sessionCollection)
+		throw new Error("Session collection is not initialized");
+
 	return sessionCollection;
 }
 
@@ -64,4 +71,3 @@ async function createIndexes() {
 		);
 	}
 }
-
