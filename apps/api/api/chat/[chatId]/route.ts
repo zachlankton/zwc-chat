@@ -9,7 +9,8 @@ import {
 } from "lib/database";
 
 // UUID v4 validation regex
-const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_V4_REGEX =
+	/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const validateUUID = (uuid: string): boolean => {
 	return UUID_V4_REGEX.test(uuid);
@@ -113,12 +114,14 @@ export const POST = apiHandler(
 			}
 		} catch (error) {
 			console.error("Failed to save user message:", error);
-			const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+			const errorMessage =
+				error instanceof Error ? error.message : "Unknown error occurred";
 			return Response.json(
-				{ 
-					error: "Failed to save message. Please try again.", 
-					details: process.env.NODE_ENV === "development" ? errorMessage : undefined 
-				}, 
+				{
+					error: "Failed to save message. Please try again.",
+					details:
+						process.env.NODE_ENV === "development" ? errorMessage : undefined,
+				},
 				{ status: 500 }
 			);
 		}
@@ -160,17 +163,21 @@ export const GET = apiHandler(
 
 		const chatId = params.chatId;
 		if (!validateUUID(chatId)) {
-			return Response.json({ error: "Invalid chat ID format" }, { status: 400 });
+			return Response.json(
+				{ error: "Invalid chat ID format" },
+				{ status: 400 }
+			);
 		}
-		
+
 		const url = new URL(req.url);
 		// Parse and validate limit
 		const rawLimit = parseInt(url.searchParams.get("limit") || "50");
-		const limit = (!isNaN(rawLimit) && rawLimit > 0) ? Math.min(rawLimit, 100) : 50;
-		
+		const limit =
+			!isNaN(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 50;
+
 		// Parse and validate offset
 		const rawOffset = parseInt(url.searchParams.get("offset") || "0");
-		const offset = (!isNaN(rawOffset) && rawOffset >= 0) ? rawOffset : 0;
+		const offset = !isNaN(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
 
 		try {
 			// First verify the user owns this chat
@@ -243,7 +250,10 @@ export const DELETE = apiHandler(
 
 		const chatId = params.chatId;
 		if (!validateUUID(chatId)) {
-			return Response.json({ error: "Invalid chat ID format" }, { status: 400 });
+			return Response.json(
+				{ error: "Invalid chat ID format" },
+				{ status: 400 }
+			);
 		}
 
 		try {
@@ -290,9 +300,12 @@ export const PUT = apiHandler(
 
 		const chatId = params.chatId;
 		if (!validateUUID(chatId)) {
-			return Response.json({ error: "Invalid chat ID format" }, { status: 400 });
+			return Response.json(
+				{ error: "Invalid chat ID format" },
+				{ status: 400 }
+			);
 		}
-		
+
 		const body = await req.json().catch(() => null);
 		if (body === null) throw badRequest("Could not parse the body");
 

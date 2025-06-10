@@ -101,7 +101,7 @@ interface EventType {
     {
       index: number;
       delta: {
-        role: "system" | "user" | "assistant";
+        role: "system" | "developer" | "user" | "assistant" | "tool";
         content: string;
         reasoning: string | null;
       };
@@ -346,19 +346,19 @@ class WebSocketClient {
 
             // Process complete SSE events (delimited by \n\n)
             const events = pendingResponse.buffer.split("\n\n");
-            
+
             // Keep the last item as it might be incomplete
             pendingResponse.buffer = events.pop() || "";
 
             // Process all complete events
             for (const event of events) {
               if (event.trim() === "") continue;
-              
+
               // Extract data from SSE event
               const dataMatch = event.match(/^data: (.+)$/m);
               if (dataMatch) {
                 const data = dataMatch[1];
-                
+
                 if (data.trim() === "[DONE]") {
                   this._log("Received message:", { header, data });
                   clearTimeout(pendingResponse.timeoutId);

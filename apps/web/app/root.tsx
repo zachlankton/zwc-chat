@@ -20,11 +20,11 @@ import { QueryClientProvider } from "@tanstack/react-query";
 
 // Lazy load ReactQueryDevtools only in development
 const ReactQueryDevtools =
-  process.env.NODE_ENV === 'development'
+  process.env.NODE_ENV === "development"
     ? React.lazy(() =>
-        import('@tanstack/react-query-devtools').then((module) => ({
+        import("@tanstack/react-query-devtools").then((module) => ({
           default: module.ReactQueryDevtools,
-        }))
+        })),
       )
     : () => null;
 
@@ -53,7 +53,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <body>
         <QueryClientProvider client={queryClient}>
           <ThemeProvider>{children}</ThemeProvider>
-          {process.env.NODE_ENV === 'development' && (
+          {process.env.NODE_ENV === "development" && (
             <React.Suspense fallback={null}>
               <ReactQueryDevtools initialIsOpen={false} />
             </React.Suspense>

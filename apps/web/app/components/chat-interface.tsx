@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Send, Paperclip, Mic, Copy, Check } from "lucide-react";
 import { Button } from "~/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { Textarea } from "~/components/ui/textarea";
 import { cn } from "~/lib/utils";
 import ReactMarkdown from "react-markdown";
@@ -174,7 +174,14 @@ export function ChatInterface({
 
     if (streamResp.status !== 200 && streamResp instanceof Response) {
       const text = await streamResp.text();
-      const message = text[0] === "{" ? JSON.parse(text).error : text;
+      const _message = text[0] === "{" ? JSON.parse(text).error : text;
+      const raw = _message?.metadata?.raw
+        ? JSON.parse(_message.metadata.raw)
+        : { detail: "" };
+      const message = _message.message
+        ? `${_message.message} ${raw.detail}`
+        : "Unknown Error Occurred, check console log for details";
+      console.error(streamResp, text);
       AsyncAlert({ title: "Error", message });
       //remove the last assistant message
       setMessages((prev) => [...prev.slice(0, -1)]);
@@ -204,6 +211,15 @@ export function ChatInterface({
         }
 
         const delta = value?.choices?.[0]?.delta;
+        const role = delta.role;
+        if (role !== "assistant") {
+          console.error(
+            "obviously we forgot to plan for message roles that aren't assistant",
+            value,
+          );
+          continue;
+        }
+
         if (!delta) {
           console.error("delta is not defined", value);
           continue;
@@ -231,7 +247,9 @@ export function ChatInterface({
     streamingRef.current = null;
     setIsLoading(false);
     setStreamingMessageId(null);
-    queryClient.invalidateQueries({ queryKey: ["chats"] });
+    setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ["chats"] });
+    }, 1000);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -245,7 +263,7 @@ export function ChatInterface({
     <div className="flex flex-col h-full">
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-5xl mx-auto px-4">
+        <div className="max-w-5xl mx-auto px-4 mb-[80vh]">
           {messages.map((message) => (
             <div
               key={message.id}
@@ -397,9 +415,6 @@ export function ChatInterface({
                     ? ` Total Tokens: ${message.totalTokens}`
                     : ""}
                 </p>
-                {isLoading && streamingMessageId === message.id ? (
-                  <div className="h-lvh" />
-                ) : null}
               </div>
             </div>
           ))}

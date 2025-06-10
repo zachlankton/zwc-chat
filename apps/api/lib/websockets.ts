@@ -8,7 +8,7 @@ import { handleRequest } from "./router";
 import type { ExtendedRequest } from "./server-types";
 import crypto from "crypto";
 import { asyncLocalStorage } from "./asyncLocalStore";
-import type { OpenRouterMessage, Chat } from "./database";
+import type { OpenRouterMessage } from "./database";
 import { getMessagesCollection, getChatsCollection } from "./database";
 
 const txtDecoder = new TextDecoder();
@@ -224,6 +224,165 @@ const reasoningPattern = new Uint8Array([
 	114, 101, 97, 115, 111, 110, 105, 110, 103, 34, 58, 34,
 ]); // "reasoning":"
 
+// Helper function to detect first token in stream
+function detectFirstToken(value: Uint8Array): boolean {
+	return (
+		value.some((_, i) =>
+			contentPattern.every((byte, j) => value[i + j] === byte)
+		) ||
+		value.some((_, i) =>
+			reasoningPattern.every((byte, j) => value[i + j] === byte)
+		) ||
+		value.includes(123) // opening brace '{'
+	);
+}
+
+// Helper function to create WebSocket message with header
+function createWebSocketMessage(
+	msgObject: any,
+	response: Response,
+	newMessageId: string,
+	value: Uint8Array
+): Uint8Array {
+	const header = new TextEncoder().encode(
+		JSON.stringify({
+			id: msgObject.id,
+			status: response.status,
+			statusText: response.statusText,
+			newMessageId,
+			length: value.length,
+		})
+	);
+	const headerLenBytes = new Uint8Array(4); // 32-bit LE
+	new DataView(headerLenBytes.buffer).setUint32(0, header.length, true);
+
+	// Combine: [header_length][header][data]
+	const message = new Uint8Array(4 + header.length + value.length);
+	message.set(headerLenBytes, 0);
+	message.set(header, 4);
+	message.set(value, 4 + header.length);
+
+	return message;
+}
+
+interface EventType {
+	id: string;
+	provider: string;
+	model: string;
+	object: string;
+	created: number;
+	choices: [
+		{
+			index: number;
+			delta: {
+				role: "system" | "developer" | "user" | "assistant" | "tool";
+				content: string;
+				reasoning: string | null;
+			};
+			finish_reason: string | null;
+			native_finish_reason: string | null;
+			logprobs: any | null;
+		},
+	];
+	usage: {
+		prompt_tokens: number;
+		completion_tokens: number;
+		total_tokens: number;
+	};
+}
+
+// Helper function to parse streaming chunks and extract message content
+function parseStreamingChunks(
+	dataChunks: number[],
+	newMessage: OpenRouterMessage
+): void {
+	const view = new Uint8Array(dataChunks);
+	const text = txtDecoder.decode(view);
+	const chunks = text.split("data: ");
+	if (chunks[0] === "") chunks.shift();
+
+	for (const chunk of chunks) {
+		if (chunk[0] === "{") {
+			const value = tryParseJson(chunk) as EventType;
+			if (!value) continue;
+
+			// Extract usage information
+			const usage = value?.usage;
+			if (usage) {
+				newMessage.promptTokens = usage.prompt_tokens;
+				newMessage.completionTokens = usage.completion_tokens;
+				newMessage.totalTokens = usage.total_tokens;
+			}
+
+			// Extract content or reasoning
+			const delta = value?.choices?.[0]?.delta;
+			const role = delta.role;
+
+			if (role !== "assistant") {
+				console.error(
+					"obviously we forgot to plan for message roles that aren't assistant",
+					value
+				);
+				continue;
+			}
+
+			if (delta) {
+				const msgKey = delta.reasoning ? "reasoning" : "content";
+				if (delta[msgKey]) {
+					newMessage[msgKey] = (newMessage[msgKey] ?? "") + delta[msgKey];
+				}
+			}
+		}
+	}
+}
+
+// Helper function to save message and update chat
+async function saveMessageAndUpdateChat(
+	newMessage: OpenRouterMessage
+): Promise<void> {
+	const messagesCollection = await getMessagesCollection();
+	await messagesCollection.insertOne(newMessage);
+
+	// Update or create the chat record
+	const chatsCollection = await getChatsCollection();
+	const chatId = newMessage.chatId;
+	const userEmail = newMessage.userEmail;
+
+	// Get the first user message to use for title (if creating new chat)
+	const firstUserMessage = await messagesCollection.findOne(
+		{ chatId, userEmail, role: "user" },
+		{ sort: { timestamp: 1 } }
+	);
+
+	const title = firstUserMessage?.content
+		? firstUserMessage.content.substring(0, 50) +
+			(firstUserMessage.content.length > 50 ? "..." : "")
+		: "New Chat";
+
+	// Use atomic upsert operation to update or create the chat
+	await chatsCollection.updateOne(
+		{ id: chatId, userEmail },
+		{
+			$set: {
+				lastMessage:
+					newMessage.content.substring(0, 100) +
+					(newMessage.content.length > 100 ? "..." : ""),
+				updatedAt: new Date(),
+			},
+			$setOnInsert: {
+				id: chatId,
+				userEmail,
+				title,
+				createdAt: new Date(),
+			},
+			$inc: { messageCount: 1 },
+		},
+		{ upsert: true }
+	);
+
+	console.log(`Message saved to database for chat ${chatId}`);
+}
+
 async function streamedChunks(
 	response: Response,
 	ws: ZwcChatWebSocketServer,
@@ -235,6 +394,7 @@ async function streamedChunks(
 	if (response.body === null) return;
 	const reader = response.body.getReader();
 
+	// Initialize new message
 	const newMessageId = crypto.randomUUID();
 	const newMessage: OpenRouterMessage = {
 		id: newMessageId,
@@ -245,127 +405,47 @@ async function streamedChunks(
 		timestamp: Date.now(),
 	};
 
-	const dataChunks = [];
+	// Stream and collect data chunks
+	const dataChunks: number[] = [];
 	while (true) {
 		const { done, value } = await reader.read();
 		if (done) break;
 
-		if (
-			!newMessage.timeToFirstToken &&
-			(value.some((_, i) =>
-				contentPattern.every((byte, j) => value[i + j] === byte)
-			) ||
-				value.some((_, i) =>
-					reasoningPattern.every((byte, j) => value[i + j] === byte)
-				))
-		) {
+		// Detect first token for timing
+		if (!newMessage.timeToFirstToken && detectFirstToken(value)) {
 			newMessage.timeToFirstToken = Date.now();
 		}
-
-		if (!newMessage.timeToFirstToken && value.includes(123))
-			newMessage.timeToFirstToken = Date.now();
 
 		dataChunks.push(...value);
 
-		const header = new TextEncoder().encode(
-			JSON.stringify({
-				id: msgObject.id,
-				status: response.status,
-				statusText: response.statusText,
-				newMessageId,
-				length: value.length,
-			})
+		// Create and send WebSocket message
+		const message = createWebSocketMessage(
+			msgObject,
+			response,
+			newMessageId,
+			value
 		);
-		const headerLenBytes = new Uint8Array(4); // 32-bit LE
-		new DataView(headerLenBytes.buffer).setUint32(0, header.length, true);
-
-		// Combine: [header_length][header][data]
-		const message = new Uint8Array(4 + header.length + value.length);
-		message.set(headerLenBytes, 0);
-		message.set(header, 4);
-		message.set(value, 4 + header.length);
-
 		ws.send(message);
 	}
 
+	// Record completion time
 	newMessage.timeToFinish = Date.now();
 	console.log("WSURL", ctx?.url.toString());
 
-	const view = new Uint8Array(dataChunks);
-	const text = txtDecoder.decode(view);
-	const chunks = text.split("data: ");
-	if (chunks[0] === "") chunks.shift();
+	// Parse the collected chunks to extract message content
+	parseStreamingChunks(dataChunks, newMessage);
 
-	for (const chunk of chunks) {
-		if (chunk[0] === "{") {
-			const value = tryParseJson(chunk);
-			if (!value) continue;
-
-			const usage = value?.usage;
-
-			if (usage) {
-				newMessage.promptTokens = usage.prompt_tokens;
-				newMessage.completionTokens = usage.completion_tokens;
-				newMessage.totalTokens = usage.total_tokens;
-			}
-
-			const delta = value?.choices?.[0]?.delta;
-			const msgKey = delta.reasoning ? "reasoning" : "content";
-			newMessage[msgKey] = (newMessage[msgKey] ?? "") + delta[msgKey];
-		}
-	}
-
-	// Save the message to the database
+	// Save message and update chat
 	try {
-		const messagesCollection = await getMessagesCollection();
-		await messagesCollection.insertOne(newMessage);
-
-		// Update or create the chat record
-		const chatsCollection = await getChatsCollection();
-		const chatId = newMessage.chatId;
-		const userEmail = newMessage.userEmail;
-
-		// Get the first user message to use for title (if creating new chat)
-		const firstUserMessage = await messagesCollection.findOne(
-			{ chatId, userEmail, role: "user" },
-			{ sort: { timestamp: 1 } }
-		);
-		
-		const title = firstUserMessage?.content
-			? firstUserMessage.content.substring(0, 50) +
-			  (firstUserMessage.content.length > 50 ? "..." : "")
-			: "New Chat";
-
-		// Use atomic upsert operation to update or create the chat
-		await chatsCollection.updateOne(
-			{ id: chatId, userEmail },
-			{
-				$set: {
-					lastMessage:
-						newMessage.content.substring(0, 100) +
-						(newMessage.content.length > 100 ? "..." : ""),
-					updatedAt: new Date(),
-				},
-				$setOnInsert: {
-					id: chatId,
-					userEmail,
-					title,
-					createdAt: new Date(),
-					messageCount: 0, // Will be incremented by $inc below
-				},
-				$inc: { messageCount: 1 },
-			},
-			{ upsert: true }
-		);
-
-		console.log(`Message saved to database for chat ${chatId}`);
+		await saveMessageAndUpdateChat(newMessage);
 	} catch (error) {
 		console.error("Failed to save message to database:", error);
 		// Send error notification to the client
 		ws.send(
 			JSON.stringify({
 				type: "error",
-				error: "Failed to save message. Your conversation may not be persisted.",
+				error:
+					"Failed to save message. Your conversation may not be persisted.",
 			})
 		);
 		// Re-throw to handle at a higher level if needed
