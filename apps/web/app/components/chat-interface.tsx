@@ -11,25 +11,27 @@ import "highlight.js/styles/github-dark.css";
 import { post } from "~/lib/fetchWrapper";
 import { AsyncAlert } from "./async-modals";
 import type { StreamResponse } from "~/lib/webSocketClient";
+import { queryClient } from "~/providers/queryClient";
 
 interface Message {
   id: string;
   content: string;
   reasoning?: string;
   role: "system" | "developer" | "user" | "assistant" | "tool";
-  timestamp: Date;
+  timestamp: number;
   promptTokens?: number;
   completionTokens?: number;
   totalTokens?: number;
+  timeToFirstToken?: number;
+  timeToFinish?: number;
 }
 
-function CodeBlock({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
+interface ChatInterfaceProps {
+  chatId?: string;
+  initialMessages?: Message[];
+}
+
+function CodeBlock({ children }: { children: React.ReactNode }) {
   const [copied, setCopied] = React.useState(false);
   const codeRef = React.useRef<HTMLElement>(null);
 
@@ -78,16 +80,17 @@ function CodeBlock({
         </Button>
       </div>
       <div className="overflow-x-auto">
-        <pre className={cn("hljs", className)}>
-          <code ref={codeRef}>{children}</code>
-        </pre>
+        <code ref={codeRef}>{children}</code>
       </div>
     </div>
   );
 }
 
-export function ChatInterface() {
-  const [messages, setMessages] = React.useState<Message[]>([]);
+export function ChatInterface({
+  chatId,
+  initialMessages = [],
+}: ChatInterfaceProps) {
+  const [messages, setMessages] = React.useState<Message[]>(initialMessages);
 
   const textRef = React.useRef<HTMLTextAreaElement>(null);
   const streamingRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -96,6 +99,11 @@ export function ChatInterface() {
     string | null
   >(null);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+
+  // Update messages when initialMessages changes (e.g., when switching chats)
+  React.useEffect(() => {
+    setMessages(initialMessages);
+  }, [initialMessages]);
 
   // Add cleanup effect
   React.useEffect(() => {
@@ -135,7 +143,7 @@ export function ChatInterface() {
       id: Date.now().toString(),
       content: input,
       role: "user",
-      timestamp: new Date(),
+      timestamp: Date.now(),
     };
 
     let msgsRef = [...messages, userMessage];
@@ -148,7 +156,7 @@ export function ChatInterface() {
       id: (Date.now() + 1).toString(),
       content: "",
       role: "assistant",
-      timestamp: new Date(),
+      timestamp: Date.now(),
     };
 
     setMessages((prev) => [...prev, assistantMessage]);
@@ -156,7 +164,7 @@ export function ChatInterface() {
     setTimeout(scrollNewMessage, 100);
 
     const streamResp = await post<StreamResponse | Response>(
-      "/chat/sdfasdfasdfasdf",
+      `/chat/${chatId || crypto.randomUUID()}`,
       { messages: msgsRef },
       {
         returnResponse: true,
@@ -210,6 +218,7 @@ export function ChatInterface() {
     streamingRef.current = null;
     setIsLoading(false);
     setStreamingMessageId(null);
+    queryClient.invalidateQueries({ queryKey: ["chats"] });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -265,7 +274,7 @@ export function ChatInterface() {
                         remarkPlugins={[remarkGfm]}
                         rehypePlugins={[rehypeHighlight]}
                         components={{
-                          code: ({ children, className, ...props }) => {
+                          code: ({ children, className }) => {
                             const childrenStr = typeof children === "string";
                             const multiLine = childrenStr
                               ? children.includes("\n")
@@ -281,11 +290,7 @@ export function ChatInterface() {
                               );
                             }
 
-                            return (
-                              <CodeBlock className={className}>
-                                {children}
-                              </CodeBlock>
-                            );
+                            return <CodeBlock>{children}</CodeBlock>;
                           },
                         }}
                       >
@@ -319,11 +324,7 @@ export function ChatInterface() {
                                   );
                                 }
 
-                                return (
-                                  <CodeBlock className={className}>
-                                    {children}
-                                  </CodeBlock>
-                                );
+                                return <CodeBlock>{children}</CodeBlock>;
                               },
                             }}
                           >
@@ -337,7 +338,7 @@ export function ChatInterface() {
                         remarkPlugins={[remarkGfm]}
                         rehypePlugins={[rehypeHighlight]}
                         components={{
-                          code: ({ children, className, ...props }) => {
+                          code: ({ children, className }) => {
                             const childrenStr = typeof children === "string";
                             const multiLine = childrenStr
                               ? children.includes("\n")
@@ -353,11 +354,7 @@ export function ChatInterface() {
                               );
                             }
 
-                            return (
-                              <CodeBlock className={className}>
-                                {children}
-                              </CodeBlock>
-                            );
+                            return <CodeBlock>{children}</CodeBlock>;
                           },
                         }}
                       >
@@ -380,7 +377,7 @@ export function ChatInterface() {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {message.timestamp.toLocaleTimeString()}
+                  {new Date(message.timestamp).toLocaleTimeString()}
                   {message.totalTokens
                     ? ` Total Tokens: ${message.totalTokens}`
                     : ""}

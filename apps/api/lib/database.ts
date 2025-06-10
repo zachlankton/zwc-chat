@@ -25,8 +25,20 @@ export interface OpenRouterMessage {
 	timeToFinish?: number;
 }
 
+export interface Chat {
+	id: string;
+	userEmail: string;
+	title: string;
+	createdAt: Date;
+	updatedAt: Date;
+	lastMessage?: string;
+	messageCount: number;
+}
+
 export let db: Db | null = null;
 export let sessionCollection: Collection<SessionData> | null = null;
+export let messagesCollection: Collection<OpenRouterMessage> | null = null;
+export let chatsCollection: Collection<Chat> | null = null;
 
 let client: MongoClient | null = new MongoClient(MONGODB_URI, {
 	minPoolSize: 5,
@@ -46,6 +58,8 @@ export async function connectToDatabase(): Promise<Db> {
 		await client.connect();
 		db = client.db(DB_NAME);
 		sessionCollection = db.collection<SessionData>("sessions");
+		messagesCollection = db.collection<OpenRouterMessage>("messages");
+		chatsCollection = db.collection<Chat>("chats");
 		if (!indexesCreated) {
 			createIndexes();
 			indexesCreated = true;
@@ -63,6 +77,19 @@ export async function getSessionsCollection() {
 		throw new Error("Session collection is not initialized");
 
 	return sessionCollection;
+}
+
+export async function getMessagesCollection() {
+	if (!messagesCollection)
+		throw new Error("Messages collection is not initialized");
+
+	return messagesCollection;
+}
+
+export async function getChatsCollection() {
+	if (!chatsCollection) throw new Error("Chats collection is not initialized");
+
+	return chatsCollection;
 }
 
 export async function closeDatabase() {
@@ -84,5 +111,28 @@ async function createIndexes() {
 			{ expiresAt: 1 },
 			{ expireAfterSeconds: 0 }
 		);
+	}
+
+	if (messagesCollection) {
+		// Compound index for efficient chat message queries
+		await messagesCollection.createIndex({
+			userEmail: 1,
+			chatId: 1,
+			timestamp: -1,
+		});
+
+		// Index for fetching messages by chatId
+		await messagesCollection.createIndex({ chatId: 1, timestamp: -1 });
+
+		// Index for user's message history
+		await messagesCollection.createIndex({ userEmail: 1, timestamp: -1 });
+	}
+
+	if (chatsCollection) {
+		// Index for user's chat list
+		await chatsCollection.createIndex({ userEmail: 1, updatedAt: -1 });
+
+		// Unique index on chat id
+		await chatsCollection.createIndex({ id: 1 }, { unique: true });
 	}
 }

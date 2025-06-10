@@ -34,12 +34,13 @@
     "highlight.js": "^11.11.1",
     "react-markdown": "^10.1.0",
     "rehype-highlight": "^7.0.2",
-    "remark-gfm": "^4.0.1"
-
+    "remark-gfm": "^4.0.1",
+    "date-fns": "^4.1.0"
   },
   "devDependencies": {
     "@react-router/dev": "^7.6.0",
     "@tailwindcss/vite": "^4.1.4",
+    "@tanstack/react-query-devtools": "^5.80.6",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "tailwindcss": "^4.1.4",

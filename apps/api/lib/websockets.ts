@@ -8,7 +8,8 @@ import { handleRequest } from "./router";
 import type { ExtendedRequest } from "./server-types";
 import crypto from "crypto";
 import { asyncLocalStorage } from "./asyncLocalStore";
-import type { OpenRouterMessage } from "./database";
+import type { OpenRouterMessage, Chat } from "./database";
+import { getMessagesCollection, getChatsCollection } from "./database";
 
 const txtDecoder = new TextDecoder();
 
@@ -241,7 +242,7 @@ async function streamedChunks(
 		userEmail: ctx.session.email,
 		content: "",
 		role: "assistant",
-		timestamp: ctx.timestamp,
+		timestamp: Date.now(),
 	};
 
 	const dataChunks = [];
@@ -314,5 +315,56 @@ async function streamedChunks(
 		}
 	}
 
-	console.log(newMessage);
+	// Save the message to the database
+	try {
+		const messagesCollection = await getMessagesCollection();
+		await messagesCollection.insertOne(newMessage);
+
+		// Update or create the chat record
+		const chatsCollection = await getChatsCollection();
+		const chatId = newMessage.chatId;
+		const userEmail = newMessage.userEmail;
+
+		// Check if chat exists
+		const existingChat = await chatsCollection.findOne({
+			id: chatId,
+			userEmail,
+		});
+
+		if (existingChat) {
+			// Update existing chat
+			await chatsCollection.updateOne(
+				{ id: chatId, userEmail },
+				{
+					$set: {
+						lastMessage:
+							newMessage.content.substring(0, 100) +
+							(newMessage.content.length > 100 ? "..." : ""),
+						updatedAt: new Date(),
+					},
+					$inc: { messageCount: 1 },
+				}
+			);
+		} else {
+			// Create new chat
+			const newChat: Chat = {
+				id: chatId,
+				userEmail,
+				title:
+					newMessage.content.substring(0, 50) +
+					(newMessage.content.length > 50 ? "..." : ""),
+				createdAt: new Date(),
+				updatedAt: new Date(),
+				lastMessage:
+					newMessage.content.substring(0, 100) +
+					(newMessage.content.length > 100 ? "..." : ""),
+				messageCount: 1,
+			};
+			await chatsCollection.insertOne(newChat);
+		}
+
+		console.log(`Message saved to database for chat ${chatId}`);
+	} catch (error) {
+		console.error("Failed to save message to database:", error);
+	}
 }
