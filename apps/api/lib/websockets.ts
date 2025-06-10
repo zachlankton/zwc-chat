@@ -105,6 +105,7 @@ export const bunWebsocketHandlers: websocketHandlers = {
 
 			req.ip = "WS:" + ws.data?.ip;
 			req.performance_start = performance.now();
+			req.timestamp = Date.now();
 
 			asyncLocalStorage.run(req, async () => {
 				const response: Response = await handleRequest(
@@ -214,6 +215,14 @@ function formatError(ws: ZwcChatWebSocketServer, message: any) {
 	);
 }
 
+// Look for "content":" or "reasoning":" byte patterns
+const contentPattern = new Uint8Array([
+	99, 111, 110, 116, 101, 110, 116, 34, 58, 34,
+]); // "content":"
+const reasoningPattern = new Uint8Array([
+	114, 101, 97, 115, 111, 110, 105, 110, 103, 34, 58, 34,
+]); // "reasoning":"
+
 async function streamedChunks(
 	response: Response,
 	ws: ZwcChatWebSocketServer,
@@ -232,13 +241,25 @@ async function streamedChunks(
 		userEmail: ctx.session.email,
 		content: "",
 		role: "assistant",
-		timestamp: Date.now(),
+		timestamp: ctx.timestamp,
 	};
 
 	const dataChunks = [];
 	while (true) {
 		const { done, value } = await reader.read();
 		if (done) break;
+
+		if (
+			!newMessage.timeToFirstToken &&
+			(value.some((_, i) =>
+				contentPattern.every((byte, j) => value[i + j] === byte)
+			) ||
+				value.some((_, i) =>
+					reasoningPattern.every((byte, j) => value[i + j] === byte)
+				))
+		) {
+			newMessage.timeToFirstToken = Date.now();
+		}
 
 		if (!newMessage.timeToFirstToken && value.includes(123))
 			newMessage.timeToFirstToken = Date.now();

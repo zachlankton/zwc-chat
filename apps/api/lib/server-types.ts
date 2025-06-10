@@ -20,6 +20,7 @@ export interface ExtendedRequest extends RequestWithSession {
 	session: SessionData;
 	accountId: string;
 	rateLogged: boolean;
+	timestamp: number;
 }
 
 export type RouteHandler = (
