@@ -1,5 +1,11 @@
+const txtDecoder = new TextDecoder();
 // Type definitions for the WebSocket client
-type WebSocketMessageType = "request" | "response" | "update" | "notification";
+type WebSocketMessageType =
+  | "request"
+  | "response"
+  | "response-chunked"
+  | "update"
+  | "notification";
 type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
 // Base message interface
@@ -27,6 +33,14 @@ interface ResponseMessage extends WebSocketMessage {
   body?: any;
 }
 
+interface ResponseChunkedMessage extends WebSocketMessage {
+  type: "response-chunked";
+  id: string;
+  status: number;
+  headers?: Headers;
+  body?: any;
+}
+
 // Response message interface
 interface NotificationMessage extends WebSocketMessage {
   type: "notification";
@@ -48,6 +62,7 @@ interface UpdateMessage extends WebSocketMessage {
 type Message =
   | RequestMessage
   | ResponseMessage
+  | ResponseChunkedMessage
   | UpdateMessage
   | NotificationMessage;
 
@@ -85,6 +100,13 @@ interface PendingRequest {
   timestamp: number;
 }
 
+interface PendingResponse {
+  response: Response;
+  timeoutId: number;
+  controller: ReadableStreamDefaultController<any>;
+  timestamp: number;
+}
+
 // The client class
 class WebSocketClient {
   private url: string;
@@ -96,6 +118,7 @@ class WebSocketClient {
   private isReconnecting: boolean;
   private eventHandlers: EventHandlers;
   private requestMap: Map<string, PendingRequest>;
+  private responseMap: Map<string, PendingResponse>;
 
   constructor(url: string, options: Partial<WebSocketClientOptions> = {}) {
     this.url = url;
@@ -125,6 +148,7 @@ class WebSocketClient {
       reconnectFailed: [],
     };
     this.requestMap = new Map<string, PendingRequest>();
+    this.responseMap = new Map<string, PendingResponse>();
 
     this.connect();
   }
@@ -195,6 +219,7 @@ class WebSocketClient {
 
     try {
       this.socket = new WebSocket(`${this.url}/${this.token}`);
+      this.socket.binaryType = "arraybuffer";
 
       this.socket.onopen = (event: Event) => {
         this._debug("Connection established");
@@ -210,6 +235,85 @@ class WebSocketClient {
 
       this.socket.onmessage = (event: MessageEvent) => {
         try {
+          if (event.data instanceof ArrayBuffer) {
+            const view = new Uint8Array(event.data);
+            const headerLength = view[0];
+            const header = JSON.parse(
+              txtDecoder.decode(view.slice(1, 1 + headerLength)),
+            );
+            const data = view.slice(1 + headerLength);
+            const text = txtDecoder.decode(data);
+
+            if (header.status !== 200) {
+              const pendingRequest = this.requestMap.get(header.id);
+              if (pendingRequest) {
+                clearTimeout(pendingRequest.timeoutId);
+                this.requestMap.delete(header.id);
+
+                pendingRequest.resolve(
+                  new Response(text, {
+                    status: header.status,
+                    statusText: header.statusText,
+                  }),
+                );
+              }
+              this._log("Received message:", { header, text });
+
+              return;
+            }
+
+            const chunks = text.split("data: ");
+            if (chunks[0] === "") chunks.shift();
+
+            let pendingResponse = this.responseMap.get(header.id);
+            if (!pendingResponse) {
+              let stashController: ReadableStreamDefaultController<any> | null =
+                null;
+              const stream = new ReadableStream({
+                async start(controller) {
+                  stashController = controller;
+                },
+              });
+
+              pendingResponse = {
+                timestamp: Date.now(),
+                timeoutId: window.setTimeout(() => {
+                  stashController!.close();
+                  this.responseMap.delete(header.id);
+                }, 60000),
+
+                controller: stashController!,
+                response: new Response(stream, {
+                  headers: {
+                    "Transfer-Encoding": "chunked",
+                    "Content-Type": "text/html; charset=UTF-8",
+                    "X-Content-Type-Options": "nosniff",
+                  },
+                }),
+              };
+
+              this.responseMap.set(header.id, pendingResponse!);
+            }
+
+            const pendingRequest = this.requestMap.get(header.id);
+            if (pendingRequest) {
+              clearTimeout(pendingRequest.timeoutId);
+              this.requestMap.delete(header.id);
+
+              pendingRequest.resolve(pendingResponse.response);
+            }
+
+            for (const chunk of chunks) {
+              if (chunk[0] === "{")
+                pendingResponse.controller.enqueue(tryParseJson(chunk));
+              if (chunk.includes("[DONE]")) {
+                this._log("Received message:", { header, chunk });
+                clearTimeout(pendingResponse.timeoutId);
+                pendingResponse.controller.close();
+              }
+            }
+          }
+
           const data = JSON.parse(event.data) as Message;
           this._log("Received message:", data);
 
@@ -227,6 +331,9 @@ class WebSocketClient {
                 }),
               );
             }
+          }
+
+          if (data.type === "response-chunked" && data.id) {
           }
 
           // Call event handlers
@@ -459,9 +566,18 @@ export {
   type WebSocketMessage,
   type RequestMessage,
   type ResponseMessage,
+  type ResponseChunkedMessage,
   type UpdateMessage,
   type Message,
   type WebSocketClientOptions,
   type WebSocketMessageType,
   type HttpMethod,
 };
+
+function tryParseJson(txt: string) {
+  try {
+    return JSON.parse(txt);
+  } catch (error) {
+    return null;
+  }
+}

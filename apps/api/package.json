@@ -15,7 +15,8 @@
 		"@anthropic-ai/sdk": "^0.33.1",
 		"@sendgrid/mail": "^8.1.5",
 		"@workos-inc/node": "^7.54.0",
-		"mongodb": "^6.17.0"
+		"mongodb": "^6.17.0",
+		"openai": "^5.2.0"
 	},
 	"scripts": {
 		"dev": "bun --env-file=.env.development --watch run server.ts",

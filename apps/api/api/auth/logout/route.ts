@@ -2,6 +2,7 @@ import { apiHandler, notAuthorized } from "lib/utils";
 import { getCurrentSession } from "../session/utils";
 import { WorkOS } from "@workos-inc/node";
 import { deleteSession } from "lib/sessionStorage";
+import type { RequestWithSession } from "../session/sessionCache";
 
 const workosApiKey = process.env.WORKOS_API_KEY;
 const clientId = process.env.WORKOS_CLIENT_ID;
@@ -17,11 +18,12 @@ const workos = new WorkOS(workosApiKey, {
 	clientId,
 });
 
-export const POST = apiHandler(async (req: any) => {
+export const POST = apiHandler(async (req: RequestWithSession) => {
 	const authHeader = req.headers.get("authorization");
 
 	await getCurrentSession(req);
 	if (!req.session) throw notAuthorized();
+	if (!authHeader) throw notAuthorized;
 
 	const authorization = authHeader.slice(7);
 

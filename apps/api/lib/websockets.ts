@@ -101,10 +101,15 @@ export const bunWebsocketHandlers: websocketHandlers = {
 			req.ip = "WS:" + ws.data?.ip;
 			req.performance_start = performance.now();
 
-			const response = await handleRequest(
+			const response: Response = await handleRequest(
 				req as ExtendedRequest,
 				ws.data.server
 			);
+
+			const cType = response.headers.get("Content-Type");
+			if (cType === "text/event-stream") {
+				return streamedChunks(response, ws, msgObject);
+			}
 
 			const bodyTxt = await response.text();
 			const body = tryParseJson(bodyTxt);
@@ -194,4 +199,49 @@ function formatError(ws: ZwcChatWebSocketServer, message: any) {
 			},
 		})
 	);
+}
+
+async function streamedChunks(
+	response: Response,
+	ws: ZwcChatWebSocketServer,
+	msgObject: any
+) {
+	if (response.body === null) return;
+	const reader = response.body.getReader();
+
+	while (true) {
+		const { done, value } = await reader.read();
+		if (done) break;
+
+		const header = new TextEncoder().encode(
+			JSON.stringify({
+				id: msgObject.id,
+				status: response.status,
+				statusText: response.statusText,
+				length: value.length,
+			})
+		);
+		const headerLength = new Uint8Array([header.length]);
+
+		// Combine: [header_length][header][data]
+		const message = new Uint8Array(1 + header.length + value.length);
+		message.set(headerLength, 0);
+		message.set(header, 1);
+		message.set(value, 1 + header.length);
+
+		ws.send(message);
+
+		/*
+		ws.send(
+			JSON.stringify({
+				type: "response-chunked",
+				id: msgObject.id,
+				body: value,
+				status: response.status,
+				statusText: response.statusText,
+				headers: response.headers,
+			})
+		);
+		*/
+	}
 }
