@@ -10,32 +10,7 @@ import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github-dark.css";
 import { post } from "~/lib/fetchWrapper";
 import { AsyncAlert } from "./async-modals";
-
-interface eventType {
-  id: string;
-  provider: string;
-  model: string;
-  object: string;
-  created: number;
-  choices: [
-    {
-      index: number;
-      delta: {
-        role: "system" | "user" | "assistant";
-        content: string;
-        reasoning: string | null;
-      };
-      finish_reason: string | null;
-      native_finish_reason: string | null;
-      logprobs: any | null;
-    },
-  ];
-  usage: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  };
-}
+import type { StreamResponse } from "~/lib/webSocketClient";
 
 interface Message {
   id: string;
@@ -180,7 +155,7 @@ export function ChatInterface() {
     setStreamingMessageId(assistantMessage.id);
     setTimeout(scrollNewMessage, 100);
 
-    const streamResp = await post<Response>(
+    const streamResp = await post<StreamResponse | Response>(
       "/chat/sdfasdfasdfasdf",
       { messages: msgsRef },
       {
@@ -188,22 +163,21 @@ export function ChatInterface() {
       },
     );
 
-    if (streamResp.status !== 200) {
+    if (streamResp.status !== 200 && streamResp instanceof Response) {
       const text = await streamResp.text();
       const message = text[0] === "{" ? JSON.parse(text).error : text;
       AsyncAlert({ title: "Error", message });
       //remove the last assistant message
       setMessages((prev) => [...prev.slice(0, -1)]);
-    } else {
-      const reader = streamResp.body!.getReader();
+    } else if ("stream" in streamResp) {
+      const reader = streamResp.stream.getReader();
 
       while (true) {
         const { done, value } = await reader.read();
-        const actualValue = value as unknown as eventType;
 
         if (done) break;
 
-        const usage = actualValue.usage;
+        const usage = value.usage;
 
         if (usage) {
           setMessages((prev) =>
@@ -220,7 +194,7 @@ export function ChatInterface() {
           );
         }
 
-        const delta = actualValue.choices[0].delta;
+        const delta = value.choices[0].delta;
         const msgKey = delta.reasoning ? "reasoning" : "content";
         setMessages((prev) =>
           prev.map((msg) =>

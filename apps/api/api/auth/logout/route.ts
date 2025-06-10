@@ -23,7 +23,7 @@ export const POST = apiHandler(async (req: RequestWithSession) => {
 
 	await getCurrentSession(req);
 	if (!req.session) throw notAuthorized();
-	if (!authHeader) throw notAuthorized;
+	if (!authHeader) throw notAuthorized();
 
 	const authorization = authHeader.slice(7);
 

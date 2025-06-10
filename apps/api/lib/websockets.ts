@@ -221,13 +221,14 @@ async function streamedChunks(
 				length: value.length,
 			})
 		);
-		const headerLength = new Uint8Array([header.length]);
+		const headerLenBytes = new Uint8Array(4); // 32-bit LE
+		new DataView(headerLenBytes.buffer).setUint32(0, header.length, true);
 
 		// Combine: [header_length][header][data]
-		const message = new Uint8Array(1 + header.length + value.length);
-		message.set(headerLength, 0);
-		message.set(header, 1);
-		message.set(value, 1 + header.length);
+		const message = new Uint8Array(4 + header.length + value.length);
+		message.set(headerLenBytes, 0);
+		message.set(header, 4);
+		message.set(value, 4 + header.length);
 
 		ws.send(message);
 

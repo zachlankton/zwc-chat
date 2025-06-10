@@ -91,6 +91,39 @@ interface EventHandlers {
   reconnectFailed: EventHandler<{ attempts: number }>[];
 }
 
+interface EventType {
+  id: string;
+  provider: string;
+  model: string;
+  object: string;
+  created: number;
+  choices: [
+    {
+      index: number;
+      delta: {
+        role: "system" | "user" | "assistant";
+        content: string;
+        reasoning: string | null;
+      };
+      finish_reason: string | null;
+      native_finish_reason: string | null;
+      logprobs: any | null;
+    },
+  ];
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+export type StreamResponse = {
+  stream: ReadableStream<EventType>;
+  status: string;
+  statusText: string;
+  headers: any;
+};
+
 // Pending request tracking
 interface PendingRequest {
   request: RequestMessage;
@@ -101,7 +134,7 @@ interface PendingRequest {
 }
 
 interface PendingResponse {
-  response: Response;
+  response: StreamResponse;
   timeoutId: number;
   controller: ReadableStreamDefaultController<any>;
   timestamp: number;
@@ -237,11 +270,11 @@ class WebSocketClient {
         try {
           if (event.data instanceof ArrayBuffer) {
             const view = new Uint8Array(event.data);
-            const headerLength = view[0];
+            const headerLength = new DataView(view.buffer).getUint32(0, true);
             const header = JSON.parse(
-              txtDecoder.decode(view.slice(1, 1 + headerLength)),
+              txtDecoder.decode(view.slice(4, 4 + headerLength)),
             );
-            const data = view.slice(1 + headerLength);
+            const data = view.slice(4 + headerLength);
             const text = txtDecoder.decode(data);
 
             if (header.status !== 200) {
@@ -283,13 +316,16 @@ class WebSocketClient {
                 }, 60000),
 
                 controller: stashController!,
-                response: new Response(stream, {
+                response: {
+                  stream,
+                  status: header.status,
+                  statusText: header.statusText,
                   headers: {
                     "Transfer-Encoding": "chunked",
                     "Content-Type": "text/html; charset=UTF-8",
                     "X-Content-Type-Options": "nosniff",
                   },
-                }),
+                },
               };
 
               this.responseMap.set(header.id, pendingResponse!);
@@ -300,6 +336,7 @@ class WebSocketClient {
               clearTimeout(pendingRequest.timeoutId);
               this.requestMap.delete(header.id);
 
+              //@ts-ignore
               pendingRequest.resolve(pendingResponse.response);
             }
 
