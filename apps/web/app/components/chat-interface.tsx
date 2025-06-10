@@ -177,7 +177,7 @@ export function ChatInterface() {
 
         if (done) break;
 
-        const usage = value.usage;
+        const usage = value?.usage;
 
         if (usage) {
           setMessages((prev) =>
@@ -194,7 +194,7 @@ export function ChatInterface() {
           );
         }
 
-        const delta = value.choices[0].delta;
+        const delta = value?.choices?.[0]?.delta;
         const msgKey = delta.reasoning ? "reasoning" : "content";
         setMessages((prev) =>
           prev.map((msg) =>
@@ -265,8 +265,13 @@ export function ChatInterface() {
                         remarkPlugins={[remarkGfm]}
                         rehypePlugins={[rehypeHighlight]}
                         components={{
-                          code: ({ children, className }) => {
-                            const isInline = !className?.includes("language-");
+                          code: ({ children, className, ...props }) => {
+                            const childrenStr = typeof children === "string";
+                            const multiLine = childrenStr
+                              ? children.includes("\n")
+                              : false;
+                            const isInline =
+                              !className?.includes("language-") && !multiLine;
 
                             if (isInline) {
                               return (
@@ -297,8 +302,14 @@ export function ChatInterface() {
                             rehypePlugins={[rehypeHighlight]}
                             components={{
                               code: ({ children, className }) => {
+                                const childrenStr =
+                                  typeof children === "string";
+                                const multiLine = childrenStr
+                                  ? children.includes("\n")
+                                  : false;
                                 const isInline =
-                                  !className?.includes("language-");
+                                  !className?.includes("language-") &&
+                                  !multiLine;
 
                                 if (isInline) {
                                   return (
@@ -326,8 +337,13 @@ export function ChatInterface() {
                         remarkPlugins={[remarkGfm]}
                         rehypePlugins={[rehypeHighlight]}
                         components={{
-                          code: ({ children, className }) => {
-                            const isInline = !className?.includes("language-");
+                          code: ({ children, className, ...props }) => {
+                            const childrenStr = typeof children === "string";
+                            const multiLine = childrenStr
+                              ? children.includes("\n")
+                              : false;
+                            const isInline =
+                              !className?.includes("language-") && !multiLine;
 
                             if (isInline) {
                               return (

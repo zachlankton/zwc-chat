@@ -114,6 +114,8 @@ export function handleRequest(req: ExtendedRequest, server: Server) {
 		const { modules, route } = await getRoute(path);
 		if (route === null) return NotFound(path, req.method);
 
+		req.params = route.params;
+
 		if (req.method === "OPTIONS") {
 			const resp = new Response();
 			Object.entries(corsOptions).forEach(([key, value]) => {

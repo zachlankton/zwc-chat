@@ -7,6 +7,7 @@ import type { Server } from "bun";
 export interface ExtendedRequest extends RequestWithSession {
 	cookies: Map<string, string>;
 	ip: string | undefined;
+	params: any;
 	server_id: string;
 	id: string;
 	path: string;

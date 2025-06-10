@@ -10,6 +10,21 @@ if (!DB_NAME) {
 	throw new Error("MONGODB_DB_NAME environment variable is not set");
 }
 
+export interface OpenRouterMessage {
+	id: string;
+	userEmail: string;
+	chatId: string;
+	content: string;
+	reasoning?: string;
+	role: "system" | "developer" | "user" | "assistant" | "tool";
+	timestamp: number;
+	promptTokens?: number;
+	completionTokens?: number;
+	totalTokens?: number;
+	timeToFirstToken?: number;
+	timeToFinish?: number;
+}
+
 export let db: Db | null = null;
 export let sessionCollection: Collection<SessionData> | null = null;
 

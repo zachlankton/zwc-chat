@@ -134,10 +134,12 @@ interface PendingRequest {
 }
 
 interface PendingResponse {
+  pendingChunks: any;
   response: StreamResponse;
   timeoutId: number;
   controller: ReadableStreamDefaultController<any>;
   timestamp: number;
+  buffer: string; // Buffer to accumulate partial SSE events
 }
 
 // The client class
@@ -295,9 +297,6 @@ class WebSocketClient {
               return;
             }
 
-            const chunks = text.split("data: ");
-            if (chunks[0] === "") chunks.shift();
-
             let pendingResponse = this.responseMap.get(header.id);
             if (!pendingResponse) {
               let stashController: ReadableStreamDefaultController<any> | null =
@@ -309,6 +308,7 @@ class WebSocketClient {
               });
 
               pendingResponse = {
+                pendingChunks: [],
                 timestamp: Date.now(),
                 timeoutId: window.setTimeout(() => {
                   stashController!.close();
@@ -326,10 +326,14 @@ class WebSocketClient {
                     "X-Content-Type-Options": "nosniff",
                   },
                 },
+                buffer: "", // Initialize empty buffer for SSE events
               };
 
               this.responseMap.set(header.id, pendingResponse!);
             }
+
+            // Append new text to buffer
+            pendingResponse.buffer += text;
 
             const pendingRequest = this.requestMap.get(header.id);
             if (pendingRequest) {
@@ -340,13 +344,33 @@ class WebSocketClient {
               pendingRequest.resolve(pendingResponse.response);
             }
 
-            for (const chunk of chunks) {
-              if (chunk[0] === "{")
-                pendingResponse.controller.enqueue(tryParseJson(chunk));
-              if (chunk.includes("[DONE]")) {
-                this._log("Received message:", { header, chunk });
-                clearTimeout(pendingResponse.timeoutId);
-                pendingResponse.controller.close();
+            // Process complete SSE events (delimited by \n\n)
+            const events = pendingResponse.buffer.split("\n\n");
+            
+            // Keep the last item as it might be incomplete
+            pendingResponse.buffer = events.pop() || "";
+
+            // Process all complete events
+            for (const event of events) {
+              if (event.trim() === "") continue;
+              
+              // Extract data from SSE event
+              const dataMatch = event.match(/^data: (.+)$/m);
+              if (dataMatch) {
+                const data = dataMatch[1];
+                
+                if (data.trim() === "[DONE]") {
+                  this._log("Received message:", { header, data });
+                  clearTimeout(pendingResponse.timeoutId);
+                  pendingResponse.controller.close();
+                  this.responseMap.delete(header.id);
+                } else {
+                  // Try to parse as JSON
+                  const parsed = tryParseJson(data);
+                  if (parsed !== null) {
+                    pendingResponse.controller.enqueue(parsed);
+                  }
+                }
               }
             }
           }
