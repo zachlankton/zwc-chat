@@ -1,8 +1,7 @@
 import * as React from "react";
-import { Send, Paperclip, Mic, Copy, Check } from "lucide-react";
+import { Copy, Check } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
-import { Textarea } from "~/components/ui/textarea";
 import { cn } from "~/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -12,6 +11,7 @@ import { post } from "~/lib/fetchWrapper";
 import { AsyncAlert } from "./async-modals";
 import type { StreamResponse } from "~/lib/webSocketClient";
 import { queryClient } from "~/providers/queryClient";
+import { ChatInput } from "./chat-input";
 
 interface Message {
   id: string;
@@ -92,7 +92,6 @@ export function ChatInterface({
 }: ChatInterfaceProps) {
   const [messages, setMessages] = React.useState<Message[]>(initialMessages);
 
-  const textRef = React.useRef<HTMLTextAreaElement>(null);
   const streamingRef = React.useRef<NodeJS.Timeout | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [streamingMessageId, setStreamingMessageId] = React.useState<
@@ -133,10 +132,7 @@ export function ChatInterface({
     setTimeout(scrollToBottom, 100);
   }, [chatId]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!textRef.current) return;
-    const input = textRef.current.value ?? "";
+  const handleSubmit = async (input: string) => {
     if (!input.trim() || isLoading) return;
 
     const userMessage: Message = {
@@ -148,7 +144,6 @@ export function ChatInterface({
 
     let msgsRef = [...messages, userMessage];
     setMessages((prev) => [...prev, userMessage]);
-    textRef.current.value = "";
     setIsLoading(true);
 
     // Create empty assistant message to start streaming
@@ -252,23 +247,78 @@ export function ChatInterface({
     }, 1000);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e as any);
-    }
-  };
-
   return (
     <div className="flex flex-col h-full">
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto pb-32">
         <div className="max-w-5xl mx-auto px-4 mb-[80vh]">
+          {messages.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-full min-h-[60vh] text-center">
+              <div className="rounded-full bg-primary/10 p-6 mb-6">
+                <svg
+                  className="h-12 w-12 text-primary"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-semibold mb-2">
+                Start a conversation
+              </h2>
+              <p className="text-muted-foreground max-w-md">
+                Ask me anything! I'm here to help with coding, analysis,
+                creative writing, and more.
+              </p>
+              <div className="grid grid-cols-2 gap-3 mt-8 w-full max-w-2xl">
+                <button
+                  onClick={() => handleSubmit("What can you help me with?")}
+                  className="text-left p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors"
+                >
+                  <h3 className="font-medium mb-1">Capabilities</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Learn what I can do
+                  </p>
+                </button>
+                <button
+                  onClick={() => handleSubmit("Help me write code")}
+                  className="text-left p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors"
+                >
+                  <h3 className="font-medium mb-1">Code Assistant</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Write and debug code
+                  </p>
+                </button>
+                <button
+                  onClick={() => handleSubmit("Help me analyze data")}
+                  className="text-left p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors"
+                >
+                  <h3 className="font-medium mb-1">Data Analysis</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Analyze and visualize data
+                  </p>
+                </button>
+                <button
+                  onClick={() => handleSubmit("Help me brainstorm ideas")}
+                  className="text-left p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors"
+                >
+                  <h3 className="font-medium mb-1">Creative Writing</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Brainstorm and create content
+                  </p>
+                </button>
+              </div>
+            </div>
+          )}
           {messages.map((message) => (
             <div
               key={message.id}
               className={cn(
-                "flex gap-3 py-4",
+                "flex gap-3 py-6 border-b border-border/50 last:border-0",
                 message.role === "user" ? "flex-row-reverse" : "",
               )}
             >
@@ -291,10 +341,10 @@ export function ChatInterface({
               >
                 <div
                   className={cn(
-                    "rounded-lg px-4 py-2 max-w-4xl",
+                    "rounded-2xl px-5 py-3 max-w-4xl shadow-sm",
                     message.role === "user"
                       ? "bg-primary text-primary-foreground"
-                      : "bg-muted",
+                      : "bg-muted/50 border border-border/50",
                   )}
                 >
                   {message.role === "user" ? (
@@ -389,19 +439,18 @@ export function ChatInterface({
                       >
                         {message.content}
                       </ReactMarkdown>
-                      {isLoading && streamingMessageId === message.id ? (
-                        <div className="flex gap-3 py-4">
-                          <div className="flex-1">
-                            <div className="bg-muted rounded-lg px-4 py-2 max-w-[80%]">
-                              <div className="flex space-x-1">
-                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" />
-                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-100" />
-                                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-200" />
-                              </div>
+                      {isLoading &&
+                        streamingMessageId === message.id &&
+                        !message.content && (
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <div className="flex space-x-1">
+                              <div className="w-2 h-2 bg-primary/60 rounded-full animate-pulse" />
+                              <div className="w-2 h-2 bg-primary/60 rounded-full animate-pulse [animation-delay:0.2s]" />
+                              <div className="w-2 h-2 bg-primary/60 rounded-full animate-pulse [animation-delay:0.4s]" />
                             </div>
+                            <span className="text-sm">Thinking...</span>
                           </div>
-                        </div>
-                      ) : null}
+                        )}
                     </div>
                   )}
                 </div>
@@ -423,49 +472,8 @@ export function ChatInterface({
         </div>
       </div>
 
-      {/* Input Area */}
-      <div className="border-t bg-background">
-        <form onSubmit={handleSubmit} className="max-w-4xl mx-auto p-4">
-          <div className="flex gap-2 items-end">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="shrink-0"
-            >
-              <Paperclip className="h-4 w-4" />
-            </Button>
-            <div className="flex-1 relative">
-              <Textarea
-                ref={textRef}
-                onKeyDown={handleKeyDown}
-                placeholder="Type your message..."
-                className="min-h-[60px] max-h-[200px] pr-12 resize-none"
-                disabled={isLoading}
-              />
-              <Button
-                type="submit"
-                size="icon"
-                className="absolute bottom-2 right-2 h-8 w-8"
-                disabled={isLoading}
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="shrink-0"
-            >
-              <Mic className="h-4 w-4" />
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground mt-2 text-center">
-            Press Enter to send, Shift+Enter for new line
-          </p>
-        </form>
-      </div>
+      {/* Modern Chat Input */}
+      <ChatInput onSubmit={handleSubmit} isLoading={isLoading} />
     </div>
   );
 }
