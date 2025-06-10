@@ -1,5 +1,11 @@
+const txtDecoder = new TextDecoder();
 // Type definitions for the WebSocket client
-type WebSocketMessageType = "request" | "response" | "update" | "notification";
+type WebSocketMessageType =
+  | "request"
+  | "response"
+  | "response-chunked"
+  | "update"
+  | "notification";
 type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
 // Base message interface
@@ -27,6 +33,14 @@ interface ResponseMessage extends WebSocketMessage {
   body?: any;
 }
 
+interface ResponseChunkedMessage extends WebSocketMessage {
+  type: "response-chunked";
+  id: string;
+  status: number;
+  headers?: Headers;
+  body?: any;
+}
+
 // Response message interface
 interface NotificationMessage extends WebSocketMessage {
   type: "notification";
@@ -48,6 +62,7 @@ interface UpdateMessage extends WebSocketMessage {
 type Message =
   | RequestMessage
   | ResponseMessage
+  | ResponseChunkedMessage
   | UpdateMessage
   | NotificationMessage;
 
@@ -76,6 +91,39 @@ interface EventHandlers {
   reconnectFailed: EventHandler<{ attempts: number }>[];
 }
 
+interface EventType {
+  id: string;
+  provider: string;
+  model: string;
+  object: string;
+  created: number;
+  choices: [
+    {
+      index: number;
+      delta: {
+        role: "system" | "user" | "assistant";
+        content: string;
+        reasoning: string | null;
+      };
+      finish_reason: string | null;
+      native_finish_reason: string | null;
+      logprobs: any | null;
+    },
+  ];
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+export type StreamResponse = {
+  stream: ReadableStream<EventType>;
+  status: string;
+  statusText: string;
+  headers: any;
+};
+
 // Pending request tracking
 interface PendingRequest {
   request: RequestMessage;
@@ -83,6 +131,15 @@ interface PendingRequest {
   resolve: (value: Response) => void;
   reject: (reason: any) => void;
   timestamp: number;
+}
+
+interface PendingResponse {
+  pendingChunks: any;
+  response: StreamResponse;
+  timeoutId: number;
+  controller: ReadableStreamDefaultController<any>;
+  timestamp: number;
+  buffer: string; // Buffer to accumulate partial SSE events
 }
 
 // The client class
@@ -96,6 +153,7 @@ class WebSocketClient {
   private isReconnecting: boolean;
   private eventHandlers: EventHandlers;
   private requestMap: Map<string, PendingRequest>;
+  private responseMap: Map<string, PendingResponse>;
 
   constructor(url: string, options: Partial<WebSocketClientOptions> = {}) {
     this.url = url;
@@ -125,6 +183,7 @@ class WebSocketClient {
       reconnectFailed: [],
     };
     this.requestMap = new Map<string, PendingRequest>();
+    this.responseMap = new Map<string, PendingResponse>();
 
     this.connect();
   }
@@ -195,6 +254,7 @@ class WebSocketClient {
 
     try {
       this.socket = new WebSocket(`${this.url}/${this.token}`);
+      this.socket.binaryType = "arraybuffer";
 
       this.socket.onopen = (event: Event) => {
         this._debug("Connection established");
@@ -210,6 +270,111 @@ class WebSocketClient {
 
       this.socket.onmessage = (event: MessageEvent) => {
         try {
+          if (event.data instanceof ArrayBuffer) {
+            const view = new Uint8Array(event.data);
+            const headerLength = new DataView(view.buffer).getUint32(0, true);
+            const header = JSON.parse(
+              txtDecoder.decode(view.slice(4, 4 + headerLength)),
+            );
+            const data = view.slice(4 + headerLength);
+            const text = txtDecoder.decode(data);
+
+            if (header.status !== 200) {
+              const pendingRequest = this.requestMap.get(header.id);
+              if (pendingRequest) {
+                clearTimeout(pendingRequest.timeoutId);
+                this.requestMap.delete(header.id);
+
+                pendingRequest.resolve(
+                  new Response(text, {
+                    status: header.status,
+                    statusText: header.statusText,
+                  }),
+                );
+              }
+              this._log("Received message:", { header, text });
+
+              return;
+            }
+
+            let pendingResponse = this.responseMap.get(header.id);
+            if (!pendingResponse) {
+              let stashController: ReadableStreamDefaultController<any> | null =
+                null;
+              const stream = new ReadableStream({
+                async start(controller) {
+                  stashController = controller;
+                },
+              });
+
+              pendingResponse = {
+                pendingChunks: [],
+                timestamp: Date.now(),
+                timeoutId: window.setTimeout(() => {
+                  stashController!.close();
+                  this.responseMap.delete(header.id);
+                }, 60000),
+
+                controller: stashController!,
+                response: {
+                  stream,
+                  status: header.status,
+                  statusText: header.statusText,
+                  headers: {
+                    "Transfer-Encoding": "chunked",
+                    "Content-Type": "text/html; charset=UTF-8",
+                    "X-Content-Type-Options": "nosniff",
+                  },
+                },
+                buffer: "", // Initialize empty buffer for SSE events
+              };
+
+              this.responseMap.set(header.id, pendingResponse!);
+            }
+
+            // Append new text to buffer
+            pendingResponse.buffer += text;
+
+            const pendingRequest = this.requestMap.get(header.id);
+            if (pendingRequest) {
+              clearTimeout(pendingRequest.timeoutId);
+              this.requestMap.delete(header.id);
+
+              //@ts-ignore
+              pendingRequest.resolve(pendingResponse.response);
+            }
+
+            // Process complete SSE events (delimited by \n\n)
+            const events = pendingResponse.buffer.split("\n\n");
+            
+            // Keep the last item as it might be incomplete
+            pendingResponse.buffer = events.pop() || "";
+
+            // Process all complete events
+            for (const event of events) {
+              if (event.trim() === "") continue;
+              
+              // Extract data from SSE event
+              const dataMatch = event.match(/^data: (.+)$/m);
+              if (dataMatch) {
+                const data = dataMatch[1];
+                
+                if (data.trim() === "[DONE]") {
+                  this._log("Received message:", { header, data });
+                  clearTimeout(pendingResponse.timeoutId);
+                  pendingResponse.controller.close();
+                  this.responseMap.delete(header.id);
+                } else {
+                  // Try to parse as JSON
+                  const parsed = tryParseJson(data);
+                  if (parsed !== null) {
+                    pendingResponse.controller.enqueue(parsed);
+                  }
+                }
+              }
+            }
+          }
+
           const data = JSON.parse(event.data) as Message;
           this._log("Received message:", data);
 
@@ -227,6 +392,9 @@ class WebSocketClient {
                 }),
               );
             }
+          }
+
+          if (data.type === "response-chunked" && data.id) {
           }
 
           // Call event handlers
@@ -459,9 +627,19 @@ export {
   type WebSocketMessage,
   type RequestMessage,
   type ResponseMessage,
+  type ResponseChunkedMessage,
   type UpdateMessage,
   type Message,
   type WebSocketClientOptions,
   type WebSocketMessageType,
   type HttpMethod,
 };
+
+function tryParseJson(txt: string) {
+  try {
+    return JSON.parse(txt);
+  } catch (error) {
+    console.error("FAILED TO PARSE CHUNK", txt);
+    return null;
+  }
+}

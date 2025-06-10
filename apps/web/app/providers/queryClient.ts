@@ -1,4 +1,5 @@
 import { QueryCache, QueryClient } from "@tanstack/react-query";
+import { checkLogin } from "login";
 import { AsyncAlert } from "~/components/async-modals";
 
 const MAX_RETRIES = 6;
@@ -11,20 +12,23 @@ export const queryClient = new QueryClient({
       if (
         !sessionExpiring &&
         error.status === 401 &&
-        location.pathname !== "/login"
+        location.pathname !== "/auth"
       ) {
-        if (localStorage.getItem("pulse_session") === null)
-          location.assign(`/login`);
-
         sessionExpiring = true;
         await AsyncAlert({
           title: "Please Login",
           message: "Your session has expired. Redirecting you to login.",
         });
-        const originalUrlPath = encodeURIComponent(
-          `${location.pathname}${location.search}`,
-        );
-        location.assign(`/login?return=${originalUrlPath}`);
+
+        const ret = await checkLogin();
+        if (ret === undefined) return;
+        if (ret.state) location.assign(ret.state);
+        if (ret.authorizationUrl) {
+          const newUrl = new URL(location.origin);
+          newUrl.pathname = "/auth";
+          newUrl.searchParams.set("authorizationUrl", ret.authorizationUrl);
+          location.assign(newUrl.toString());
+        }
       }
       console.log(error);
     },

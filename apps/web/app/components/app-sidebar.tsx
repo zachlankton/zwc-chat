@@ -22,6 +22,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   useSidebar,
+  SidebarTrigger,
 } from "~/components/ui/sidebar";
 import { Button } from "~/components/ui/button";
 
@@ -163,7 +164,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       setShowContent(false);
       setTitleFading(true);
       const textTimer = setTimeout(() => {
-        setTitleText("ZWC");
+        setTitleText("");
         setTitleFading(false);
       }, 250);
       const timer = setTimeout(() => setHideElements(true), 300);
@@ -177,9 +178,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className={`border-b border-sidebar-border px-0`}>
-        <div className="flex items-center justify-between px-2 py-4 overflow-hidden">
+        <div className="flex items-center justify-between px-2 py-1 overflow-hidden">
+          <SidebarTrigger className="" />
+
           <h2
-            className={`${isCollapsed ? "text-xs" : "text-xl min-w-[238px]"} h-6 w-full text-center font-semibold transition-all duration-100 ${
+            className={`${isCollapsed ? "text-xs" : "text-xl min-w-[238px]"} ml-12 h-6 w-full font-semibold transition-all duration-100 ${
               titleFading ? "opacity-0" : "opacity-100"
             }`}
           >
@@ -188,7 +191,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </div>
         <div className={`px-2`}>
           <Button
-            className={`w-full justify-start h-10 has-[>svg]:px-2`}
+            className={`w-full justify-start h-9 has-[>svg]:px-2`}
             variant="default"
           >
             <Plus className="h-4 w-4 px-0" />
@@ -201,17 +204,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </span>
           </Button>
         </div>
-        <SidebarGroup className="pb-0">
-          {isCollapsed ? (
-            <Search className="h-8 w-8 text-muted-foreground" />
-          ) : (
+        <SidebarGroup className="pb-0 flex flex-row items-center">
+          <Search className="h-8 w-8 text-muted-foreground" />
+
+          {isCollapsed ? null : (
             <SidebarGroupLabel
-              className={`flex items-center overflow-hidden justify-between px-2 h-4 text-sm transition-opacity duration-300 ${
-                showContent ? "opacity-100" : "opacity-0"
+              className={`overflow-hidden justify-between ml-10 px-2 h-4 text-sm transition-all duration-100 ${
+                showContent ? "opacity-100" : "opacity-0 text-xs"
               }`}
             >
-              <span className="min-w-[206px]">Recent Chats</span>
-              <Search className="h-2 w-2 text-muted-foreground" />
+              <span className="">Recent Chats</span>
             </SidebarGroupLabel>
           )}
         </SidebarGroup>

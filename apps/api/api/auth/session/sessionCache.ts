@@ -19,6 +19,7 @@ export interface SessionData {
 	expiresAt: Date;
 	requestTimestampHistory: number[];
 	requestPerSecondLimit: string;
+	openRouterApiKey?: string;
 }
 
 export function userIsSuperAdmin(req: RequestWithSession) {

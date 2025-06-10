@@ -20,6 +20,7 @@ interface FetchOptions extends RequestInit {
   params?: Record<string, string>;
   baseUrl?: string;
   autoHandleStates?: boolean;
+  returnResponse?: boolean;
 }
 
 export class HttpError extends Error {
@@ -79,6 +80,8 @@ export async function fetchWrapper(
         referrerPolicy: "no-referrer-when-downgrade",
       });
     }
+
+    if (options.returnResponse) return response;
 
     let data;
     const contentType = response.headers.get("content-type");

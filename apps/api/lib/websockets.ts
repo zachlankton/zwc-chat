@@ -6,6 +6,11 @@ import { getCurrentSession } from "api/auth/session/utils";
 import type { Server, ServerWebSocket } from "bun";
 import { handleRequest } from "./router";
 import type { ExtendedRequest } from "./server-types";
+import crypto from "crypto";
+import { asyncLocalStorage } from "./asyncLocalStore";
+import type { OpenRouterMessage } from "./database";
+
+const txtDecoder = new TextDecoder();
 
 export async function handleWebsocketUpgrade(
 	server: Server,
@@ -100,25 +105,39 @@ export const bunWebsocketHandlers: websocketHandlers = {
 
 			req.ip = "WS:" + ws.data?.ip;
 			req.performance_start = performance.now();
+			req.timestamp = Date.now();
 
-			const response = await handleRequest(
-				req as ExtendedRequest,
-				ws.data.server
-			);
+			asyncLocalStorage.run(req, async () => {
+				const response: Response = await handleRequest(
+					req as ExtendedRequest,
+					ws.data.server
+				);
 
-			const bodyTxt = await response.text();
-			const body = tryParseJson(bodyTxt);
+				const cType = response.headers.get("Content-Type") ?? "";
+				if (cType.startsWith("text/event-stream")) {
+					await streamedChunks(response, ws, msgObject);
+				} else {
+					const bodyTxt = await response.text();
+					const body = tryParseJson(bodyTxt);
 
-			ws.send(
-				JSON.stringify({
-					type: "response",
-					id: msgObject.id,
-					body,
-					status: response.status,
-					statusText: response.statusText,
-					headers: response.headers,
-				})
-			);
+					ws.send(
+						JSON.stringify({
+							type: "response",
+							id: msgObject.id,
+							body,
+							status: response.status,
+							statusText: response.statusText,
+							headers: response.headers,
+						})
+					);
+				}
+
+				console.log(
+					`WS: ${response.status} Response in ${(
+						performance.now() - req.performance_start
+					).toFixed(2)}ms`
+				);
+			});
 		} else {
 			const session = await getWsSession(ws.data.url, ws.data.token);
 			if (!session) return ws.close(4401, "Not Authorized");
@@ -194,4 +213,106 @@ function formatError(ws: ZwcChatWebSocketServer, message: any) {
 			},
 		})
 	);
+}
+
+// Look for "content":" or "reasoning":" byte patterns
+const contentPattern = new Uint8Array([
+	99, 111, 110, 116, 101, 110, 116, 34, 58, 34,
+]); // "content":"
+const reasoningPattern = new Uint8Array([
+	114, 101, 97, 115, 111, 110, 105, 110, 103, 34, 58, 34,
+]); // "reasoning":"
+
+async function streamedChunks(
+	response: Response,
+	ws: ZwcChatWebSocketServer,
+	msgObject: any
+) {
+	const ctx = asyncLocalStorage.getStore();
+	if (!ctx) throw new Error("NEED SOME CONTEXT TO STREAM CHUNKS");
+
+	if (response.body === null) return;
+	const reader = response.body.getReader();
+
+	const newMessageId = crypto.randomUUID();
+	const newMessage: OpenRouterMessage = {
+		id: newMessageId,
+		chatId: ctx.params.chatId,
+		userEmail: ctx.session.email,
+		content: "",
+		role: "assistant",
+		timestamp: ctx.timestamp,
+	};
+
+	const dataChunks = [];
+	while (true) {
+		const { done, value } = await reader.read();
+		if (done) break;
+
+		if (
+			!newMessage.timeToFirstToken &&
+			(value.some((_, i) =>
+				contentPattern.every((byte, j) => value[i + j] === byte)
+			) ||
+				value.some((_, i) =>
+					reasoningPattern.every((byte, j) => value[i + j] === byte)
+				))
+		) {
+			newMessage.timeToFirstToken = Date.now();
+		}
+
+		if (!newMessage.timeToFirstToken && value.includes(123))
+			newMessage.timeToFirstToken = Date.now();
+
+		dataChunks.push(...value);
+
+		const header = new TextEncoder().encode(
+			JSON.stringify({
+				id: msgObject.id,
+				status: response.status,
+				statusText: response.statusText,
+				newMessageId,
+				length: value.length,
+			})
+		);
+		const headerLenBytes = new Uint8Array(4); // 32-bit LE
+		new DataView(headerLenBytes.buffer).setUint32(0, header.length, true);
+
+		// Combine: [header_length][header][data]
+		const message = new Uint8Array(4 + header.length + value.length);
+		message.set(headerLenBytes, 0);
+		message.set(header, 4);
+		message.set(value, 4 + header.length);
+
+		ws.send(message);
+	}
+
+	newMessage.timeToFinish = Date.now();
+	console.log("WSURL", ctx?.url.toString());
+
+	const view = new Uint8Array(dataChunks);
+	const text = txtDecoder.decode(view);
+	const chunks = text.split("data: ");
+	if (chunks[0] === "") chunks.shift();
+
+	for (const chunk of chunks) {
+		if (chunk[0] === "{") {
+			const value = tryParseJson(chunk);
+			if (!value) continue;
+
+			const usage = value?.usage;
+
+			if (usage) {
+				newMessage.promptTokens = usage.prompt_tokens;
+				newMessage.completionTokens = usage.completion_tokens;
+				newMessage.totalTokens = usage.total_tokens;
+			}
+
+			const delta = value?.choices?.[0]?.delta;
+			const msgKey = delta.reasoning ? "reasoning" : "content";
+			newMessage[msgKey] = (newMessage[msgKey] ?? "") + delta[msgKey];
+		}
+	}
+
+	console.log(newMessage);
 }
