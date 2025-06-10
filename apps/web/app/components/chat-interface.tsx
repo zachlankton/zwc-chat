@@ -249,7 +249,7 @@ export function ChatInterface() {
     <div className="flex flex-col h-full">
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-4">
+        <div className="max-w-5xl mx-auto px-4">
           {messages.map((message) => (
             <div
               key={message.id}
@@ -279,18 +279,18 @@ export function ChatInterface() {
               >
                 <div
                   className={cn(
-                    "rounded-lg px-4 py-2 max-w-[80%]",
+                    "rounded-lg px-4 py-2 max-w-4xl",
                     message.role === "user"
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted",
                   )}
                 >
                   {message.role === "user" ? (
-                    <p className="text-sm whitespace-pre-wrap user-message">
+                    <p className="text-sm whitespace-pre-wrap user-message max-w-2xl max-h-[30vh] overflow-y-auto">
                       {message.content}
                     </p>
                   ) : (
-                    <div className="prose prose-sm max-w-none">
+                    <div className="prose prose-sm">
                       {message.reasoning ? (
                         <>
                           <h1>Reasoning</h1>
