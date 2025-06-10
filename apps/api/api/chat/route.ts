@@ -9,8 +9,14 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 	if (!req.session.email) throw notAuthorized();
 
 	const url = new URL(req.url);
-	const limit = parseInt(url.searchParams.get('limit') || '20');
-	const offset = parseInt(url.searchParams.get('offset') || '0');
+	
+	// Parse and validate limit
+	const rawLimit = parseInt(url.searchParams.get('limit') || '20');
+	const limit = (!isNaN(rawLimit) && rawLimit > 0) ? Math.min(rawLimit, 100) : 20;
+	
+	// Parse and validate offset
+	const rawOffset = parseInt(url.searchParams.get('offset') || '0');
+	const offset = (!isNaN(rawOffset) && rawOffset >= 0) ? rawOffset : 0;
 
 	try {
 		const chatsCollection = await getChatsCollection();

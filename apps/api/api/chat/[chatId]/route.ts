@@ -8,6 +8,20 @@ import {
 	type Chat,
 } from "lib/database";
 
+// UUID v4 validation regex
+const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const validateUUID = (uuid: string): boolean => {
+	return UUID_V4_REGEX.test(uuid);
+};
+
+// Type for chat update operations
+interface ChatUpdateData {
+	updatedAt: Date;
+	title?: string;
+	lastMessage?: string;
+}
+
 const DEEPSEEK_R1_QWEN3_8B_FREE = "deepseek/deepseek-r1-0528-qwen3-8b:free";
 const supportedModels = [DEEPSEEK_R1_QWEN3_8B_FREE];
 
@@ -32,6 +46,9 @@ export const POST = apiHandler(
 			throw badRequest(`We do not currently support model: ${body.model}`);
 
 		const userChatId = params.chatId;
+		if (!validateUUID(userChatId)) {
+			throw badRequest("Invalid chat ID format");
+		}
 
 		// Save user message before processing
 		try {
@@ -82,6 +99,14 @@ export const POST = apiHandler(
 			}
 		} catch (error) {
 			console.error("Failed to save user message:", error);
+			const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+			return Response.json(
+				{ 
+					error: "Failed to save message. Please try again.", 
+					details: process.env.NODE_ENV === "development" ? errorMessage : undefined 
+				}, 
+				{ status: 500 }
+			);
 		}
 
 		return fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -120,9 +145,18 @@ export const GET = apiHandler(
 		if (!req.session.email) throw notAuthorized();
 
 		const chatId = params.chatId;
+		if (!validateUUID(chatId)) {
+			return Response.json({ error: "Invalid chat ID format" }, { status: 400 });
+		}
+		
 		const url = new URL(req.url);
-		const limit = parseInt(url.searchParams.get("limit") || "50");
-		const offset = parseInt(url.searchParams.get("offset") || "0");
+		// Parse and validate limit
+		const rawLimit = parseInt(url.searchParams.get("limit") || "50");
+		const limit = (!isNaN(rawLimit) && rawLimit > 0) ? Math.min(rawLimit, 100) : 50;
+		
+		// Parse and validate offset
+		const rawOffset = parseInt(url.searchParams.get("offset") || "0");
+		const offset = (!isNaN(rawOffset) && rawOffset >= 0) ? rawOffset : 0;
 
 		try {
 			// First verify the user owns this chat
@@ -161,7 +195,7 @@ export const GET = apiHandler(
 				role: msg.role,
 				content: msg.content,
 				reasoning: msg.reasoning,
-				timestamp: new Date(msg.timestamp).toISOString(),
+				timestamp: msg.timestamp,
 				promptTokens: msg.promptTokens,
 				completionTokens: msg.completionTokens,
 				totalTokens: msg.totalTokens,
@@ -194,6 +228,9 @@ export const DELETE = apiHandler(
 		if (!req.session.email) throw notAuthorized();
 
 		const chatId = params.chatId;
+		if (!validateUUID(chatId)) {
+			return Response.json({ error: "Invalid chat ID format" }, { status: 400 });
+		}
 
 		try {
 			// Verify the user owns this chat
@@ -238,6 +275,10 @@ export const PUT = apiHandler(
 		if (!req.session.email) throw notAuthorized();
 
 		const chatId = params.chatId;
+		if (!validateUUID(chatId)) {
+			return Response.json({ error: "Invalid chat ID format" }, { status: 400 });
+		}
+		
 		const body = await req.json().catch(() => null);
 		if (body === null) throw badRequest("Could not parse the body");
 
@@ -254,7 +295,7 @@ export const PUT = apiHandler(
 			}
 
 			// Update chat metadata
-			const updateData: any = {
+			const updateData: ChatUpdateData = {
 				updatedAt: new Date(),
 			};
 

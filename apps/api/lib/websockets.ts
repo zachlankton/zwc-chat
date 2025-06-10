@@ -325,40 +325,44 @@ async function streamedChunks(
 		const chatId = newMessage.chatId;
 		const userEmail = newMessage.userEmail;
 
-		// Check if chat exists
-		const existingChat = await chatsCollection.findOne({
-			id: chatId,
-			userEmail,
-		});
+		// Use atomic operations to update the chat
+		const updateResult = await chatsCollection.updateOne(
+			{ id: chatId, userEmail },
+			{
+				$set: {
+					lastMessage:
+						newMessage.content.substring(0, 100) +
+						(newMessage.content.length > 100 ? "..." : ""),
+					updatedAt: new Date(),
+				},
+				$inc: { messageCount: 1 },
+			}
+		);
 
-		if (existingChat) {
-			// Update existing chat
-			await chatsCollection.updateOne(
-				{ id: chatId, userEmail },
-				{
-					$set: {
-						lastMessage:
-							newMessage.content.substring(0, 100) +
-							(newMessage.content.length > 100 ? "..." : ""),
-						updatedAt: new Date(),
-					},
-					$inc: { messageCount: 1 },
-				}
+		// If no chat was updated, it doesn't exist yet
+		if (updateResult.matchedCount === 0) {
+			// Get the first user message to use for title
+			const firstUserMessage = await messagesCollection.findOne(
+				{ chatId, userEmail, role: "user" },
+				{ sort: { timestamp: 1 } }
 			);
-		} else {
+			
+			const title = firstUserMessage?.content
+				? firstUserMessage.content.substring(0, 50) +
+				  (firstUserMessage.content.length > 50 ? "..." : "")
+				: "New Chat";
+
 			// Create new chat
 			const newChat: Chat = {
 				id: chatId,
 				userEmail,
-				title:
-					newMessage.content.substring(0, 50) +
-					(newMessage.content.length > 50 ? "..." : ""),
+				title,
 				createdAt: new Date(),
 				updatedAt: new Date(),
 				lastMessage:
 					newMessage.content.substring(0, 100) +
 					(newMessage.content.length > 100 ? "..." : ""),
-				messageCount: 1,
+				messageCount: 2, // User message + this assistant message
 			};
 			await chatsCollection.insertOne(newChat);
 		}
@@ -366,5 +370,14 @@ async function streamedChunks(
 		console.log(`Message saved to database for chat ${chatId}`);
 	} catch (error) {
 		console.error("Failed to save message to database:", error);
+		// Send error notification to the client
+		ws.send(
+			JSON.stringify({
+				type: "error",
+				error: "Failed to save message. Your conversation may not be persisted.",
+			})
+		);
+		// Re-throw to handle at a higher level if needed
+		throw error;
 	}
 }

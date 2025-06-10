@@ -9,8 +9,8 @@ export default function Dashboard() {
   useEffect(() => {
     // Redirect to a new chat when landing on home
     const newChatId = crypto.randomUUID();
-    navigate(`/chat/${newChatId}`);
-  }, []);
+    navigate(`/chat/${newChatId}`, { replace: true });
+  }, [navigate]);
 
   return (
     <SidebarProvider>

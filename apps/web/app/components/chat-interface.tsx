@@ -130,8 +130,8 @@ export function ChatInterface({
   };
 
   React.useEffect(() => {
-    scrollToBottom();
-  }, []);
+    setTimeout(scrollToBottom, 100);
+  }, [chatId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,6 +157,7 @@ export function ChatInterface({
       content: "",
       role: "assistant",
       timestamp: Date.now(),
+      timeToFinish: 0,
     };
 
     setMessages((prev) => [...prev, assistantMessage]);
@@ -214,6 +215,14 @@ export function ChatInterface({
       }
     }
 
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === assistantMessage.id
+          ? { ...msg, timeToFinish: Date.now() }
+          : msg,
+      ),
+    );
+
     // Streaming complete
     streamingRef.current = null;
     setIsLoading(false);
@@ -269,7 +278,7 @@ export function ChatInterface({
                   )}
                 >
                   {message.role === "user" ? (
-                    <div className="text-sm whitespace-pre-wrap user-message max-w-2xl max-h-[30vh] overflow-y-auto">
+                    <div className="prose prose-sm text-sm whitespace-pre-wrap user-message max-w-2xl max-h-[30vh] overflow-y-auto">
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
                         rehypePlugins={[rehypeHighlight]}
@@ -377,7 +386,11 @@ export function ChatInterface({
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {new Date(message.timestamp).toLocaleTimeString()}
+                  {new Date(
+                    message.role === "user"
+                      ? message.timestamp
+                      : (message.timeToFinish ?? 0),
+                  ).toLocaleTimeString()}
                   {message.totalTokens
                     ? ` Total Tokens: ${message.totalTokens}`
                     : ""}

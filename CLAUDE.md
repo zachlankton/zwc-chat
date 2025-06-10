@@ -52,7 +52,7 @@ This is a **monorepo** chat application with AI integration:
 - **Auth**: Session-based authentication with MongoDB backing
 
 ### API Route Structure
-```
+```text
 /api/auth/login      - WorkOS authentication
 /api/auth/callback   - OAuth callback
 /api/auth/logout     - Session cleanup
