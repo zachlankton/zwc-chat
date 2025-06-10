@@ -46,8 +46,6 @@ export default function ChatRoute() {
     enabled: !!chatId,
   });
 
-  console.log(!!chatId, chatId, data, error);
-
   const queryClient = useQueryClient();
 
   // Update chat list when we navigate to a new chat
@@ -58,7 +56,7 @@ export default function ChatRoute() {
     }
   }, [chatId]);
 
-  if (error) {
+  if (error || !chatId) {
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-destructive">Failed to load chat</p>

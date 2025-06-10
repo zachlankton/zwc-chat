@@ -325,8 +325,19 @@ async function streamedChunks(
 		const chatId = newMessage.chatId;
 		const userEmail = newMessage.userEmail;
 
-		// Use atomic operations to update the chat
-		const updateResult = await chatsCollection.updateOne(
+		// Get the first user message to use for title (if creating new chat)
+		const firstUserMessage = await messagesCollection.findOne(
+			{ chatId, userEmail, role: "user" },
+			{ sort: { timestamp: 1 } }
+		);
+		
+		const title = firstUserMessage?.content
+			? firstUserMessage.content.substring(0, 50) +
+			  (firstUserMessage.content.length > 50 ? "..." : "")
+			: "New Chat";
+
+		// Use atomic upsert operation to update or create the chat
+		await chatsCollection.updateOne(
 			{ id: chatId, userEmail },
 			{
 				$set: {
@@ -335,37 +346,17 @@ async function streamedChunks(
 						(newMessage.content.length > 100 ? "..." : ""),
 					updatedAt: new Date(),
 				},
+				$setOnInsert: {
+					id: chatId,
+					userEmail,
+					title,
+					createdAt: new Date(),
+					messageCount: 0, // Will be incremented by $inc below
+				},
 				$inc: { messageCount: 1 },
-			}
+			},
+			{ upsert: true }
 		);
-
-		// If no chat was updated, it doesn't exist yet
-		if (updateResult.matchedCount === 0) {
-			// Get the first user message to use for title
-			const firstUserMessage = await messagesCollection.findOne(
-				{ chatId, userEmail, role: "user" },
-				{ sort: { timestamp: 1 } }
-			);
-			
-			const title = firstUserMessage?.content
-				? firstUserMessage.content.substring(0, 50) +
-				  (firstUserMessage.content.length > 50 ? "..." : "")
-				: "New Chat";
-
-			// Create new chat
-			const newChat: Chat = {
-				id: chatId,
-				userEmail,
-				title,
-				createdAt: new Date(),
-				updatedAt: new Date(),
-				lastMessage:
-					newMessage.content.substring(0, 100) +
-					(newMessage.content.length > 100 ? "..." : ""),
-				messageCount: 2, // User message + this assistant message
-			};
-			await chatsCollection.insertOne(newChat);
-		}
 
 		console.log(`Message saved to database for chat ${chatId}`);
 	} catch (error) {

@@ -27,8 +27,8 @@ interface Message {
 }
 
 interface ChatInterfaceProps {
-  chatId?: string;
-  initialMessages?: Message[];
+  chatId: string;
+  initialMessages: Message[];
 }
 
 function CodeBlock({ children }: { children: React.ReactNode }) {
@@ -165,7 +165,7 @@ export function ChatInterface({
     setTimeout(scrollNewMessage, 100);
 
     const streamResp = await post<StreamResponse | Response>(
-      `/chat/${chatId || crypto.randomUUID()}`,
+      `/chat/${chatId}`,
       { messages: msgsRef },
       {
         returnResponse: true,
@@ -204,6 +204,10 @@ export function ChatInterface({
         }
 
         const delta = value?.choices?.[0]?.delta;
+        if (!delta) {
+          console.error("delta is not defined", value);
+          continue;
+        }
         const msgKey = delta.reasoning ? "reasoning" : "content";
         setMessages((prev) =>
           prev.map((msg) =>
@@ -253,12 +257,10 @@ export function ChatInterface({
               <Avatar className="h-8 w-8">
                 {message.role === "assistant" ? (
                   <>
-                    <AvatarImage src="/ai-avatar.png" />
                     <AvatarFallback>AI</AvatarFallback>
                   </>
                 ) : (
                   <>
-                    <AvatarImage src="/user-avatar.png" />
                     <AvatarFallback>U</AvatarFallback>
                   </>
                 )}

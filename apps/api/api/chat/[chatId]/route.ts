@@ -94,6 +94,20 @@ export const POST = apiHandler(
 							messageCount: 1,
 						};
 						await chatsCollection.insertOne(newChat);
+					} else {
+						// Update existing chat with new user message
+						await chatsCollection.updateOne(
+							{ id: chatId, userEmail: req.session.email },
+							{
+								$set: {
+									lastMessage:
+										lastMessage.content.substring(0, 100) +
+										(lastMessage.content.length > 100 ? "..." : ""),
+									updatedAt: new Date(),
+								},
+								$inc: { messageCount: 1 },
+							}
+						);
 					}
 				}
 			}
