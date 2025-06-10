@@ -260,9 +260,33 @@ export function ChatInterface() {
                   )}
                 >
                   {message.role === "user" ? (
-                    <p className="text-sm whitespace-pre-wrap user-message max-w-2xl max-h-[30vh] overflow-y-auto">
-                      {message.content}
-                    </p>
+                    <div className="text-sm whitespace-pre-wrap user-message max-w-2xl max-h-[30vh] overflow-y-auto">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        rehypePlugins={[rehypeHighlight]}
+                        components={{
+                          code: ({ children, className }) => {
+                            const isInline = !className?.includes("language-");
+
+                            if (isInline) {
+                              return (
+                                <code className="px-1 py-0.5 bg-primary text-primary-foreground rounded text-sm">
+                                  {children}
+                                </code>
+                              );
+                            }
+
+                            return (
+                              <CodeBlock className={className}>
+                                {children}
+                              </CodeBlock>
+                            );
+                          },
+                        }}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                    </div>
                   ) : (
                     <div className="prose prose-sm">
                       {message.reasoning ? (

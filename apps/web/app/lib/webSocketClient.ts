@@ -615,6 +615,7 @@ function tryParseJson(txt: string) {
   try {
     return JSON.parse(txt);
   } catch (error) {
+    console.error("FAILED TO PARSE CHUNK", txt);
     return null;
   }
 }

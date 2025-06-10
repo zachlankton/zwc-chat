@@ -106,8 +106,8 @@ export const bunWebsocketHandlers: websocketHandlers = {
 				ws.data.server
 			);
 
-			const cType = response.headers.get("Content-Type");
-			if (cType === "text/event-stream") {
+			const cType = response.headers.get("Content-Type") ?? "";
+			if (cType.startsWith("text/event-stream")) {
 				return streamedChunks(response, ws, msgObject);
 			}
 

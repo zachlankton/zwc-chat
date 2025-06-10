@@ -22,7 +22,7 @@ export const POST = apiHandler(
 		const body = await req.json().catch(() => null);
 		if (body === null) throw badRequest("Could not parse the body");
 		if (!body.messages) throw badRequest("messages[] key is required");
-		if (body.model && !supportedModels[body.model])
+		if (body.model && !supportedModels.includes(body.model))
 			throw badRequest(`We do not currently support model: ${body.model}`);
 
 		const userChatId = `${req.session.email}|${params.chatId}`;
