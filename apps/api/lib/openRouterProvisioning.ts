@@ -71,7 +71,7 @@ class OpenRouterProvisioningService {
 			const response = await this.makeRequest("POST", "", {
 				name: `User: ${email}`,
 				label: `user-${userId}`,
-				limit: limit || 10, // Default $10 limit
+				limit: limit || 5, // Default $5 limit
 			});
 
 			const result = (await response.json()) as OpenRouterKey;

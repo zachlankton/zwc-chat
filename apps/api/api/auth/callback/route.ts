@@ -73,8 +73,7 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 				try {
 					const { key, encryptedKey } = await provisioningService.createKey(
 						auth.user.id,
-						auth.user.email,
-						10 // $10 default limit
+						auth.user.email
 					);
 
 					// Update user with API key information
