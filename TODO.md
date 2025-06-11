@@ -35,4 +35,6 @@
 - [x] ability to retry a single individual assistant response that includes up to that point in history context (with any model)
 - [ ] ability to split/branch off of a conversation at any point (create new chat from that point in history?)
 - [ ] user profile/settings page with subscription management and billing history
+- [ ] implement AI generated chat titles/summaries
+- [ ] implement user credits remaining health bar
 

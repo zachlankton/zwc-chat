@@ -249,8 +249,30 @@ export function ChatInterface({
   });
 
   const [messages, setMessages] = React.useState<Message[]>(initialMessages);
-  const [selectedModel, setSelectedModel] =
-    React.useState<string>("openai/gpt-4o-mini");
+  
+  // Initialize selectedModel based on context
+  const getInitialModel = () => {
+    // For existing chats, use the model from the last assistant message
+    if (initialMessages.length > 0) {
+      const lastAssistantMessage = [...initialMessages]
+        .reverse()
+        .find(msg => msg.role === "assistant" && msg.model);
+      if (lastAssistantMessage?.model) {
+        return lastAssistantMessage.model;
+      }
+    }
+    
+    // For new chats, use localStorage
+    const savedModel = localStorage.getItem("selectedModel");
+    if (savedModel) {
+      return savedModel;
+    }
+    
+    // Default fallback
+    return "openai/gpt-4o-mini";
+  };
+  
+  const [selectedModel, setSelectedModel] = React.useState<string>(getInitialModel());
 
   const streamingRef = React.useRef<NodeJS.Timeout | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -262,7 +284,22 @@ export function ChatInterface({
   // Update messages when initialMessages changes (e.g., when switching chats)
   React.useEffect(() => {
     setMessages(initialMessages);
+    
+    // Also update the selected model based on the new chat's messages
+    if (initialMessages.length > 0) {
+      const lastAssistantMessage = [...initialMessages]
+        .reverse()
+        .find(msg => msg.role === "assistant" && msg.model);
+      if (lastAssistantMessage?.model) {
+        setSelectedModel(lastAssistantMessage.model);
+      }
+    }
   }, [initialMessages]);
+  
+  // Save selected model to localStorage whenever it changes
+  React.useEffect(() => {
+    localStorage.setItem("selectedModel", selectedModel);
+  }, [selectedModel]);
 
   // Add cleanup effect
   React.useEffect(() => {

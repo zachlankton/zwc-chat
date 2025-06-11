@@ -52,20 +52,6 @@ export function ModelSelector({
           m.id.toLowerCase().includes(searchQuery.toLowerCase())),
     ) || [];
 
-  // Load last selected model from localStorage
-  useEffect(() => {
-    const savedModel = localStorage.getItem("selectedModel");
-    if (savedModel && data?.all.some((m) => m.id === savedModel)) {
-      onModelChange(savedModel);
-    }
-  }, [data, onModelChange]);
-
-  // Save selected model to localStorage
-  useEffect(() => {
-    if (selectedModel) {
-      localStorage.setItem("selectedModel", selectedModel);
-    }
-  }, [selectedModel]);
 
   const formatPrice = (price: string) => {
     const num = parseFloat(price);

@@ -50,8 +50,3 @@ export function useSession() {
   const q = useQuery(sessionQuery);
   return q.data;
 }
-
-export function logOut() {
-  post("/auth/logout", {});
-  localStorage.removeItem("pulse_session");
-}
