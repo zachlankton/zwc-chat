@@ -113,12 +113,13 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 				console.log(`User ${auth.user.email} already has an API key`);
 			}
 
-			// Decrypt API key if needed
-			let apiKey: string | undefined;
-			if (user && user.openRouterApiKey) {
+			// Decrypt API key for in-memory storage
+			let decryptedApiKey: string | undefined;
+			if (user?.openRouterApiKey) {
 				try {
-					// Check if it's encrypted (longer than typical API key)
-					apiKey = await provisioningService.decryptKey(user.openRouterApiKey);
+					decryptedApiKey = await provisioningService.decryptKey(
+						user.openRouterApiKey
+					);
 				} catch (error) {
 					console.error("Failed to decrypt API key:", error);
 				}
@@ -136,10 +137,11 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 				expiresAt: new Date(Date.now() + 1000 * 60 * 60),
 				requestPerSecondLimit: userDefaultRateLimit,
 				requestTimestampHistory: [],
-				openRouterApiKey: apiKey, // Add user's API key to session
+				openRouterApiKey: decryptedApiKey, // Store decrypted key for cache
 			};
 
-			await setSession(session.token, session);
+			// We need a special method that stores decrypted in cache but encrypted in DB
+			await setSession(session.token, session, user?.openRouterApiKey);
 
 			// Return the session data from the lock callback
 			return {
@@ -175,4 +177,3 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 		return new Response("Authentication failed", { status: 500 });
 	}
 });
-
