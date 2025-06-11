@@ -91,6 +91,12 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 						auth.user.email
 					);
 
+					if (!encryptedKey) {
+						throw new Error(
+							"createKey did not return encryptedKey; aborting to avoid storing plaintext secret"
+						);
+					}
+
 					// Update user with API key information
 					await usersCollection.updateOne(
 						{ email: auth.user.email },
