@@ -33,9 +33,9 @@
 - [ ] support tool calling???? not sure the best way to do this but would be super cool
 - [ ] ability to edit/delete individual messages
 - [x] ability to retry a single individual assistant response that includes up to that point in history context (with any model)
-- [ ] ability to split/branch off of a conversation at any point (create new chat from that point in history?)
+- [x] ability to split/branch off of a conversation at any point (create new chat from that point in history?)
 - [ ] user profile/settings page with subscription management and billing history
-- [ ] implement AI generated chat titles/summaries
+- [x] implement AI generated chat titles/summaries
 - [ ] implement user credits remaining health bar
 - [ ] make sure to filter our attachments allowed by the currently selected models abilities, pdfs work for all models, images only work for some
 

@@ -36,6 +36,7 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { useQuery } from "@tanstack/react-query";
+import { useApiKeyInfo } from "~/stores/session";
 
 interface Message {
   id: string;
@@ -269,6 +270,9 @@ export function ChatInterface({
     queryFn: () => get("/api/models"),
     staleTime: 60 * 60 * 1000, // 1 hour
   });
+
+  const apiKeyInfo = useApiKeyInfo();
+  console.log(apiKeyInfo);
 
   const [messages, setMessages] = React.useState<Message[]>(initialMessages);
 
@@ -599,7 +603,18 @@ export function ChatInterface({
         ? `${_message.message} ${raw.detail}`
         : "Unknown Error Occurred, check console log for details";
       console.error(streamResp, text);
-      AsyncAlert({ title: "Error", message });
+      if (
+        streamResp.status === 403 &&
+        message.toLowerCase().includes("key limit exceeded")
+      ) {
+        AsyncAlert({
+          title: "Error",
+          message:
+            "You have reached your limit, please purchase more credits to continue.",
+        });
+      } else {
+        AsyncAlert({ title: "Error", message });
+      }
       // Restore the original message
       setMessages((prev) =>
         prev.map((msg, idx) => (idx === messageIndex ? messageToRetry : msg)),
@@ -1027,6 +1042,7 @@ export function ChatInterface({
         modelsData={modelsData}
         modelsLoading={modelsLoading}
         modelsError={modelsError}
+        apiKeyInfo={apiKeyInfo?.data}
       />
     </div>
   );

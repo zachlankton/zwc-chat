@@ -1,11 +1,32 @@
 import * as React from "react";
-import { Send, Paperclip, Mic, X } from "lucide-react";
+import {
+  Send,
+  Paperclip,
+  Mic,
+  X,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+} from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { cn } from "~/lib/utils";
 import { useRef, useState } from "react";
 import { useSidebar } from "./ui/sidebar";
 import { ModelSelector } from "./model-selector";
 import type { ModelsResponse } from "./chat-interface";
+
+interface ApiKeyInfo {
+  label: string;
+  limit: number;
+  usage: number;
+  is_provisioning_key: boolean;
+  limit_remaining: number;
+  is_free_tier: boolean;
+  rate_limit: {
+    requests: number;
+    interval: string;
+  };
+}
 
 interface ChatInputProps {
   onSubmit: (message: string, attachments: File[]) => void;
@@ -16,6 +37,7 @@ interface ChatInputProps {
   modelsData?: ModelsResponse;
   modelsLoading: any;
   modelsError: any;
+  apiKeyInfo?: ApiKeyInfo | null;
 }
 
 export function ChatInput({
@@ -27,12 +49,38 @@ export function ChatInput({
   modelsData,
   modelsLoading,
   modelsError,
+  apiKeyInfo,
 }: ChatInputProps) {
   const [isFocused, setIsFocused] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sidebar = useSidebar();
   const sidebarCollapsed = sidebar.state === "collapsed";
+
+  // Calculate usage percentage and determine status
+  const getUsageStatus = () => {
+    if (!apiKeyInfo) return null;
+
+    const usagePercentage = (apiKeyInfo.usage / apiKeyInfo.limit) * 100;
+    const remainingPercentage = Math.max(0, 100 - usagePercentage);
+
+    let status: "good" | "warning" | "critical" = "good";
+    if (usagePercentage >= 90) {
+      status = "critical";
+    } else if (usagePercentage >= 80) {
+      status = "warning";
+    }
+
+    return {
+      percentage: remainingPercentage,
+      status,
+      remaining: apiKeyInfo.limit_remaining,
+      limit: apiKeyInfo.limit,
+      usage: apiKeyInfo.usage,
+    };
+  };
+
+  const usageStatus = getUsageStatus();
 
   const handleSubmit = () => {
     if (!textareaRef.current) return;
@@ -195,6 +243,44 @@ export function ChatInput({
               <span>Press Enter to send, Shift+Enter for new line</span>
             </div>
             <div className="flex items-center gap-4">
+              {/* API Key Usage Indicator */}
+              {usageStatus && (
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    {usageStatus.status === "critical" ? (
+                      <XCircle className="h-3.5 w-3.5 text-destructive" />
+                    ) : usageStatus.status === "warning" ? (
+                      <AlertCircle className="h-3.5 w-3.5 text-yellow-500" />
+                    ) : (
+                      <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                    )}
+                    <span
+                      className={cn(
+                        "text-xs font-medium",
+                        usageStatus.status === "critical" && "text-destructive",
+                        usageStatus.status === "warning" && "text-yellow-500",
+                        usageStatus.status === "good" && "text-green-500",
+                      )}
+                    >
+                      {usageStatus.remaining > 0
+                        ? `$${usageStatus.remaining.toFixed(3)} remaining`
+                        : "No credits remaining"}
+                    </span>
+                  </div>
+                  {/* Progress bar */}
+                  <div className="relative w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        "absolute left-0 top-0 h-full transition-all duration-300",
+                        usageStatus.status === "critical" && "bg-destructive",
+                        usageStatus.status === "warning" && "bg-yellow-500",
+                        usageStatus.status === "good" && "bg-green-500",
+                      )}
+                      style={{ width: `${usageStatus.percentage}%` }}
+                    />
+                  </div>
+                </div>
+              )}
               {selectedModel && onModelChange && (
                 <ModelSelector
                   selectedModel={selectedModel}
