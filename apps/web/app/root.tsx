@@ -1,4 +1,5 @@
 import "../login.ts";
+import React from "react";
 import {
   isRouteErrorResponse,
   Links,
@@ -16,6 +17,16 @@ import { checkLogin } from "../login";
 import { ThemeProvider } from "./providers/theme-provider.js";
 import { queryClient } from "./providers/queryClient.js";
 import { QueryClientProvider } from "@tanstack/react-query";
+
+// Lazy load ReactQueryDevtools only in development
+const ReactQueryDevtools =
+  process.env.NODE_ENV === "development"
+    ? React.lazy(() =>
+        import("@tanstack/react-query-devtools").then((module) => ({
+          default: module.ReactQueryDevtools,
+        })),
+      )
+    : () => null;
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -42,6 +53,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <body>
         <QueryClientProvider client={queryClient}>
           <ThemeProvider>{children}</ThemeProvider>
+          {process.env.NODE_ENV === "development" && (
+            <React.Suspense fallback={null}>
+              <ReactQueryDevtools initialIsOpen={false} />
+            </React.Suspense>
+          )}
         </QueryClientProvider>
         <ScrollRestoration />
         <Scripts />
