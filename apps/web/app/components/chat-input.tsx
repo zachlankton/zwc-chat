@@ -263,7 +263,7 @@ export function ChatInput({
                       )}
                     >
                       {usageStatus.remaining > 0
-                        ? `$${usageStatus.remaining.toFixed(3)} remaining`
+                        ? `${usageStatus.percentage.toFixed(1)}% remaining`
                         : "No credits remaining"}
                     </span>
                   </div>
