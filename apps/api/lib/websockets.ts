@@ -10,6 +10,7 @@ import crypto from "crypto";
 import { asyncLocalStorage } from "./asyncLocalStore";
 import type { OpenRouterMessage } from "./database";
 import { getMessagesCollection, getChatsCollection } from "./database";
+import { appendFile } from "node:fs/promises";
 
 const txtDecoder = new TextDecoder();
 
@@ -278,6 +279,7 @@ interface EventType {
 				role: "system" | "developer" | "user" | "assistant" | "tool";
 				content: string;
 				reasoning: string | null;
+				annotations: any;
 			};
 			finish_reason: string | null;
 			native_finish_reason: string | null;
@@ -303,6 +305,8 @@ function parseStreamingChunks(
 
 	for (const chunk of chunks) {
 		if (chunk[0] === "{") {
+			//appendFile("debug-chunks.txt", chunk);
+
 			const value = tryParseJson(chunk) as EventType;
 			if (!value) continue;
 
@@ -317,6 +321,10 @@ function parseStreamingChunks(
 			// Extract content or reasoning
 			const delta = value?.choices?.[0]?.delta;
 			const role = delta.role;
+
+			if (delta.annotations) {
+				newMessage.annotations = delta.annotations;
+			}
 
 			if (role !== "assistant") {
 				console.error(
@@ -360,7 +368,9 @@ async function saveMessageAndUpdateChat(
 		if (typeof firstUserMessage.content === "string") {
 			userTextContent = firstUserMessage.content;
 		} else if (Array.isArray(firstUserMessage.content)) {
-			const textPart = firstUserMessage.content.find((item: any) => item.type === "text") as any;
+			const textPart = firstUserMessage.content.find(
+				(item: any) => item.type === "text"
+			) as any;
 			userTextContent = textPart?.text || "Sent attachments";
 		}
 	}
@@ -378,7 +388,7 @@ async function saveMessageAndUpdateChat(
 				lastMessage:
 					typeof newMessage.content === "string"
 						? newMessage.content.substring(0, 100) +
-						  (newMessage.content.length > 100 ? "..." : "")
+							(newMessage.content.length > 100 ? "..." : "")
 						: "Assistant response",
 				updatedAt: new Date(),
 			},

@@ -76,20 +76,24 @@ export const POST = apiHandler(
 					// Update chat with user message using atomic upsert
 					const chatsCollection = await getChatsCollection();
 					const now = new Date();
-					
+
 					// Extract text content for title/lastMessage
 					let textContent = "";
 					if (typeof lastMessage.content === "string") {
 						textContent = lastMessage.content;
 					} else if (Array.isArray(lastMessage.content)) {
 						// Extract text from content array
-						const textPart = lastMessage.content.find((item: any) => item.type === "text") as any;
+						const textPart = lastMessage.content.find(
+							(item: any) => item.type === "text"
+						) as any;
 						textContent = textPart?.text || "Sent attachments";
 					}
-					
-					const chatTitle = textContent.substring(0, 50) +
+
+					const chatTitle =
+						textContent.substring(0, 50) +
 						(textContent.length > 50 ? "..." : "");
-					const chatLastMessage = textContent.substring(0, 100) +
+					const chatLastMessage =
+						textContent.substring(0, 100) +
 						(textContent.length > 100 ? "..." : "");
 
 					await chatsCollection.updateOne(
@@ -221,6 +225,7 @@ export const GET = apiHandler(
 				totalTokens: msg.totalTokens,
 				timeToFirstToken: msg.timeToFirstToken,
 				timeToFinish: msg.timeToFinish,
+				annotations: msg.annotations,
 			}));
 
 			return Response.json({
