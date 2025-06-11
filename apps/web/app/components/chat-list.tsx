@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { del, fetchWrapper, get } from "../lib/fetchWrapper";
+import { del, fetchWrapper, get, put } from "../lib/fetchWrapper";
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, Pencil, Check, X } from "lucide-react";
 import { useNavigate } from "react-router";
 import { AsyncConfirm } from "./async-modals";
+import { useState } from "react";
 
 interface Chat {
   id: string;
@@ -34,6 +35,8 @@ export function ChatList({
 }: ChatListProps) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [editingChatId, setEditingChatId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
 
   // Fetch user's chats
   const { data, isLoading, error } = useQuery({
@@ -64,6 +67,40 @@ export function ChatList({
       }
     },
   });
+
+  // Update chat title mutation
+  const updateChatMutation = useMutation({
+    mutationFn: async ({ chatId, title }: { chatId: string; title: string }) => {
+      const response = await put<Response>(`/api/chat/${chatId}`, 
+        { title }, 
+        { returnResponse: true }
+      );
+      if (!response.ok) throw new Error("Failed to update chat");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["chats"] });
+      setEditingChatId(null);
+    },
+  });
+
+  const handleEditStart = (chatId: string, currentTitle: string) => {
+    setEditingChatId(chatId);
+    setEditTitle(currentTitle);
+  };
+
+  const handleEditSave = (chatId: string) => {
+    if (editTitle.trim() && editTitle.trim() !== "") {
+      updateChatMutation.mutate({ chatId, title: editTitle.trim() });
+    } else {
+      setEditingChatId(null);
+    }
+  };
+
+  const handleEditCancel = () => {
+    setEditingChatId(null);
+    setEditTitle("");
+  };
 
   if (error) {
     return (
@@ -106,32 +143,93 @@ export function ChatList({
               >
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-medium truncate">
-                      {chat.title}
-                    </h4>
-                    {chat.lastMessage && (
-                      <p className="text-xs text-muted-foreground truncate mt-1">
-                        {chat.lastMessage}
-                      </p>
+                    {editingChatId === chat.id ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              handleEditSave(chat.id);
+                            } else if (e.key === "Escape") {
+                              handleEditCancel();
+                            }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex-1 px-2 py-1 text-sm bg-background border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                          autoFocus
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditSave(chat.id);
+                          }}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditCancel();
+                          }}
+                          className="h-6 w-6 p-0"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <h4 className="text-sm font-medium truncate">
+                          {chat.title}
+                        </h4>
+                        {chat.lastMessage && (
+                          <p className="text-xs text-muted-foreground truncate mt-1">
+                            {chat.lastMessage}
+                          </p>
+                        )}
+                      </>
                     )}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      const { ok } = await AsyncConfirm({
-                        destructive: true,
-                        title: "Delete Chat",
-                        message: "Are you sure you want to delete this chat?",
-                      });
+                  <div className="flex items-center gap-1">
+                    {editingChatId !== chat.id && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditStart(chat.id, chat.title);
+                          }}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const { ok } = await AsyncConfirm({
+                              destructive: true,
+                              title: "Delete Chat",
+                              message: "Are you sure you want to delete this chat?",
+                            });
 
-                      if (ok) deleteChatMutation.mutate(chat.id);
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                            if (ok) deleteChatMutation.mutate(chat.id);
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
