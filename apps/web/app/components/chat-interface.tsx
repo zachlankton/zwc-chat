@@ -358,6 +358,7 @@ export function ChatInterface({
   const handleSubmit = async (input: string, attachments: File[]) => {
     if (!input.trim() || isLoading) return;
     const stashMessageLength = messages.length;
+    const isNewChat = initialMessages.length === 0 && stashMessageLength === 0;
 
     // Convert files to base64
     const fileToBase64 = async (file: File): Promise<string> => {
@@ -393,6 +394,30 @@ export function ChatInterface({
           });
         }
       }
+    }
+
+    // If this is a new chat, immediately add a placeholder to the chat list
+    if (isNewChat) {
+      queryClient.setQueryData(["chats"], (oldData: any) => {
+        if (!oldData) return oldData;
+
+        const placeholderChat = {
+          id: chatId,
+          title: "Generating...",
+          lastMessage:
+            typeof content === "string"
+              ? content.slice(0, 50)
+              : "New conversation",
+          updatedAt: new Date().toISOString(),
+          messageCount: 1,
+        };
+
+        return {
+          ...oldData,
+          chats: [placeholderChat, ...oldData.chats],
+          total: oldData.total + 1,
+        };
+      });
     }
 
     const userMessage: Message = {
@@ -508,12 +533,10 @@ export function ChatInterface({
     setStreamingMessageId(null);
 
     // Generate title for new chats after first response
-    const isNewChat = initialMessages.length === 0 && stashMessageLength === 0;
     if (isNewChat) {
       // Fire and forget - don't wait for title generation
       post(`/chat/${chatId}/generate-title`, {})
         .then(() => {
-          console.log("Title generation triggered");
           // Invalidate chats query to refresh the title
           setTimeout(() => {
             queryClient.invalidateQueries({ queryKey: ["chats"] });
