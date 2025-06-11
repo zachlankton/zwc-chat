@@ -127,7 +127,6 @@ export const POST = apiHandler(
 			);
 		}
 
-		console.log("OPENROUTERKEY", req.session.openRouterApiKey);
 		return fetch("https://openrouter.ai/api/v1/chat/completions", {
 			method: "POST",
 			headers: {
