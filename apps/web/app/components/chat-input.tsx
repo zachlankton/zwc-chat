@@ -54,6 +54,7 @@ export function ChatInput({
   const [isFocused, setIsFocused] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const textareaScrollHeightRef = useRef<HTMLTextAreaElement>(null);
   const sidebar = useSidebar();
   const sidebarCollapsed = sidebar.state === "collapsed";
 
@@ -94,23 +95,35 @@ export function ChatInput({
     }
   };
 
-  const handleKeyUp = (extra?: any) => {
-    if (!textareaRef.current) return;
-    const message = textareaRef.current.value;
-    const extraNumber = typeof extra === "number" ? extra : 0;
-
-    const count = Math.max(message.split("\n").length, 1) + extraNumber;
-    if (textareaRef.current) {
-      textareaRef.current.style.height = `${count * 20}px`;
-    }
-  };
-
   const handleKeyDown = (e: any) => {
-    if (e.key === "Enter") handleKeyUp(1);
+    if (textareaRef.current && textareaScrollHeightRef.current) {
+      textareaScrollHeightRef.current.value = textareaRef.current.value;
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
     }
+
+    setTimeout(() => {
+      if (!textareaRef.current) return;
+      if (!textareaScrollHeightRef.current) return;
+
+      const textarea = textareaRef.current;
+      const textScroll = textareaScrollHeightRef.current;
+
+      const message = textarea.value;
+
+      if (message.length === 0) return (textarea.style.height = "20px");
+
+      const count = Math.max(message.split("\n").length, 1);
+      textarea.style.height = `${count * 20}px`;
+
+      // Get the scroll height (content height)
+      const scrollHeight = textScroll.scrollHeight;
+
+      textarea.style.height = `${Math.max(scrollHeight, count * 20)}px`;
+    }, 100);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -185,10 +198,22 @@ export function ChatInput({
             </label>
 
             {/* Textarea */}
-            <div className="flex-1">
+            <div className="flex-1 relative">
+              <textarea
+                ref={textareaScrollHeightRef}
+                disabled={isLoading}
+                rows={1}
+                className={cn(
+                  "w-full absolute bottom-[-9000px] bg-transparent text-transparent mt-2 mb-1 resize-none text-sm",
+                  "min-h-[24px] max-h-[200px]",
+                )}
+                style={{
+                  scrollbarWidth: "thin",
+                  height: "20px",
+                }}
+              />
               <textarea
                 ref={textareaRef}
-                onKeyUp={() => handleKeyUp()}
                 onKeyDown={handleKeyDown}
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => setIsFocused(false)}
@@ -263,7 +288,7 @@ export function ChatInput({
                       )}
                     >
                       {usageStatus.remaining > 0
-                        ? `${usageStatus.percentage.toFixed(1)}% remaining`
+                        ? `${usageStatus.percentage.toFixed(1)}% credits remain`
                         : "No credits remaining"}
                     </span>
                   </div>

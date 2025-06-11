@@ -11,6 +11,100 @@ const validateUUID = (uuid: string): boolean => {
   return UUID_V4_REGEX.test(uuid);
 };
 
+export const PUT = apiHandler(
+  async (
+    req: RequestWithSession,
+    { params }: { params: { chatId: string; messageId: string } }
+  ) => {
+    await getCurrentSession(req);
+    if (!req.session) throw notAuthorized();
+    if (!req.session.email) throw notAuthorized();
+
+    const { chatId, messageId } = params;
+
+    // Validate UUIDs
+    if (!validateUUID(chatId)) {
+      throw badRequest("Invalid chat ID format");
+    }
+    if (!validateUUID(messageId)) {
+      throw badRequest("Invalid message ID format");
+    }
+
+    const body = await req.json().catch(() => null);
+    if (!body || !body.content) {
+      throw badRequest("Content is required");
+    }
+
+    try {
+      // First verify the user owns this chat
+      const chatsCollection = await getChatsCollection();
+      const chat = await chatsCollection.findOne({
+        id: chatId,
+        userEmail: req.session.email,
+      });
+
+      if (!chat) {
+        return Response.json({ error: "Chat not found" }, { status: 404 });
+      }
+
+      // Update the message
+      const messagesCollection = await getMessagesCollection();
+      const updateResult = await messagesCollection.updateOne(
+        {
+          id: messageId,
+          chatId,
+          userEmail: req.session.email,
+        },
+        {
+          $set: {
+            content: body.content,
+            editedAt: new Date(),
+          },
+        }
+      );
+
+      if (updateResult.matchedCount === 0) {
+        return Response.json({ error: "Message not found" }, { status: 404 });
+      }
+
+      // Update chat's last message if this was the most recent message
+      const latestMessage = await messagesCollection
+        .findOne(
+          {
+            chatId,
+            userEmail: req.session.email,
+          },
+          {
+            sort: { timestamp: -1 },
+          }
+        );
+
+      if (latestMessage && latestMessage.id === messageId) {
+        const chatLastMessage =
+          body.content.substring(0, 100) + (body.content.length > 100 ? "..." : "");
+
+        await chatsCollection.updateOne(
+          { id: chatId },
+          {
+            $set: {
+              lastMessage: chatLastMessage,
+              updatedAt: new Date(),
+            },
+          }
+        );
+      }
+
+      return Response.json({ success: true });
+    } catch (error) {
+      console.error("Error updating message:", error);
+      return Response.json(
+        { error: "Failed to update message" },
+        { status: 500 }
+      );
+    }
+  }
+);
+
 export const DELETE = apiHandler(
   async (
     req: RequestWithSession,

@@ -1,5 +1,13 @@
 import * as React from "react";
-import { Copy, Check, Sparkles, RotateCcw, GitBranchPlus, Trash2 } from "lucide-react";
+import {
+  Copy,
+  Check,
+  Sparkles,
+  RotateCcw,
+  GitBranchPlus,
+  Trash2,
+  Pencil,
+} from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { cn } from "~/lib/utils";
@@ -7,11 +15,17 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github-dark.css";
-import { get, post, del } from "~/lib/fetchWrapper";
-import { AsyncAlert, AsyncConfirm } from "./async-modals";
+import { get, post, del, put } from "~/lib/fetchWrapper";
+import { AsyncAlert, AsyncConfirm, AsyncModal } from "./async-modals";
 import type { StreamResponse } from "~/lib/webSocketClient";
 import { queryClient } from "~/providers/queryClient";
 import { ChatInput } from "./chat-input";
+import {
+  DialogTitle,
+  DialogDescription,
+  DialogClose,
+} from "~/components/ui/dialog";
+import { Textarea } from "~/components/ui/textarea";
 
 export interface Model {
   id: string;
@@ -202,6 +216,78 @@ function MessageBranchButton({
   );
 }
 
+function MessageEditButton({
+  messageId,
+  content,
+  onEdit,
+}: {
+  messageId: string;
+  content: string | any[];
+  onEdit: (messageId: string, newContent: string) => void;
+}) {
+  const handleEdit = async () => {
+    // Extract text content from message
+    let textContent = "";
+    if (typeof content === "string") {
+      textContent = content;
+    } else if (Array.isArray(content)) {
+      // Extract text from content array
+      const textPart = content.find((item: any) => item.type === "text") as any;
+      textContent = textPart?.text || "";
+    }
+
+    const result = await AsyncModal(
+      <>
+        <DialogTitle className="mb-4 text-xl font-bold">
+          Edit Message
+        </DialogTitle>
+        <DialogDescription className="mb-4">
+          Edit the message content below:
+        </DialogDescription>
+        <div className="mb-6">
+          <Textarea
+            name="content"
+            defaultValue={textContent}
+            className="min-h-[50vh] w-full resize-y"
+            placeholder="Enter your message..."
+            autoFocus
+          />
+        </div>
+        <div className="grid grid-flow-row-dense grid-cols-2 gap-3">
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Cancel
+            </Button>
+          </DialogClose>
+          <Button type="submit" variant="default">
+            Save
+          </Button>
+        </div>
+      </>,
+      {
+        style: { maxWidth: "80vw" },
+        initialData: { content: textContent },
+      },
+    );
+
+    if (result.ok && result.data.content?.trim()) {
+      onEdit(messageId, result.data.content.trim());
+    }
+  };
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleEdit}
+      className="h-6 has-[>svg]:px-2 has-[>svg]:py-4 text-xs hover:bg-muted/50"
+      title="Edit message"
+    >
+      <Pencil className="h-3" />
+    </Button>
+  );
+}
+
 function MessageDeleteButton({
   messageId,
   onDelete,
@@ -252,7 +338,7 @@ function CodeBlock({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="relative group">
-      <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute right-2 top-2 text-white opacity-0 group-hover:opacity-100 transition-opacity">
         <Button
           variant="ghost"
           size="icon"
@@ -740,16 +826,20 @@ export function ChatInterface({
     const { ok } = await AsyncConfirm({
       destructive: true,
       title: "Delete Message",
-      message: "Are you sure you want to delete this message? This action cannot be undone.",
+      message:
+        "Are you sure you want to delete this message? This action cannot be undone.",
     });
 
     if (!ok) return;
 
     try {
       // Call API to delete message
-      const response = await del<Response>(`/chat/${chatId}/message/${messageId}`, {
-        returnResponse: true,
-      });
+      const response = await del<Response>(
+        `/chat/${chatId}/message/${messageId}`,
+        {
+          returnResponse: true,
+        },
+      );
 
       if (!response.ok) {
         throw new Error("Failed to delete message");
@@ -765,6 +855,55 @@ export function ChatInterface({
       AsyncAlert({
         title: "Error",
         message: "Failed to delete message. Please try again.",
+      });
+    }
+  };
+
+  const handleEdit = async (messageId: string, newContent: string) => {
+    try {
+      // Find the message to edit
+      const messageIndex = messages.findIndex((msg) => msg.id === messageId);
+      if (messageIndex === -1) return;
+
+      const originalMessage = messages[messageIndex];
+
+      // Optimistically update the message
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId
+            ? {
+                ...msg,
+                content:
+                  typeof msg.content === "string"
+                    ? newContent
+                    : [{ type: "text", text: newContent }],
+              }
+            : msg,
+        ),
+      );
+
+      // Call API to update message
+      const response = await put<Response>(
+        `/chat/${chatId}/message/${messageId}`,
+        { content: newContent },
+        { returnResponse: true },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to update message");
+      }
+
+      // Invalidate chat list to update last message if needed
+      queryClient.invalidateQueries({ queryKey: ["chats"] });
+    } catch (error) {
+      console.error("Failed to edit message:", error);
+
+      // Revert the optimistic update on error
+      setMessages((prev) => [...prev]);
+
+      AsyncAlert({
+        title: "Error",
+        message: "Failed to edit message. Please try again.",
       });
     }
   };
@@ -1076,6 +1215,11 @@ export function ChatInterface({
                         />
                       </>
                     )}
+                    <MessageEditButton
+                      messageId={message.id}
+                      content={message.content}
+                      onEdit={handleEdit}
+                    />
                     <MessageDeleteButton
                       messageId={message.id}
                       onDelete={handleDelete}
