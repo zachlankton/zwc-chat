@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Copy, Check, Sparkles } from "lucide-react";
+import { Copy, Check, Sparkles, RotateCcw } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { cn } from "~/lib/utils";
@@ -7,11 +7,35 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github-dark.css";
-import { post } from "~/lib/fetchWrapper";
+import { get, post } from "~/lib/fetchWrapper";
 import { AsyncAlert } from "./async-modals";
 import type { StreamResponse } from "~/lib/webSocketClient";
 import { queryClient } from "~/providers/queryClient";
 import { ChatInput } from "./chat-input";
+
+export interface Model {
+  id: string;
+  name: string;
+  description: string;
+  context_length: number;
+  pricing: {
+    prompt: string;
+    completion: string;
+  };
+}
+
+export interface ModelsResponse {
+  favorites: Model[];
+  all: Model[];
+}
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
+import { useQuery } from "@tanstack/react-query";
 
 interface Message {
   id: string;
@@ -104,6 +128,57 @@ function MessageCopyButton({
   );
 }
 
+function MessageRetryButton({
+  messageIndex,
+  messageModel,
+  currentModel,
+  onRetry,
+}: {
+  messageIndex: number;
+  messageModel: string;
+  currentModel: string;
+  onRetry: (messageIndex: number, newModel?: string) => void;
+}) {
+  const modelsAreSame = messageModel === currentModel;
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 has-[>svg]:px-2 has-[>svg]:py-4 text-xs hover:bg-muted/50"
+          >
+            <RotateCcw className="h-3" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => onRetry(messageIndex, messageModel)}>
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Retry With {messageModel.split("/")[1] || messageModel}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => onRetry(messageIndex, currentModel)}
+            disabled={modelsAreSame}
+          >
+            {modelsAreSame ? (
+              <span className="flex text-muted-foreground">
+                <Sparkles className="h-4 w-4 mr-2" />
+                Change your current model to retry with that
+              </span>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4 mr-2" />
+                Retry with {currentModel.split("/")[1] || currentModel}
+              </>
+            )}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  );
+}
+
 function CodeBlock({ children }: { children: React.ReactNode }) {
   const [copied, setCopied] = React.useState(false);
   const codeRef = React.useRef<HTMLElement>(null);
@@ -163,6 +238,16 @@ export function ChatInterface({
   chatId,
   initialMessages = [],
 }: ChatInterfaceProps) {
+  const {
+    data: modelsData,
+    isLoading: modelsLoading,
+    error: modelsError,
+  } = useQuery<ModelsResponse>({
+    queryKey: ["models"],
+    queryFn: () => get("/api/models"),
+    staleTime: 60 * 60 * 1000, // 1 hour
+  });
+
   const [messages, setMessages] = React.useState<Message[]>(initialMessages);
   const [selectedModel, setSelectedModel] =
     React.useState<string>("openai/gpt-4o-mini");
@@ -365,6 +450,130 @@ export function ChatInterface({
     }, 1000);
   };
 
+  const handleRetry = async (messageIndex: number, newModel?: string) => {
+    if (isLoading) return;
+
+    // Get the message to retry and ensure it's an assistant message
+    const messageToRetry = messages[messageIndex];
+    if (messageToRetry.role !== "assistant") return;
+
+    // Find all messages up to and including the user message before this assistant message
+    const messagesUpToRetry = messages.slice(0, messageIndex);
+
+    // Update the model if a new one was selected
+    const modelToUse = newModel || messageToRetry.model || selectedModel;
+
+    setIsLoading(true);
+
+    // Mark this specific message as being regenerated
+    setStreamingMessageId(messageToRetry.id);
+
+    // Clear the content of the message being retried
+    setMessages((prev) =>
+      prev.map((msg, idx) =>
+        idx === messageIndex
+          ? { ...msg, content: "", reasoning: undefined, model: modelToUse }
+          : msg,
+      ),
+    );
+
+    const streamResp = await post<StreamResponse | Response>(
+      `/chat/${chatId}`,
+      { 
+        messages: messagesUpToRetry, 
+        model: modelToUse,
+        messageIdToReplace: messageToRetry.id 
+      },
+      {
+        returnResponse: true,
+      },
+    );
+
+    if (streamResp.status !== 200 && streamResp instanceof Response) {
+      const text = await streamResp.text();
+      const _message = text[0] === "{" ? JSON.parse(text).error : text;
+      const raw = _message?.metadata?.raw
+        ? JSON.parse(_message.metadata.raw)
+        : { detail: "" };
+      const message = _message.message
+        ? `${_message.message} ${raw.detail}`
+        : "Unknown Error Occurred, check console log for details";
+      console.error(streamResp, text);
+      AsyncAlert({ title: "Error", message });
+      // Restore the original message
+      setMessages((prev) =>
+        prev.map((msg, idx) => (idx === messageIndex ? messageToRetry : msg)),
+      );
+    } else if ("stream" in streamResp) {
+      const reader = streamResp.stream.getReader();
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        const usage = value?.usage;
+
+        if (usage) {
+          setMessages((prev) =>
+            prev.map((msg, idx) =>
+              idx === messageIndex
+                ? {
+                    ...msg,
+                    promptTokens: usage.prompt_tokens,
+                    completionTokens: usage.completion_tokens,
+                    totalTokens: usage.total_tokens,
+                  }
+                : msg,
+            ),
+          );
+        }
+
+        const delta = value?.choices?.[0]?.delta;
+        const role = delta.role;
+        if (role !== "assistant") {
+          console.error(
+            "obviously we forgot to plan for message roles that aren't assistant",
+            value,
+          );
+          continue;
+        }
+
+        if (!delta) {
+          console.error("delta is not defined", value);
+          continue;
+        }
+        const msgKey = delta.reasoning ? "reasoning" : "content";
+        setMessages((prev) =>
+          prev.map((msg, idx) =>
+            idx === messageIndex
+              ? {
+                  ...msg,
+                  [msgKey]: (msg[msgKey] ?? "") + (delta[msgKey] || ""),
+                }
+              : msg,
+          ),
+        );
+      }
+    }
+
+    setMessages((prev) =>
+      prev.map((msg, idx) =>
+        idx === messageIndex
+          ? { ...msg, timeToFinish: Date.now() - msg.timestamp }
+          : msg,
+      ),
+    );
+
+    // Streaming complete
+    streamingRef.current = null;
+    setIsLoading(false);
+    setStreamingMessageId(null);
+    setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ["chats"] });
+    }, 1000);
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Messages Area */}
@@ -432,7 +641,7 @@ export function ChatInterface({
               </div>
             </div>
           )}
-          {messages.map((message) => (
+          {messages.map((message, index) => (
             <div
               key={message.id}
               className={cn(
@@ -652,12 +861,20 @@ export function ChatInterface({
                       </>
                     )}
                   </div>
-                  <div>
+                  <div className="flex items-center gap-1">
                     {message.role === "assistant" && (
-                      <MessageCopyButton
-                        content={message.content}
-                        reasoning={message.reasoning}
-                      />
+                      <>
+                        <MessageRetryButton
+                          messageIndex={index}
+                          messageModel={message.model ?? ""}
+                          currentModel={selectedModel}
+                          onRetry={handleRetry}
+                        />
+                        <MessageCopyButton
+                          content={message.content}
+                          reasoning={message.reasoning}
+                        />
+                      </>
                     )}
                   </div>
                 </div>
@@ -675,6 +892,9 @@ export function ChatInterface({
         isLoading={isLoading}
         selectedModel={selectedModel}
         onModelChange={setSelectedModel}
+        modelsData={modelsData}
+        modelsLoading={modelsLoading}
+        modelsError={modelsError}
       />
     </div>
   );

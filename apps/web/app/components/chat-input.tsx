@@ -5,6 +5,7 @@ import { cn } from "~/lib/utils";
 import { useRef, useState } from "react";
 import { useSidebar } from "./ui/sidebar";
 import { ModelSelector } from "./model-selector";
+import type { ModelsResponse } from "./chat-interface";
 
 interface ChatInputProps {
   onSubmit: (message: string, attachments: File[]) => void;
@@ -12,6 +13,9 @@ interface ChatInputProps {
   placeholder?: string;
   selectedModel?: string;
   onModelChange?: (model: string) => void;
+  modelsData?: ModelsResponse;
+  modelsLoading: any;
+  modelsError: any;
 }
 
 export function ChatInput({
@@ -20,6 +24,9 @@ export function ChatInput({
   placeholder = "Message AI assistant...",
   selectedModel,
   onModelChange,
+  modelsData,
+  modelsLoading,
+  modelsError,
 }: ChatInputProps) {
   const [isFocused, setIsFocused] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -45,7 +52,6 @@ export function ChatInput({
     const extraNumber = typeof extra === "number" ? extra : 0;
 
     const count = Math.max(message.split("\n").length, 1) + extraNumber;
-    console.log(count);
     if (textareaRef.current) {
       textareaRef.current.style.height = `${count * 20}px`;
     }
@@ -193,6 +199,9 @@ export function ChatInput({
                 <ModelSelector
                   selectedModel={selectedModel}
                   onModelChange={onModelChange}
+                  data={modelsData}
+                  isLoading={modelsLoading}
+                  error={modelsError}
                 />
               )}
             </div>

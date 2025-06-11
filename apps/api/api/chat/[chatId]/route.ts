@@ -7,6 +7,7 @@ import {
 	type OpenRouterMessage,
 } from "lib/database";
 import { DEFAULT_MODEL } from "lib/modelConfig";
+import type { ExtendedRequest } from "lib/server-types";
 
 // UUID v4 validation regex
 const UUID_V4_REGEX =
@@ -44,16 +45,19 @@ export const POST = apiHandler(
 		
 		// Extract model from request body, use default if not provided
 		const model = body.model || DEFAULT_MODEL;
+		
+		// Extract messageIdToReplace if this is a retry
+		const messageIdToReplace = body.messageIdToReplace;
 
 		const userChatId = params.chatId;
 		if (!validateUUID(userChatId)) {
 			throw badRequest("Invalid chat ID format");
 		}
 
-		// Save user message before processing
+		// Save user message before processing (only if not retrying)
 		try {
 			const messages = body.messages;
-			if (messages && messages.length > 0) {
+			if (messages && messages.length > 0 && !messageIdToReplace) {
 				const lastMessage = messages[messages.length - 1];
 				if (lastMessage.role === "user") {
 					const chatId = userChatId;
@@ -126,6 +130,12 @@ export const POST = apiHandler(
 				},
 				{ status: 500 }
 			);
+		}
+		
+		// Store messageIdToReplace in the request for websocket handler
+		if (messageIdToReplace) {
+			// The request becomes ExtendedRequest in the websocket handler
+			(req as ExtendedRequest).messageIdToReplace = messageIdToReplace;
 		}
 
 		return fetch("https://openrouter.ai/api/v1/chat/completions", {

@@ -8,60 +8,49 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Skeleton } from "~/components/ui/skeleton";
-import { get } from "~/lib/fetchWrapper";
-import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Sparkles, Zap } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
-
-interface Model {
-  id: string;
-  name: string;
-  description: string;
-  context_length: number;
-  pricing: {
-    prompt: string;
-    completion: string;
-  };
-}
-
-interface ModelsResponse {
-  favorites: Model[];
-  all: Model[];
-}
+import type { ModelsResponse } from "./chat-interface";
 
 interface ModelSelectorProps {
   selectedModel: string;
   onModelChange: (model: string) => void;
+  data?: ModelsResponse;
+  isLoading: boolean;
+  error: any;
 }
 
-export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorProps) {
+export function ModelSelector({
+  selectedModel,
+  onModelChange,
+  data,
+  isLoading,
+  error,
+}: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch models from API
-  const { data, isLoading, error } = useQuery<ModelsResponse>({
-    queryKey: ["models"],
-    queryFn: () => get("/api/models"),
-    staleTime: 60 * 60 * 1000, // 1 hour
-  });
 
   // Find the selected model info
   const selectedModelInfo = data?.all.find((m) => m.id === selectedModel);
 
   // Filter models based on search
-  const filteredFavorites = data?.favorites.filter(
-    (m) =>
-      m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.id.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+  const filteredFavorites =
+    data?.favorites.filter(
+      (m) =>
+        m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.id.toLowerCase().includes(searchQuery.toLowerCase()),
+    ) || [];
 
-  const filteredAll = data?.all.filter(
-    (m) =>
-      !data.favorites.some((f) => f.id === m.id) &&
-      (m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.id.toLowerCase().includes(searchQuery.toLowerCase()))
-  ) || [];
+  const filteredAll =
+    data?.all.filter(
+      (m) =>
+        !data.favorites.some((f) => f.id === m.id) &&
+        (m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          m.id.toLowerCase().includes(searchQuery.toLowerCase())),
+    ) || [];
 
   // Load last selected model from localStorage
   useEffect(() => {
@@ -104,12 +93,15 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
   }
 
   return (
-    <DropdownMenu open={open} onOpenChange={(newOpen) => {
-      setOpen(newOpen);
-      if (!newOpen) {
-        setSearchQuery("");
-      }
-    }}>
+    <DropdownMenu
+      open={open}
+      onOpenChange={(newOpen) => {
+        setOpen(newOpen);
+        if (!newOpen) {
+          setSearchQuery("");
+        }
+      }}
+    >
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
@@ -128,10 +120,6 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
       <DropdownMenuContent
         className="w-96 max-h-[60vh] overflow-hidden"
         align="start"
-        onOpenAutoFocus={(e) => {
-          e.preventDefault();
-          searchInputRef.current?.focus();
-        }}
       >
         <div className="sticky top-0 bg-background p-2">
           <input
@@ -225,3 +213,4 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
     </DropdownMenu>
   );
 }
+

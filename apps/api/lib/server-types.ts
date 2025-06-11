@@ -21,6 +21,7 @@ export interface ExtendedRequest extends RequestWithSession {
 	accountId: string;
 	rateLogged: boolean;
 	timestamp: number;
+	messageIdToReplace?: string; // For message retry functionality
 }
 
 export type RouteHandler = (

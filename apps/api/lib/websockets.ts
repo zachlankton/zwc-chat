@@ -351,10 +351,33 @@ function parseStreamingChunks(
 
 // Helper function to save message and update chat
 async function saveMessageAndUpdateChat(
-	newMessage: OpenRouterMessage
+	newMessage: OpenRouterMessage,
+	messageIdToReplace?: string
 ): Promise<void> {
 	const messagesCollection = await getMessagesCollection();
-	await messagesCollection.insertOne(newMessage);
+	
+	if (messageIdToReplace) {
+		// Get the original message to preserve its timestamp
+		const originalMessage = await messagesCollection.findOne({
+			id: messageIdToReplace,
+			chatId: newMessage.chatId,
+			userEmail: newMessage.userEmail
+		});
+		
+		if (originalMessage) {
+			// Preserve the original timestamp
+			newMessage.timestamp = originalMessage.timestamp;
+		}
+		
+		// Update existing message
+		await messagesCollection.replaceOne(
+			{ id: messageIdToReplace, chatId: newMessage.chatId, userEmail: newMessage.userEmail },
+			newMessage
+		);
+	} else {
+		// Insert new message
+		await messagesCollection.insertOne(newMessage);
+	}
 
 	// Update or create the chat record
 	const chatsCollection = await getChatsCollection();
@@ -403,7 +426,7 @@ async function saveMessageAndUpdateChat(
 				title,
 				createdAt: new Date(),
 			},
-			$inc: { messageCount: 1 },
+			$inc: { messageCount: messageIdToReplace ? 0 : 1 }, // Only increment if it's a new message
 		},
 		{ upsert: true }
 	);
@@ -421,9 +444,12 @@ async function streamedChunks(
 
 	if (response.body === null) return;
 	const reader = response.body.getReader();
+	
+	// Get messageIdToReplace from context if this is a retry
+	const messageIdToReplace = ctx.messageIdToReplace;
 
 	// Initialize new message
-	const newMessageId = crypto.randomUUID();
+	const newMessageId = messageIdToReplace || crypto.randomUUID();
 	const newMessage: OpenRouterMessage = {
 		id: newMessageId,
 		chatId: ctx.params.chatId,
@@ -464,5 +490,5 @@ async function streamedChunks(
 	parseStreamingChunks(dataChunks, newMessage);
 
 	// Save message and update chat
-	await saveMessageAndUpdateChat(newMessage);
+	await saveMessageAndUpdateChat(newMessage, messageIdToReplace);
 }
