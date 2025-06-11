@@ -15,7 +15,14 @@ import { ChatInput } from "./chat-input";
 
 interface Message {
   id: string;
-  content: string | Array<{ type: string; text?: string; image_url?: { url: string }; file?: { filename: string; file_data: string } }>;
+  content:
+    | string
+    | Array<{
+        type: string;
+        text?: string;
+        image_url?: { url: string };
+        file?: { filename: string; file_data: string };
+      }>;
   reasoning?: string;
   role: "system" | "developer" | "user" | "assistant" | "tool";
   timestamp: number;
@@ -152,23 +159,23 @@ export function ChatInterface({
     let content: string | any[] = input;
     if (attachments.length > 0) {
       content = [{ type: "text", text: input }];
-      
+
       // Add attachments to content array
       for (const file of attachments) {
         const base64Data = await fileToBase64(file);
-        
+
         if (file.type.startsWith("image/")) {
           content.push({
             type: "image_url",
-            image_url: { url: base64Data }
+            image_url: { url: base64Data },
           });
         } else if (file.type === "application/pdf") {
           content.push({
             type: "file",
-            file: { 
+            file: {
               filename: file.name,
-              file_data: base64Data 
-            }
+              file_data: base64Data,
+            },
           });
         }
       }
@@ -262,7 +269,10 @@ export function ChatInterface({
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMessage.id
-              ? { ...msg, [msgKey]: (msg[msgKey] ?? "") + (delta[msgKey] || "") }
+              ? {
+                  ...msg,
+                  [msgKey]: (msg[msgKey] ?? "") + (delta[msgKey] || ""),
+                }
               : msg,
           ),
         );
@@ -272,7 +282,7 @@ export function ChatInterface({
     setMessages((prev) =>
       prev.map((msg) =>
         msg.id === assistantMessage.id
-          ? { ...msg, timeToFinish: Date.now() }
+          ? { ...msg, timeToFinish: Date.now() - msg.timestamp }
           : msg,
       ),
     );
@@ -426,12 +436,14 @@ export function ChatInterface({
                                   rehypePlugins={[rehypeHighlight]}
                                   components={{
                                     code: ({ children, className }) => {
-                                      const childrenStr = typeof children === "string";
+                                      const childrenStr =
+                                        typeof children === "string";
                                       const multiLine = childrenStr
                                         ? children.includes("\n")
                                         : false;
                                       const isInline =
-                                        !className?.includes("language-") && !multiLine;
+                                        !className?.includes("language-") &&
+                                        !multiLine;
 
                                       if (isInline) {
                                         return (
@@ -450,17 +462,22 @@ export function ChatInterface({
                               );
                             } else if (item.type === "image_url") {
                               return (
-                                <img 
+                                <img
                                   key={index}
-                                  src={item.image_url?.url} 
+                                  src={item.image_url?.url}
                                   alt="Uploaded image"
                                   className="max-w-full rounded-lg"
                                 />
                               );
                             } else if (item.type === "file") {
                               return (
-                                <div key={index} className="flex items-center gap-2 bg-primary/10 rounded-lg p-2">
-                                  <span className="text-sm">📎 {item.file?.filename}</span>
+                                <div
+                                  key={index}
+                                  className="flex items-center gap-2 bg-primary/10 rounded-lg p-2"
+                                >
+                                  <span className="text-sm">
+                                    📎 {item.file?.filename}
+                                  </span>
                                 </div>
                               );
                             }
@@ -530,7 +547,9 @@ export function ChatInterface({
                           },
                         }}
                       >
-                        {typeof message.content === "string" ? message.content : "Assistant response"}
+                        {typeof message.content === "string"
+                          ? message.content
+                          : "Assistant response"}
                       </ReactMarkdown>
                       {isLoading &&
                         streamingMessageId === message.id &&
@@ -551,7 +570,7 @@ export function ChatInterface({
                   {new Date(
                     message.role === "user"
                       ? message.timestamp
-                      : (message.timeToFinish ?? 0),
+                      : message.timestamp + (message.timeToFinish ?? 0),
                   ).toLocaleTimeString()}
                   {message.totalTokens
                     ? ` Total Tokens: ${message.totalTokens}`
