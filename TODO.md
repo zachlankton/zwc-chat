@@ -20,4 +20,13 @@
 - [x] thread the needle from our backend request to open router all the way to the front end
 - [x] use raw response ArrayBuffer to avoid de/serialization overhead
 - [x] remove mock data, test chat locally
+- [x] persist chats to mongodb
+- [x] improve the input box, make sticky/fixed to bottom
+- [x] improve scrolling
+- [x] setup openrouter apikey provisioning
+- [ ] leverage openrouter models list to enable multiple model selection
+- [ ] allow switching models in the middle of a chat
+- [ ] copy buttons for entire messages (grab markdown)
+- [ ] create admin page to manage users
+- [ ] leverage openrouter byok, allow users to add more credits via stripe or auth with openrouter to byok
 
