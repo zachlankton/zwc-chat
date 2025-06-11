@@ -12,7 +12,6 @@ import { AsyncAlert } from "./async-modals";
 import type { StreamResponse } from "~/lib/webSocketClient";
 import { queryClient } from "~/providers/queryClient";
 import { ChatInput } from "./chat-input";
-import { ModelSelector } from "./model-selector";
 
 interface Message {
   id: string;
@@ -38,6 +37,71 @@ interface Message {
 interface ChatInterfaceProps {
   chatId: string;
   initialMessages: Message[];
+}
+
+function MessageCopyButton({
+  content,
+  reasoning,
+}: {
+  content: string | any[];
+  reasoning?: string;
+}) {
+  const [copied, setCopied] = React.useState(false);
+
+  const handleCopy = async () => {
+    // Convert content to markdown string
+    let markdownContent = "";
+
+    // Add reasoning if present
+    if (reasoning) {
+      markdownContent = `# Reasoning\n\n${reasoning}\n\n---\n\n`;
+    }
+
+    if (typeof content === "string") {
+      markdownContent += content;
+    } else if (Array.isArray(content)) {
+      // Handle array content (mixed text/images/files)
+      markdownContent += content
+        .map((item) => {
+          if (item.type === "text") {
+            return item.text || "";
+          } else if (item.type === "image_url") {
+            return `![Image](${item.image_url?.url})`;
+          } else if (item.type === "file") {
+            return `[${item.file?.filename}]`;
+          }
+          return "";
+        })
+        .join("\n\n");
+    }
+
+    try {
+      await navigator.clipboard.writeText(markdownContent);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      // Fallback for older browsers
+      const textarea = document.createElement("textarea");
+      textarea.value = markdownContent;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleCopy}
+      className="h-6 has-[>svg]:px-2 has-[>svg]:py-4 text-xs hover:bg-muted/50"
+    >
+      {copied ? <Check className="h-3" /> : <Copy className="h-3" />}
+    </Button>
+  );
 }
 
 function CodeBlock({ children }: { children: React.ReactNode }) {
@@ -100,7 +164,8 @@ export function ChatInterface({
   initialMessages = [],
 }: ChatInterfaceProps) {
   const [messages, setMessages] = React.useState<Message[]>(initialMessages);
-  const [selectedModel, setSelectedModel] = React.useState<string>("openai/gpt-4o-mini");
+  const [selectedModel, setSelectedModel] =
+    React.useState<string>("openai/gpt-4o-mini");
 
   const streamingRef = React.useRef<NodeJS.Timeout | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -570,29 +635,31 @@ export function ChatInterface({
                     </div>
                   )}
                 </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>
-                    {new Date(
-                      message.role === "user"
-                        ? message.timestamp
-                        : message.timestamp + (message.timeToFinish ?? 0),
-                    ).toLocaleTimeString()}
-                  </span>
-                  {message.model && message.role === "assistant" && (
-                    <>
-                      <span>•</span>
-                      <span className="flex items-center gap-1">
-                        <Sparkles className="h-3 w-3" />
-                        {message.model.split("/")[1] || message.model}
-                      </span>
-                    </>
-                  )}
-                  {message.totalTokens && (
-                    <>
-                      <span>•</span>
-                      <span>{message.totalTokens} tokens</span>
-                    </>
-                  )}
+                <div className="flex max-w-4xl items-center justify-between text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    {message.model && message.role === "assistant" && (
+                      <>
+                        <span className="flex items-center gap-1">
+                          <Sparkles className="h-3 w-3" />
+                          {message.model.split("/")[1] || message.model}
+                        </span>
+                      </>
+                    )}
+                    {message.totalTokens && (
+                      <>
+                        <span>•</span>
+                        <span>{message.totalTokens} tokens</span>
+                      </>
+                    )}
+                  </div>
+                  <div>
+                    {message.role === "assistant" && (
+                      <MessageCopyButton
+                        content={message.content}
+                        reasoning={message.reasoning}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -603,8 +670,8 @@ export function ChatInterface({
       </div>
 
       {/* Modern Chat Input */}
-      <ChatInput 
-        onSubmit={handleSubmit} 
+      <ChatInput
+        onSubmit={handleSubmit}
         isLoading={isLoading}
         selectedModel={selectedModel}
         onModelChange={setSelectedModel}
