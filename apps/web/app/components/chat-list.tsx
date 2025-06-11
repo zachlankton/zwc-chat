@@ -1,11 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { del, fetchWrapper, get, put } from "../lib/fetchWrapper";
+import { del, get, put } from "../lib/fetchWrapper";
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
-import { Trash2, Plus, Pencil, Check, X } from "lucide-react";
+import { Trash2, Plus, Pencil, Check, X, MoreVertical } from "lucide-react";
 import { useNavigate } from "react-router";
 import { AsyncConfirm } from "./async-modals";
 import { useState } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "./ui/dropdown-menu";
 
 interface Chat {
   id: string;
@@ -70,10 +77,17 @@ export function ChatList({
 
   // Update chat title mutation
   const updateChatMutation = useMutation({
-    mutationFn: async ({ chatId, title }: { chatId: string; title: string }) => {
-      const response = await put<Response>(`/api/chat/${chatId}`, 
-        { title }, 
-        { returnResponse: true }
+    mutationFn: async ({
+      chatId,
+      title,
+    }: {
+      chatId: string;
+      title: string;
+    }) => {
+      const response = await put<Response>(
+        `/api/chat/${chatId}`,
+        { title },
+        { returnResponse: true },
       );
       if (!response.ok) throw new Error("Failed to update chat");
       return response.json();
@@ -136,12 +150,12 @@ export function ChatList({
               <div
                 key={chat.id}
                 className={cn(
-                  "group relative rounded-lg p-3 hover:bg-muted cursor-pointer transition-colors",
+                  "group relative rounded-lg pl-2 mb-1 hover:bg-muted cursor-pointer transition-colors",
                   currentChatId === chat.id && "bg-muted",
                 )}
                 onClick={() => onChatSelect(chat.id)}
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-center gap-3">
                   <div className="flex-1 min-w-0">
                     {editingChatId === chat.id ? (
                       <div className="flex items-center gap-2">
@@ -188,48 +202,52 @@ export function ChatList({
                         <h4 className="text-sm font-medium truncate">
                           {chat.title}
                         </h4>
-                        {chat.lastMessage && (
-                          <p className="text-xs text-muted-foreground truncate mt-1">
-                            {chat.lastMessage}
-                          </p>
-                        )}
                       </>
                     )}
                   </div>
-                  <div className="flex items-center gap-1">
-                    {editingChatId !== chat.id && (
-                      <>
+                  {editingChatId !== chat.id && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
                         <Button
                           variant="ghost"
                           size="sm"
                           className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuItem
                           onClick={(e) => {
                             e.stopPropagation();
                             handleEditStart(chat.id, chat.title);
                           }}
                         >
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0"
+                          <Pencil className="h-4 w-4 mr-2" />
+                          Rename
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
                           onClick={async (e) => {
                             e.stopPropagation();
                             const { ok } = await AsyncConfirm({
                               destructive: true,
                               title: "Delete Chat",
-                              message: "Are you sure you want to delete this chat?",
+                              message:
+                                "Are you sure you want to delete this chat?",
                             });
 
                             if (ok) deleteChatMutation.mutate(chat.id);
                           }}
                         >
-                          <Trash2 className="h-3 w-3 text-destructive" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </div>
               </div>
             ))}
