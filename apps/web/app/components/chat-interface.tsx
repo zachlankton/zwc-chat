@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Copy, Check, Sparkles, RotateCcw, GitBranchPlus } from "lucide-react";
+import { Copy, Check, Sparkles, RotateCcw, GitBranchPlus, Trash2 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { cn } from "~/lib/utils";
@@ -7,8 +7,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github-dark.css";
-import { get, post } from "~/lib/fetchWrapper";
-import { AsyncAlert } from "./async-modals";
+import { get, post, del } from "~/lib/fetchWrapper";
+import { AsyncAlert, AsyncConfirm } from "./async-modals";
 import type { StreamResponse } from "~/lib/webSocketClient";
 import { queryClient } from "~/providers/queryClient";
 import { ChatInput } from "./chat-input";
@@ -198,6 +198,26 @@ function MessageBranchButton({
       title="Branch conversation from here"
     >
       <GitBranchPlus className="h-3" />
+    </Button>
+  );
+}
+
+function MessageDeleteButton({
+  messageId,
+  onDelete,
+}: {
+  messageId: string;
+  onDelete: (messageId: string) => void;
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => onDelete(messageId)}
+      className="h-6 has-[>svg]:px-2 has-[>svg]:py-4 text-xs hover:bg-destructive/20 hover:text-destructive"
+      title="Delete message"
+    >
+      <Trash2 className="h-3" />
     </Button>
   );
 }
@@ -716,6 +736,39 @@ export function ChatInterface({
     }
   };
 
+  const handleDelete = async (messageId: string) => {
+    const { ok } = await AsyncConfirm({
+      destructive: true,
+      title: "Delete Message",
+      message: "Are you sure you want to delete this message? This action cannot be undone.",
+    });
+
+    if (!ok) return;
+
+    try {
+      // Call API to delete message
+      const response = await del<Response>(`/chat/${chatId}/message/${messageId}`, {
+        returnResponse: true,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete message");
+      }
+
+      // Remove message from local state
+      setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
+
+      // Invalidate chat list to update last message if needed
+      queryClient.invalidateQueries({ queryKey: ["chats"] });
+    } catch (error) {
+      console.error("Failed to delete message:", error);
+      AsyncAlert({
+        title: "Error",
+        message: "Failed to delete message. Please try again.",
+      });
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Messages Area */}
@@ -1023,6 +1076,10 @@ export function ChatInterface({
                         />
                       </>
                     )}
+                    <MessageDeleteButton
+                      messageId={message.id}
+                      onDelete={handleDelete}
+                    />
                   </div>
                 </div>
               </div>
