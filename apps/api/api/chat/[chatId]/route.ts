@@ -274,16 +274,11 @@ export const DELETE = apiHandler(
 
 			// Delete all messages for this chat
 			const messagesCollection = await getMessagesCollection();
-			await messagesCollection.deleteMany({
-				chatId,
-				userEmail: req.session.email,
-			});
 
-			// Delete the chat record
-			await chatsCollection.deleteOne({
-				id: chatId,
-				userEmail: req.session.email,
-			});
+			messagesCollection.bulkWrite([
+				{ deleteMany: { filter: { chatId, userEmail: req.session.email } } },
+				{ deleteOne: { filter: { id: chatId, userEmail: req.session.email } } },
+			]);
 
 			return Response.json({ success: true });
 		} catch (error) {
