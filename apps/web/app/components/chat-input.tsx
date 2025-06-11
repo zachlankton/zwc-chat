@@ -3,6 +3,7 @@ import { Send, Paperclip, Mic, Sparkles, X } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { cn } from "~/lib/utils";
 import { useEffect, useRef, useState } from "react";
+import { useSidebar } from "./ui/sidebar";
 
 interface ChatInputProps {
   onSubmit: (message: string) => void;
@@ -19,6 +20,8 @@ export function ChatInput({
   const [isFocused, setIsFocused] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const sidebar = useSidebar();
+  const sidebarCollapsed = sidebar.state === "collapsed";
 
   // Auto-resize textarea
   useEffect(() => {
@@ -31,19 +34,36 @@ export function ChatInput({
     }
   }, [message]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = () => {
+    if (!textareaRef.current) return;
+    const message = textareaRef.current.value;
+
     if (message.trim() && !isLoading) {
       onSubmit(message);
       setMessage("");
       setAttachments([]);
+      textareaRef.current.value = "";
+      textareaRef.current.style.height = "20px";
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyUp = (extra: any) => {
+    if (!textareaRef.current) return;
+    const message = textareaRef.current.value;
+    const extraNumber = typeof extra === "number" ? extra : 0;
+
+    const count = Math.max(message.split("\n").length, 1) + extraNumber;
+    console.log(count);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = `${count * 20}px`;
+    }
+  };
+
+  const handleKeyDown = (e: any) => {
+    if (e.key === "Enter") handleKeyUp(1);
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e as any);
+      handleSubmit();
     }
   };
 
@@ -57,8 +77,10 @@ export function ChatInput({
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-background via-background to-transparent pt-6 pb-4 animate-in slide-in-from-bottom duration-300">
-      <div className="max-w-4xl mx-auto px-4">
+    <div
+      className={`fixed bottom-0 ${sidebarCollapsed ? "left-[48px]" : "left-[256px]"} right-0 z-40 bg-gradient-to-t from-background via-background to-transparent pt-6 pb-4 animate-in slide-in-from-bottom duration-300`}
+    >
+      <div className="max-w-4xl mx-auto px-20">
         {/* Attachments Preview */}
         {attachments.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-2">
@@ -81,7 +103,7 @@ export function ChatInput({
         )}
 
         {/* Main Input Container */}
-        <form onSubmit={handleSubmit}>
+        <div>
           <div
             className={cn(
               "relative flex items-end gap-2 rounded-2xl border-2 bg-background/95 backdrop-blur-sm transition-all duration-200",
@@ -92,7 +114,7 @@ export function ChatInput({
             )}
           >
             {/* Attachment Button */}
-            <label htmlFor="file-upload" className="pb-3 pl-3">
+            <label htmlFor="file-upload" className="py-2 pl-3">
               <input
                 id="file-upload"
                 type="file"
@@ -116,29 +138,28 @@ export function ChatInput({
             </label>
 
             {/* Textarea */}
-            <div className="flex-1 py-3">
+            <div className="flex-1">
               <textarea
                 ref={textareaRef}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
+                onKeyUp={handleKeyUp}
                 onKeyDown={handleKeyDown}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
                 placeholder={placeholder}
                 disabled={isLoading}
+                autoFocus={true}
                 rows={1}
                 className={cn(
-                  "w-full resize-none bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none",
+                  "w-full mt-2 mb-1 transition-all duration-50 resize-none bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none",
                   "min-h-[24px] max-h-[200px]",
                 )}
                 style={{
                   scrollbarWidth: "thin",
+                  height: "20px",
                 }}
               />
             </div>
 
             {/* Right Side Actions */}
-            <div className="flex items-center gap-1 pb-3 pr-3">
+            <div className="flex items-center gap-1 py-2 pr-3">
               {/* Mic Button */}
               <Button
                 type="button"
@@ -152,9 +173,9 @@ export function ChatInput({
 
               {/* Send Button */}
               <Button
-                type="submit"
+                type="button"
                 size="icon"
-                disabled={!message.trim() || isLoading}
+                disabled={isLoading}
                 className={cn(
                   "h-8 w-8 rounded-lg transition-all duration-200",
                   message.trim()
@@ -193,8 +214,9 @@ export function ChatInput({
               </span>
             )}
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );
 }
+

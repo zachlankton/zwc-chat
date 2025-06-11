@@ -114,7 +114,10 @@ export function ChatInterface({
   }, []);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "end",
+    });
   };
 
   const scrollNewMessage = () => {
@@ -251,7 +254,7 @@ export function ChatInterface({
     <div className="flex flex-col h-full">
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto pb-32">
-        <div className="max-w-5xl mx-auto px-4 mb-[80vh]">
+        <div className="max-w-5xl mx-auto px-4 mb-[70vh]">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full min-h-[60vh] text-center">
               <div className="rounded-full bg-primary/10 p-6 mb-6">
@@ -468,7 +471,7 @@ export function ChatInterface({
             </div>
           ))}
 
-          <div ref={messagesEndRef} />
+          <div ref={messagesEndRef} className="mt-24" />
         </div>
       </div>
 
