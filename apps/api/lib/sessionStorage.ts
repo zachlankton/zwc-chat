@@ -3,6 +3,7 @@ import {
 	type SessionData,
 } from "../api/auth/session/sessionCache";
 import { getSessionsCollection } from "./database";
+import { provisioningService } from "./openRouterProvisioning";
 
 export async function getSession(token: string): Promise<SessionData | null> {
 	// Try cache first
@@ -19,7 +20,22 @@ export async function getSession(token: string): Promise<SessionData | null> {
 
 		if (dbSession) {
 			console.log("Session found in MongoDB:", dbSession.email);
-			// Restore session to cache
+
+			// Decrypt API key if present before caching
+			if (dbSession.openRouterApiKey) {
+				try {
+					const decryptedKey = await provisioningService.decryptKey(
+						dbSession.openRouterApiKey
+					);
+					dbSession.openRouterApiKey = decryptedKey;
+				} catch (error) {
+					console.error("Failed to decrypt API key for session:", error);
+					// Remove the encrypted key if decryption fails
+					delete dbSession.openRouterApiKey;
+				}
+			}
+
+			// Restore session to cache with decrypted key
 			sessionCache.set(token, dbSession);
 			return dbSession;
 		}
@@ -32,15 +48,19 @@ export async function getSession(token: string): Promise<SessionData | null> {
 
 export async function setSession(
 	token: string,
-	session: SessionData
+	session: SessionData,
+	encryptedApiKey?: string
 ): Promise<void> {
-	// Set in cache
+	// Set in cache with decrypted key
 	sessionCache.set(token, session);
 
-	// Also save to MongoDB
+	// Also save to MongoDB - use encrypted key if provided
 	try {
 		const sessions = await getSessionsCollection();
-		await sessions.replaceOne({ token }, session, { upsert: true });
+		const sessionForDb = encryptedApiKey
+			? { ...session, openRouterApiKey: encryptedApiKey }
+			: session;
+		await sessions.replaceOne({ token }, sessionForDb, { upsert: true });
 		console.log("Session saved to MongoDB:", session.email);
 	} catch (error) {
 		console.error("Error saving session to MongoDB:", error);
@@ -64,6 +84,27 @@ export async function deleteSession(token: string): Promise<void> {
 export async function updateSessionInStorage(
 	session: SessionData
 ): Promise<void> {
-	await setSession(session.token, session);
-}
+	// Update cache with full session
+	sessionCache.set(session.token, session);
 
+	// For DB, only update specific fields, never touch the API key
+	try {
+		const sessions = await getSessionsCollection();
+		const { openRouterApiKey, ...sessionWithoutKey } = session;
+
+		// Only update fields that might change, preserve the encrypted API key
+		await sessions.updateOne(
+			{ token: session.token },
+			{
+				$set: {
+					expiresAt: session.expiresAt,
+					// Add any other fields that might be updated
+					// but explicitly exclude openRouterApiKey
+				},
+			}
+		);
+		console.log("Session updated in MongoDB:", session.email);
+	} catch (error) {
+		console.error("Error updating session in MongoDB:", error);
+	}
+}
