@@ -357,6 +357,7 @@ export function ChatInterface({
 
   const handleSubmit = async (input: string, attachments: File[]) => {
     if (!input.trim() || isLoading) return;
+    const stashMessageLength = messages.length;
 
     // Convert files to base64
     const fileToBase64 = async (file: File): Promise<string> => {
@@ -505,9 +506,25 @@ export function ChatInterface({
     streamingRef.current = null;
     setIsLoading(false);
     setStreamingMessageId(null);
-    setTimeout(() => {
-      queryClient.invalidateQueries({ queryKey: ["chats"] });
-    }, 1000);
+
+    // Generate title for new chats after first response
+    const isNewChat = initialMessages.length === 0 && stashMessageLength === 0;
+    if (isNewChat) {
+      // Fire and forget - don't wait for title generation
+      post(`/chat/${chatId}/generate-title`, {})
+        .then(() => {
+          console.log("Title generation triggered");
+          // Invalidate chats query to refresh the title
+          setTimeout(() => {
+            queryClient.invalidateQueries({ queryKey: ["chats"] });
+          }, 1000);
+        })
+        .catch((err) => console.error("Failed to generate title:", err));
+    } else {
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["chats"] });
+      }, 1000);
+    }
   };
 
   const handleRetry = async (messageIndex: number, newModel?: string) => {
