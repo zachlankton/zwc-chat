@@ -65,7 +65,9 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 				console.log(`Created new user record for: ${auth.user.email}`);
 			} else if (user.userId !== auth.user.id) {
 				// User exists but with different WorkOS ID (different auth provider)
-				console.log(`Updating userId for ${auth.user.email} from ${user.userId} to ${auth.user.id}`);
+				console.log(
+					`Updating userId for ${auth.user.email} from ${user.userId} to ${auth.user.id}`
+				);
 				await usersCollection.updateOne(
 					{ email: auth.user.email },
 					{
@@ -94,7 +96,7 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 						{ email: auth.user.email },
 						{
 							$set: {
-								openRouterApiKey: encryptedKey || key.key,
+								openRouterApiKey: encryptedKey,
 								openRouterKeyHash: key.data.hash,
 								openRouterKeyLimit: key.data.limit,
 								openRouterKeyUsage: key.data.usage,
@@ -105,7 +107,7 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 					);
 
 					// Update local user object
-					user.openRouterApiKey = encryptedKey || key.key;
+					user.openRouterApiKey = encryptedKey;
 					user.openRouterKeyHash = key.data.hash;
 					user.openRouterKeyLimit = key.data.limit;
 					user.openRouterKeyUsage = key.data.usage;
