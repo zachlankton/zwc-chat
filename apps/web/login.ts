@@ -4,6 +4,7 @@ import { fetchSession, setSession, type SessionData } from "~/stores/session";
 const api_url = import.meta.env.VITE_API_URL;
 
 if (api_url === undefined) console.error("VITE_API_URL env var is not defined");
+let calledAuthAlready = false;
 
 export async function checkLogin() {
   if (typeof window === "undefined") return;
@@ -13,13 +14,15 @@ export async function checkLogin() {
   const url = new URL(location.href);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
-  if (code) {
+  if (code && !calledAuthAlready) {
+    calledAuthAlready = true;
     const response = await fetch(`${api_url}/auth/callback?code=${code}`);
     if (response.status === 201) {
       const session = (await response.json()) as SessionData;
       setSession(session);
       localStorage.removeItem(LS_REDIRECTED_TO_LOGIN);
       localStorage.setItem(LS_TOKEN, session.token);
+      calledAuthAlready = false;
       return { state };
     }
 
@@ -29,6 +32,7 @@ export async function checkLogin() {
     ) {
       localStorage.removeItem(LS_REDIRECTED_TO_LOGIN);
       location.assign("/auth");
+      calledAuthAlready = false;
       return;
     }
   }

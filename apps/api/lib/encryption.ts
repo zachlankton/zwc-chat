@@ -120,6 +120,7 @@ export class EncryptionService {
 		}
 
 		if (!masterKeyHex || masterKeyHex.length !== 64) {
+			console.error("Invalid master key length", masterKeyHex.length);
 			throw new Error(
 				"Invalid master key length. Require 32 bytes (64 hex characters)"
 			);

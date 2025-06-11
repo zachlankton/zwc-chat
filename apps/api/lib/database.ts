@@ -41,10 +41,23 @@ export interface Chat {
 	messageCount: number;
 }
 
+export interface User {
+	userId: string; // WorkOS user ID
+	email: string;
+	openRouterApiKey?: string; // Encrypted API key
+	openRouterKeyHash?: string; // Key identifier from OpenRouter
+	openRouterKeyLimit?: number; // Credit limit
+	openRouterKeyUsage?: number; // Current usage
+	openRouterKeyCreatedAt?: Date; // Provisioning timestamp
+	createdAt: Date;
+	updatedAt: Date;
+}
+
 export let db: Db | null = null;
 export let sessionCollection: Collection<SessionData> | null = null;
 export let messagesCollection: Collection<OpenRouterMessage> | null = null;
 export let chatsCollection: Collection<Chat> | null = null;
+export let usersCollection: Collection<User> | null = null;
 
 let client: MongoClient | null = new MongoClient(MONGODB_URI, {
 	minPoolSize: 5,
@@ -71,6 +84,7 @@ export async function connectToDatabase(): Promise<Db> {
 		sessionCollection = db.collection<SessionData>("sessions");
 		messagesCollection = db.collection<OpenRouterMessage>("messages");
 		chatsCollection = db.collection<Chat>("chats");
+		usersCollection = db.collection<User>("users");
 		if (!indexesCreated) {
 			createIndexes();
 			indexesCreated = true;
@@ -101,6 +115,12 @@ export async function getChatsCollection() {
 	if (!chatsCollection) throw new Error("Chats collection is not initialized");
 
 	return chatsCollection;
+}
+
+export async function getUsersCollection() {
+	if (!usersCollection) throw new Error("Users collection is not initialized");
+
+	return usersCollection;
 }
 
 export async function closeDatabase() {
@@ -145,5 +165,16 @@ async function createIndexes() {
 
 		// Unique index on chat id
 		await chatsCollection.createIndex({ id: 1 }, { unique: true });
+	}
+
+	if (usersCollection) {
+		// Unique index on userId
+		await usersCollection.createIndex({ userId: 1 }, { unique: true });
+
+		// Unique index on email
+		await usersCollection.createIndex({ email: 1 }, { unique: true });
+
+		// Index on key hash for lookups
+		await usersCollection.createIndex({ openRouterKeyHash: 1 });
 	}
 }

@@ -24,6 +24,7 @@
 		"check": "tsc --noEmit",
 		"mongo:start": "./scripts/createLocalMongo.sh || docker start zwc-chat-mongo",
 		"mongo:stop": "docker stop zwc-chat-mongo",
-		"mongo:delete": "./scripts/deleteLocalMongo.sh"
+		"mongo:delete": "./scripts/deleteLocalMongo.sh",
+		"test:provisioning": "bun run scripts/testProvisioning.ts"
 	}
 }
