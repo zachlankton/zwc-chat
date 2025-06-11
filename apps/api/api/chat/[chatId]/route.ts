@@ -5,8 +5,7 @@ import {
 	getMessagesCollection,
 	getChatsCollection,
 	type OpenRouterMessage,
-	type Chat,
-	type OpenRouterContent,
+	getMongoClient,
 } from "lib/database";
 
 // UUID v4 validation regex
@@ -275,10 +274,22 @@ export const DELETE = apiHandler(
 			// Delete all messages for this chat
 			const messagesCollection = await getMessagesCollection();
 
-			messagesCollection.bulkWrite([
-				{ deleteMany: { filter: { chatId, userEmail: req.session.email } } },
-				{ deleteOne: { filter: { id: chatId, userEmail: req.session.email } } },
-			]);
+			const session = getMongoClient().startSession();
+
+			try {
+				await session.withTransaction(async () => {
+					await messagesCollection.deleteMany(
+						{ chatId, userEmail: req.session.email },
+						{ session }
+					);
+					await chatsCollection.deleteOne(
+						{ id: chatId, userEmail: req.session.email },
+						{ session }
+					);
+				});
+			} finally {
+				await session.endSession();
+			}
 
 			return Response.json({ success: true });
 		} catch (error) {

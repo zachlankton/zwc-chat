@@ -26,7 +26,7 @@ export interface OpenRouterMessage {
 	annotations?: any; // For storing PDF annotations
 }
 
-export type OpenRouterContent = 
+export type OpenRouterContent =
 	| { type: "text"; text: string }
 	| { type: "image_url"; image_url: { url: string } }
 	| { type: "file"; file: { filename: string; file_data: string } };
@@ -53,6 +53,11 @@ let client: MongoClient | null = new MongoClient(MONGODB_URI, {
 	serverSelectionTimeoutMS: 5000,
 	socketTimeoutMS: 45000,
 });
+
+export function getMongoClient() {
+	if (!client) throw new Error("Client is null or undefined");
+	return client;
+}
 
 let indexesCreated = false;
 
