@@ -40,6 +40,11 @@ export interface Chat {
 	updatedAt: Date;
 	lastMessage?: string;
 	messageCount: number;
+	branchedFrom?: {
+		chatId: string;
+		messageId: string;
+		branchedAt: Date;
+	};
 }
 
 export interface User {

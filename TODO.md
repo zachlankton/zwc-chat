@@ -37,4 +37,5 @@
 - [ ] user profile/settings page with subscription management and billing history
 - [ ] implement AI generated chat titles/summaries
 - [ ] implement user credits remaining health bar
+- [ ] make sure to filter our attachments allowed by the currently selected models abilities, pdfs work for all models, images only work for some
 
