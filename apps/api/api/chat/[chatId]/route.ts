@@ -72,44 +72,31 @@ export const POST = apiHandler(
 					await messagesCollection.insertOne(userMessage);
 					console.log(`User message saved to database for chat ${chatId}`);
 
-					// Update chat with user message
+					// Update chat with user message using atomic upsert
 					const chatsCollection = await getChatsCollection();
-					const existingChat = await chatsCollection.findOne({
-						id: chatId,
-						userEmail: req.session.email,
-					});
+					const now = new Date();
+					const chatTitle = lastMessage.content.substring(0, 50) +
+						(lastMessage.content.length > 50 ? "..." : "");
+					const chatLastMessage = lastMessage.content.substring(0, 100) +
+						(lastMessage.content.length > 100 ? "..." : "");
 
-					if (!existingChat) {
-						// Create new chat if it doesn't exist
-						const newChat: Chat = {
-							id: chatId,
-							userEmail: req.session.email,
-							title:
-								lastMessage.content.substring(0, 50) +
-								(lastMessage.content.length > 50 ? "..." : ""),
-							createdAt: new Date(),
-							updatedAt: new Date(),
-							lastMessage:
-								lastMessage.content.substring(0, 100) +
-								(lastMessage.content.length > 100 ? "..." : ""),
-							messageCount: 1,
-						};
-						await chatsCollection.insertOne(newChat);
-					} else {
-						// Update existing chat with new user message
-						await chatsCollection.updateOne(
-							{ id: chatId, userEmail: req.session.email },
-							{
-								$set: {
-									lastMessage:
-										lastMessage.content.substring(0, 100) +
-										(lastMessage.content.length > 100 ? "..." : ""),
-									updatedAt: new Date(),
-								},
-								$inc: { messageCount: 1 },
-							}
-						);
-					}
+					await chatsCollection.updateOne(
+						{ id: chatId, userEmail: req.session.email },
+						{
+							$set: {
+								lastMessage: chatLastMessage,
+								updatedAt: now,
+							},
+							$setOnInsert: {
+								id: chatId,
+								userEmail: req.session.email,
+								title: chatTitle,
+								createdAt: now,
+							},
+							$inc: { messageCount: 1 },
+						},
+						{ upsert: true }
+					);
 				}
 			}
 		} catch (error) {
