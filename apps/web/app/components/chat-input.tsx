@@ -1,38 +1,31 @@
 import * as React from "react";
-import { Send, Paperclip, Mic, Sparkles, X } from "lucide-react";
+import { Send, Paperclip, Mic, X } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { cn } from "~/lib/utils";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useSidebar } from "./ui/sidebar";
+import { ModelSelector } from "./model-selector";
 
 interface ChatInputProps {
   onSubmit: (message: string, attachments: File[]) => void;
   isLoading?: boolean;
   placeholder?: string;
+  selectedModel?: string;
+  onModelChange?: (model: string) => void;
 }
 
 export function ChatInput({
   onSubmit,
   isLoading = false,
   placeholder = "Message AI assistant...",
+  selectedModel,
+  onModelChange,
 }: ChatInputProps) {
-  const [message, setMessage] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sidebar = useSidebar();
   const sidebarCollapsed = sidebar.state === "collapsed";
-
-  // Auto-resize textarea
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${Math.min(
-        textareaRef.current.scrollHeight,
-        200,
-      )}px`;
-    }
-  }, [message]);
 
   const handleSubmit = () => {
     if (!textareaRef.current) return;
@@ -40,7 +33,6 @@ export function ChatInput({
 
     if (message.trim() && !isLoading) {
       onSubmit(message, attachments);
-      setMessage("");
       setAttachments([]);
       textareaRef.current.value = "";
       textareaRef.current.style.height = "20px";
@@ -80,7 +72,7 @@ export function ChatInput({
     <div
       className={`fixed bottom-0 ${sidebarCollapsed ? "left-[48px]" : "left-[256px]"} right-0 z-40 bg-gradient-to-t from-background via-background to-transparent pt-6 pb-4 animate-in slide-in-from-bottom duration-300`}
     >
-      <div className="max-w-4xl mx-auto px-20">
+      <div className="max-w-4xl mx-auto px-6">
         {/* Attachments Preview */}
         {attachments.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-2">
@@ -144,7 +136,6 @@ export function ChatInput({
                 ref={textareaRef}
                 onKeyUp={() => handleKeyUp()}
                 onKeyDown={handleKeyDown}
-                onChange={(e) => setMessage(e.target.value)}
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => setIsFocused(false)}
                 placeholder={placeholder}
@@ -181,43 +172,30 @@ export function ChatInput({
                 size="icon"
                 disabled={isLoading}
                 onClick={handleSubmit}
-                className={cn(
-                  "h-8 w-8 rounded-lg transition-all duration-200",
-                  message.trim()
-                    ? "bg-primary hover:bg-primary/90 shadow-sm"
-                    : "bg-muted text-muted-foreground",
-                )}
+                className={cn("h-8 w-8 rounded-lg transition-all duration-200")}
               >
                 {isLoading ? (
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent" />
                 ) : (
-                  <Send
-                    className={cn(
-                      "h-4 w-4 transition-transform",
-                      message.trim() && "translate-x-0.5",
-                    )}
-                  />
+                  <Send className={cn("h-4 w-4 transition-transform")} />
                 )}
               </Button>
             </div>
           </div>
 
-          {/* Helper Text */}
-          <div className="mt-2 flex items-center justify-between px-2 text-xs text-muted-foreground">
-            <div className="flex items-center gap-4">
+          {/* Helper Text and Model Selector */}
+          <div className="mt-2 flex items-center justify-between px-2">
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
               <span>Press Enter to send, Shift+Enter for new line</span>
-              {isFocused && (
-                <div className="flex items-center gap-1 animate-in fade-in duration-300">
-                  <Sparkles className="h-3 w-3" />
-                  <span>AI is ready to help</span>
-                </div>
+            </div>
+            <div className="flex items-center gap-4">
+              {selectedModel && onModelChange && (
+                <ModelSelector
+                  selectedModel={selectedModel}
+                  onModelChange={onModelChange}
+                />
               )}
             </div>
-            {message.length > 0 && (
-              <span className="animate-in fade-in duration-300">
-                {message.length} / 4000
-              </span>
-            )}
           </div>
         </div>
       </div>

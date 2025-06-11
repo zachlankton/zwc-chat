@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, Sparkles } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { cn } from "~/lib/utils";
@@ -12,6 +12,7 @@ import { AsyncAlert } from "./async-modals";
 import type { StreamResponse } from "~/lib/webSocketClient";
 import { queryClient } from "~/providers/queryClient";
 import { ChatInput } from "./chat-input";
+import { ModelSelector } from "./model-selector";
 
 interface Message {
   id: string;
@@ -25,6 +26,7 @@ interface Message {
       }>;
   reasoning?: string;
   role: "system" | "developer" | "user" | "assistant" | "tool";
+  model?: string; // Model used for this message
   timestamp: number;
   promptTokens?: number;
   completionTokens?: number;
@@ -98,6 +100,7 @@ export function ChatInterface({
   initialMessages = [],
 }: ChatInterfaceProps) {
   const [messages, setMessages] = React.useState<Message[]>(initialMessages);
+  const [selectedModel, setSelectedModel] = React.useState<string>("openai/gpt-4o-mini");
 
   const streamingRef = React.useRef<NodeJS.Timeout | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -197,6 +200,7 @@ export function ChatInterface({
       id: (Date.now() + 1).toString(),
       content: "",
       role: "assistant",
+      model: selectedModel, // Include the model being used
       timestamp: Date.now(),
       timeToFinish: 0,
     };
@@ -207,7 +211,7 @@ export function ChatInterface({
 
     const streamResp = await post<StreamResponse | Response>(
       `/chat/${chatId}`,
-      { messages: msgsRef },
+      { messages: msgsRef, model: selectedModel },
       {
         returnResponse: true,
       },
@@ -566,16 +570,30 @@ export function ChatInterface({
                     </div>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {new Date(
-                    message.role === "user"
-                      ? message.timestamp
-                      : message.timestamp + (message.timeToFinish ?? 0),
-                  ).toLocaleTimeString()}
-                  {message.totalTokens
-                    ? ` Total Tokens: ${message.totalTokens}`
-                    : ""}
-                </p>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span>
+                    {new Date(
+                      message.role === "user"
+                        ? message.timestamp
+                        : message.timestamp + (message.timeToFinish ?? 0),
+                    ).toLocaleTimeString()}
+                  </span>
+                  {message.model && message.role === "assistant" && (
+                    <>
+                      <span>•</span>
+                      <span className="flex items-center gap-1">
+                        <Sparkles className="h-3 w-3" />
+                        {message.model.split("/")[1] || message.model}
+                      </span>
+                    </>
+                  )}
+                  {message.totalTokens && (
+                    <>
+                      <span>•</span>
+                      <span>{message.totalTokens} tokens</span>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           ))}
@@ -585,7 +603,12 @@ export function ChatInterface({
       </div>
 
       {/* Modern Chat Input */}
-      <ChatInput onSubmit={handleSubmit} isLoading={isLoading} />
+      <ChatInput 
+        onSubmit={handleSubmit} 
+        isLoading={isLoading}
+        selectedModel={selectedModel}
+        onModelChange={setSelectedModel}
+      />
     </div>
   );
 }

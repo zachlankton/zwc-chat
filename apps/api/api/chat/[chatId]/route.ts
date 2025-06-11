@@ -6,6 +6,7 @@ import {
 	getChatsCollection,
 	type OpenRouterMessage,
 } from "lib/database";
+import { DEFAULT_MODEL } from "lib/modelConfig";
 
 // UUID v4 validation regex
 const UUID_V4_REGEX =
@@ -22,8 +23,6 @@ interface ChatUpdateData {
 	lastMessage?: string;
 }
 
-const DEEPSEEK_R1_QWEN3_8B_FREE = "deepseek/deepseek-r1-0528-qwen3-8b:free";
-const supportedModels = [DEEPSEEK_R1_QWEN3_8B_FREE];
 
 const openRouterApiKey = process.env.OPENROUTER_KEY;
 if (!openRouterApiKey)
@@ -42,8 +41,9 @@ export const POST = apiHandler(
 		const body = await req.json().catch(() => null);
 		if (body === null) throw badRequest("Could not parse the body");
 		if (!body.messages) throw badRequest("messages[] key is required");
-		if (body.model && !supportedModels.includes(body.model))
-			throw badRequest(`We do not currently support model: ${body.model}`);
+		
+		// Extract model from request body, use default if not provided
+		const model = body.model || DEFAULT_MODEL;
 
 		const userChatId = params.chatId;
 		if (!validateUUID(userChatId)) {
@@ -64,6 +64,7 @@ export const POST = apiHandler(
 						userEmail: req.session.email,
 						content: lastMessage.content,
 						role: "user",
+						model: model, // Store which model the user requested
 						timestamp: Date.now(),
 					};
 
@@ -136,7 +137,7 @@ export const POST = apiHandler(
 				"Content-Type": "application/json",
 			},
 			body: JSON.stringify({
-				model: DEEPSEEK_R1_QWEN3_8B_FREE,
+				model: model, // Use dynamic model
 				stream: true,
 				transforms: ["middle-out"], // silicon valley fo lyfe
 				user: req.session.email,
@@ -217,6 +218,7 @@ export const GET = apiHandler(
 				role: msg.role,
 				content: msg.content,
 				reasoning: msg.reasoning,
+				model: msg.model, // Include model in response
 				timestamp: msg.timestamp,
 				promptTokens: msg.promptTokens,
 				completionTokens: msg.completionTokens,

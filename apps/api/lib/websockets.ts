@@ -310,6 +310,11 @@ function parseStreamingChunks(
 			const value = tryParseJson(chunk) as EventType;
 			if (!value) continue;
 
+			// Extract model information
+			if (value.model && !newMessage.model) {
+				newMessage.model = value.model;
+			}
+
 			// Extract usage information
 			const usage = value?.usage;
 			if (usage) {

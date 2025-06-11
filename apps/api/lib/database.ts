@@ -17,6 +17,7 @@ export interface OpenRouterMessage {
 	content: string | OpenRouterContent[];
 	reasoning?: string;
 	role: "system" | "developer" | "user" | "assistant" | "tool";
+	model?: string; // The model used for this message
 	timestamp: number;
 	promptTokens?: number;
 	completionTokens?: number;

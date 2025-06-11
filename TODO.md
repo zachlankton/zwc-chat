@@ -29,4 +29,9 @@
 - [ ] copy buttons for entire messages (grab markdown)
 - [ ] create admin page to manage users
 - [ ] leverage openrouter byok, allow users to add more credits via stripe or auth with openrouter to byok
+- [ ] support speech recognition
+- [ ] support tool calling???? not sure the best way to do this but would be super cool
+- [ ] ability to edit/delete individual messages
+- [ ] ability to regenerate a singlue individual assistant response that only includes up to that point in history context
+- [ ] ability to split/branch off of a conversation at any point (create new chat from that point in history?)
 
