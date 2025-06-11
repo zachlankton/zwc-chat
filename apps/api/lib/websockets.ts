@@ -436,7 +436,7 @@ async function streamedChunks(
 
 		// Detect first token for timing
 		if (!newMessage.timeToFirstToken && detectFirstToken(value)) {
-			newMessage.timeToFirstToken = Date.now();
+			newMessage.timeToFirstToken = Date.now() - newMessage.timestamp;
 		}
 
 		dataChunks.push(...value);
@@ -452,7 +452,7 @@ async function streamedChunks(
 	}
 
 	// Record completion time
-	newMessage.timeToFinish = Date.now();
+	newMessage.timeToFinish = Date.now() - newMessage.timestamp;
 	console.log("WSURL", ctx?.url.toString());
 
 	// Parse the collected chunks to extract message content
