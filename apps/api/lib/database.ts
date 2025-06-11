@@ -168,10 +168,10 @@ async function createIndexes() {
 	}
 
 	if (usersCollection) {
-		// Unique index on userId
-		await usersCollection.createIndex({ userId: 1 }, { unique: true });
+		// Non-unique index on userId for lookups (can change per auth provider)
+		await usersCollection.createIndex({ userId: 1 });
 
-		// Unique index on email
+		// Unique index on email - this is our primary identifier
 		await usersCollection.createIndex({ email: 1 }, { unique: true });
 
 		// Index on key hash for lookups

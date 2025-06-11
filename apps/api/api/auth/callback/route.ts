@@ -63,6 +63,19 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 				const result = await usersCollection.insertOne(newUser);
 				user = { ...newUser, _id: result.insertedId };
 				console.log(`Created new user record for: ${auth.user.email}`);
+			} else if (user.userId !== auth.user.id) {
+				// User exists but with different WorkOS ID (different auth provider)
+				console.log(`Updating userId for ${auth.user.email} from ${user.userId} to ${auth.user.id}`);
+				await usersCollection.updateOne(
+					{ email: auth.user.email },
+					{
+						$set: {
+							userId: auth.user.id,
+							updatedAt: new Date(),
+						},
+					}
+				);
+				user.userId = auth.user.id;
 			}
 
 			// Check if user needs an API key (new user or existing user without key)
@@ -78,7 +91,7 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 
 					// Update user with API key information
 					await usersCollection.updateOne(
-						{ userId: auth.user.id },
+						{ email: auth.user.email },
 						{
 							$set: {
 								openRouterApiKey: encryptedKey || key.key,
