@@ -6,6 +6,7 @@ import {
 	getChatsCollection,
 	type OpenRouterMessage,
 	type Chat,
+	type OpenRouterContent,
 } from "lib/database";
 
 // UUID v4 validation regex
@@ -75,10 +76,21 @@ export const POST = apiHandler(
 					// Update chat with user message using atomic upsert
 					const chatsCollection = await getChatsCollection();
 					const now = new Date();
-					const chatTitle = lastMessage.content.substring(0, 50) +
-						(lastMessage.content.length > 50 ? "..." : "");
-					const chatLastMessage = lastMessage.content.substring(0, 100) +
-						(lastMessage.content.length > 100 ? "..." : "");
+					
+					// Extract text content for title/lastMessage
+					let textContent = "";
+					if (typeof lastMessage.content === "string") {
+						textContent = lastMessage.content;
+					} else if (Array.isArray(lastMessage.content)) {
+						// Extract text from content array
+						const textPart = lastMessage.content.find((item: any) => item.type === "text") as any;
+						textContent = textPart?.text || "Sent attachments";
+					}
+					
+					const chatTitle = textContent.substring(0, 50) +
+						(textContent.length > 50 ? "..." : "");
+					const chatLastMessage = textContent.substring(0, 100) +
+						(textContent.length > 100 ? "..." : "");
 
 					await chatsCollection.updateOne(
 						{ id: chatId, userEmail: req.session.email },

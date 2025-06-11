@@ -14,7 +14,7 @@ export interface OpenRouterMessage {
 	id: string;
 	userEmail: string;
 	chatId: string;
-	content: string;
+	content: string | OpenRouterContent[];
 	reasoning?: string;
 	role: "system" | "developer" | "user" | "assistant" | "tool";
 	timestamp: number;
@@ -23,7 +23,13 @@ export interface OpenRouterMessage {
 	totalTokens?: number;
 	timeToFirstToken?: number;
 	timeToFinish?: number;
+	annotations?: any; // For storing PDF annotations
 }
+
+export type OpenRouterContent = 
+	| { type: "text"; text: string }
+	| { type: "image_url"; image_url: { url: string } }
+	| { type: "file"; file: { filename: string; file_data: string } };
 
 export interface Chat {
 	id: string;

@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSidebar } from "./ui/sidebar";
 
 interface ChatInputProps {
-  onSubmit: (message: string) => void;
+  onSubmit: (message: string, attachments: File[]) => void;
   isLoading?: boolean;
   placeholder?: string;
 }
@@ -39,7 +39,7 @@ export function ChatInput({
     const message = textareaRef.current.value;
 
     if (message.trim() && !isLoading) {
-      onSubmit(message);
+      onSubmit(message, attachments);
       setMessage("");
       setAttachments([]);
       textareaRef.current.value = "";
@@ -119,6 +119,7 @@ export function ChatInput({
                 id="file-upload"
                 type="file"
                 multiple
+                accept="image/png,image/jpeg,image/webp,application/pdf"
                 onChange={handleFileSelect}
                 className="sr-only"
                 disabled={isLoading}
@@ -143,6 +144,9 @@ export function ChatInput({
                 ref={textareaRef}
                 onKeyUp={handleKeyUp}
                 onKeyDown={handleKeyDown}
+                onChange={(e) => setMessage(e.target.value)}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
                 placeholder={placeholder}
                 disabled={isLoading}
                 autoFocus={true}
@@ -176,6 +180,7 @@ export function ChatInput({
                 type="button"
                 size="icon"
                 disabled={isLoading}
+                onClick={handleSubmit}
                 className={cn(
                   "h-8 w-8 rounded-lg transition-all duration-200",
                   message.trim()

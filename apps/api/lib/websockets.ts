@@ -354,9 +354,20 @@ async function saveMessageAndUpdateChat(
 		{ sort: { timestamp: 1 } }
 	);
 
-	const title = firstUserMessage?.content
-		? firstUserMessage.content.substring(0, 50) +
-			(firstUserMessage.content.length > 50 ? "..." : "")
+	// Extract text content from user message
+	let userTextContent = "";
+	if (firstUserMessage?.content) {
+		if (typeof firstUserMessage.content === "string") {
+			userTextContent = firstUserMessage.content;
+		} else if (Array.isArray(firstUserMessage.content)) {
+			const textPart = firstUserMessage.content.find((item: any) => item.type === "text") as any;
+			userTextContent = textPart?.text || "Sent attachments";
+		}
+	}
+
+	const title = userTextContent
+		? userTextContent.substring(0, 50) +
+			(userTextContent.length > 50 ? "..." : "")
 		: "New Chat";
 
 	// Use atomic upsert operation to update or create the chat
@@ -365,8 +376,10 @@ async function saveMessageAndUpdateChat(
 		{
 			$set: {
 				lastMessage:
-					newMessage.content.substring(0, 100) +
-					(newMessage.content.length > 100 ? "..." : ""),
+					typeof newMessage.content === "string"
+						? newMessage.content.substring(0, 100) +
+						  (newMessage.content.length > 100 ? "..." : "")
+						: "Assistant response",
 				updatedAt: new Date(),
 			},
 			$setOnInsert: {

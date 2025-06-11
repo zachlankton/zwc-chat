@@ -15,7 +15,7 @@ import { ChatInput } from "./chat-input";
 
 interface Message {
   id: string;
-  content: string;
+  content: string | Array<{ type: string; text?: string; image_url?: { url: string }; file?: { filename: string; file_data: string } }>;
   reasoning?: string;
   role: "system" | "developer" | "user" | "assistant" | "tool";
   timestamp: number;
@@ -135,12 +135,48 @@ export function ChatInterface({
     setTimeout(scrollToBottom, 100);
   }, [chatId]);
 
-  const handleSubmit = async (input: string) => {
+  const handleSubmit = async (input: string, attachments: File[]) => {
     if (!input.trim() || isLoading) return;
+
+    // Convert files to base64
+    const fileToBase64 = async (file: File): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = (error) => reject(error);
+      });
+    };
+
+    // Create content array if we have attachments
+    let content: string | any[] = input;
+    if (attachments.length > 0) {
+      content = [{ type: "text", text: input }];
+      
+      // Add attachments to content array
+      for (const file of attachments) {
+        const base64Data = await fileToBase64(file);
+        
+        if (file.type.startsWith("image/")) {
+          content.push({
+            type: "image_url",
+            image_url: { url: base64Data }
+          });
+        } else if (file.type === "application/pdf") {
+          content.push({
+            type: "file",
+            file: { 
+              filename: file.name,
+              file_data: base64Data 
+            }
+          });
+        }
+      }
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      content: input,
+      content: content,
       role: "user",
       timestamp: Date.now(),
     };
@@ -226,7 +262,7 @@ export function ChatInterface({
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMessage.id
-              ? { ...msg, [msgKey]: (msg[msgKey] ?? "") + delta[msgKey] }
+              ? { ...msg, [msgKey]: (msg[msgKey] ?? "") + (delta[msgKey] || "") }
               : msg,
           ),
         );
@@ -279,7 +315,7 @@ export function ChatInterface({
               </p>
               <div className="grid grid-cols-2 gap-3 mt-8 w-full max-w-2xl">
                 <button
-                  onClick={() => handleSubmit("What can you help me with?")}
+                  onClick={() => handleSubmit("What can you help me with?", [])}
                   className="text-left p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors"
                 >
                   <h3 className="font-medium mb-1">Capabilities</h3>
@@ -288,7 +324,7 @@ export function ChatInterface({
                   </p>
                 </button>
                 <button
-                  onClick={() => handleSubmit("Help me write code")}
+                  onClick={() => handleSubmit("Help me write code", [])}
                   className="text-left p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors"
                 >
                   <h3 className="font-medium mb-1">Code Assistant</h3>
@@ -297,7 +333,7 @@ export function ChatInterface({
                   </p>
                 </button>
                 <button
-                  onClick={() => handleSubmit("Help me analyze data")}
+                  onClick={() => handleSubmit("Help me analyze data", [])}
                   className="text-left p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors"
                 >
                   <h3 className="font-medium mb-1">Data Analysis</h3>
@@ -306,7 +342,7 @@ export function ChatInterface({
                   </p>
                 </button>
                 <button
-                  onClick={() => handleSubmit("Help me brainstorm ideas")}
+                  onClick={() => handleSubmit("Help me brainstorm ideas", [])}
                   className="text-left p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors"
                 >
                   <h3 className="font-medium mb-1">Creative Writing</h3>
@@ -352,32 +388,86 @@ export function ChatInterface({
                 >
                   {message.role === "user" ? (
                     <div className="prose prose-sm text-sm whitespace-pre-wrap user-message max-w-2xl max-h-[30vh] overflow-y-auto">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        rehypePlugins={[rehypeHighlight]}
-                        components={{
-                          code: ({ children, className }) => {
-                            const childrenStr = typeof children === "string";
-                            const multiLine = childrenStr
-                              ? children.includes("\n")
-                              : false;
-                            const isInline =
-                              !className?.includes("language-") && !multiLine;
+                      {typeof message.content === "string" ? (
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          rehypePlugins={[rehypeHighlight]}
+                          components={{
+                            code: ({ children, className }) => {
+                              const childrenStr = typeof children === "string";
+                              const multiLine = childrenStr
+                                ? children.includes("\n")
+                                : false;
+                              const isInline =
+                                !className?.includes("language-") && !multiLine;
 
-                            if (isInline) {
+                              if (isInline) {
+                                return (
+                                  <code className="px-1 py-0.5 bg-primary text-primary-foreground rounded text-sm">
+                                    {children}
+                                  </code>
+                                );
+                              }
+
+                              return <CodeBlock>{children}</CodeBlock>;
+                            },
+                          }}
+                        >
+                          {message.content}
+                        </ReactMarkdown>
+                      ) : (
+                        <div className="space-y-2">
+                          {message.content.map((item, index) => {
+                            if (item.type === "text") {
                               return (
-                                <code className="px-1 py-0.5 bg-primary text-primary-foreground rounded text-sm">
-                                  {children}
-                                </code>
+                                <ReactMarkdown
+                                  key={index}
+                                  remarkPlugins={[remarkGfm]}
+                                  rehypePlugins={[rehypeHighlight]}
+                                  components={{
+                                    code: ({ children, className }) => {
+                                      const childrenStr = typeof children === "string";
+                                      const multiLine = childrenStr
+                                        ? children.includes("\n")
+                                        : false;
+                                      const isInline =
+                                        !className?.includes("language-") && !multiLine;
+
+                                      if (isInline) {
+                                        return (
+                                          <code className="px-1 py-0.5 bg-primary text-primary-foreground rounded text-sm">
+                                            {children}
+                                          </code>
+                                        );
+                                      }
+
+                                      return <CodeBlock>{children}</CodeBlock>;
+                                    },
+                                  }}
+                                >
+                                  {item.text || ""}
+                                </ReactMarkdown>
+                              );
+                            } else if (item.type === "image_url") {
+                              return (
+                                <img 
+                                  key={index}
+                                  src={item.image_url?.url} 
+                                  alt="Uploaded image"
+                                  className="max-w-full rounded-lg"
+                                />
+                              );
+                            } else if (item.type === "file") {
+                              return (
+                                <div key={index} className="flex items-center gap-2 bg-primary/10 rounded-lg p-2">
+                                  <span className="text-sm">📎 {item.file?.filename}</span>
+                                </div>
                               );
                             }
-
-                            return <CodeBlock>{children}</CodeBlock>;
-                          },
-                        }}
-                      >
-                        {message.content}
-                      </ReactMarkdown>
+                            return null;
+                          })}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="prose prose-sm">
@@ -440,7 +530,7 @@ export function ChatInterface({
                           },
                         }}
                       >
-                        {message.content}
+                        {typeof message.content === "string" ? message.content : "Assistant response"}
                       </ReactMarkdown>
                       {isLoading &&
                         streamingMessageId === message.id &&
