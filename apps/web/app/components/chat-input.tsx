@@ -47,7 +47,7 @@ export function ChatInput({
     }
   };
 
-  const handleKeyUp = (extra: any) => {
+  const handleKeyUp = (extra?: any) => {
     if (!textareaRef.current) return;
     const message = textareaRef.current.value;
     const extraNumber = typeof extra === "number" ? extra : 0;
@@ -142,7 +142,7 @@ export function ChatInput({
             <div className="flex-1">
               <textarea
                 ref={textareaRef}
-                onKeyUp={handleKeyUp}
+                onKeyUp={() => handleKeyUp()}
                 onKeyDown={handleKeyDown}
                 onChange={(e) => setMessage(e.target.value)}
                 onFocus={() => setIsFocused(true)}
@@ -224,4 +224,3 @@ export function ChatInput({
     </div>
   );
 }
-

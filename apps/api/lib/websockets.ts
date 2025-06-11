@@ -10,7 +10,7 @@ import crypto from "crypto";
 import { asyncLocalStorage } from "./asyncLocalStore";
 import type { OpenRouterMessage } from "./database";
 import { getMessagesCollection, getChatsCollection } from "./database";
-import { appendFile } from "node:fs/promises";
+//import { appendFile } from "node:fs/promises";
 
 const txtDecoder = new TextDecoder();
 
@@ -459,19 +459,5 @@ async function streamedChunks(
 	parseStreamingChunks(dataChunks, newMessage);
 
 	// Save message and update chat
-	try {
-		await saveMessageAndUpdateChat(newMessage);
-	} catch (error) {
-		console.error("Failed to save message to database:", error);
-		// Send error notification to the client
-		ws.send(
-			JSON.stringify({
-				type: "error",
-				error:
-					"Failed to save message. Your conversation may not be persisted.",
-			})
-		);
-		// Re-throw to handle at a higher level if needed
-		throw error;
-	}
+	await saveMessageAndUpdateChat(newMessage);
 }
