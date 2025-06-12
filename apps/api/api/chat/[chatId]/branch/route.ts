@@ -32,7 +32,7 @@ export const POST = apiHandler(
 		const body = await req.json().catch(() => null);
 		if (body === null) throw badRequest("Could not parse the body");
 		if (!body.messageId) throw badRequest("messageId is required");
-		if (!body.messageIndex) throw badRequest("messageIndex is required");
+		if (body.messageIndex === undefined || body.messageIndex === null) throw badRequest("messageIndex is required");
 
 		try {
 			// Verify the user owns this chat
@@ -55,6 +55,11 @@ export const POST = apiHandler(
 				})
 				.sort({ timestamp: 1 })
 				.toArray();
+
+			// Validate messageIndex is within bounds
+			if (body.messageIndex < 0 || body.messageIndex >= messages.length) {
+				throw badRequest("messageIndex out of bounds");
+			}
 
 			// Take only messages up to the specified index
 			const messagesToCopy = messages.slice(0, body.messageIndex + 1);
