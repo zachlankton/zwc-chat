@@ -15,9 +15,9 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github-dark.css";
-import { get, post, del, put } from "~/lib/fetchWrapper";
+import { get, post, del, put, wsClient } from "~/lib/fetchWrapper";
 import { AsyncAlert, AsyncConfirm, AsyncModal } from "./async-modals";
-import type { StreamResponse } from "~/lib/webSocketClient";
+import { getHeaderAndText, type StreamResponse } from "~/lib/webSocketClient";
 import { queryClient } from "~/providers/queryClient";
 import { ChatInput } from "./chat-input";
 import {
@@ -53,6 +53,7 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { useQuery } from "@tanstack/react-query";
 import { useApiKeyInfo } from "~/stores/session";
+import { parseSSEEvents } from "~/lib/llm-tools";
 
 interface Message {
   id: string;
@@ -407,7 +408,127 @@ export function ChatInterface({
 
   const apiKeyInfo = useApiKeyInfo();
 
+  const streamingRef = React.useRef<NodeJS.Timeout | null>(null);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [streamingMessageId, setStreamingMessageId] = React.useState<
+    string | null
+  >(null);
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+
   const [messages, setMessages] = React.useState<Message[]>(initialMessages);
+  const buffer = React.useRef("");
+  const assistantMessage = React.useRef<null | Message>(null);
+
+  const wsStream = React.useCallback((data: any) => {
+    if (assistantMessage.current === null) return;
+    const messageHasThisChatId =
+      data.type &&
+      data.headers &&
+      data.headers["x-zwc-chat-id"] &&
+      data.headers["x-zwc-chat-id"] === chatId;
+
+    if (data instanceof ArrayBuffer) {
+      const { header, text } = getHeaderAndText(data);
+      if (!header.chatId) return;
+      if (header.chatId !== chatId) return;
+
+      const stashMessageLength = messages.length;
+      const isNewChat =
+        initialMessages.length === 0 && stashMessageLength === 0;
+
+      for (const chunk of parseSSEEvents(text, buffer)) {
+        if (chunk.type === "data" && assistantMessage.current) {
+          handleChunk({
+            value: chunk.parsed,
+            setMessages,
+            assistantMessage: assistantMessage.current,
+          });
+        } else if (chunk.type === "done") {
+          setIsLoading(false);
+          setStreamingMessageId(null);
+          streamingRef.current = null;
+
+          assistantMessage.current = null;
+
+          // Generate title for new chats after first response
+          if (isNewChat) {
+            // Fire and forget - don't wait for title generation
+            post(`/chat/${chatId}/generate-title`, {})
+              .then(() => {
+                // Invalidate chats query to refresh the title
+                setTimeout(() => {
+                  queryClient.invalidateQueries({ queryKey: ["chats"] });
+                  queryClient.invalidateQueries({ queryKey: ["APIKEYINFO"] });
+                }, 1000);
+              })
+              .catch((err) => console.error("Failed to generate title:", err));
+          } else {
+            setTimeout(() => {
+              queryClient.invalidateQueries({ queryKey: ["APIKEYINFO"] });
+              queryClient.invalidateQueries({ queryKey: ["chats"] });
+            }, 1000);
+          }
+        } else {
+          console.log({ text, chunk });
+        }
+      }
+    } else {
+      if (!messageHasThisChatId) return;
+
+      if (
+        data.status === 403 &&
+        data.body &&
+        data.body.error &&
+        data.body.error.message.toLowerCase().includes("key limit exceeded")
+      ) {
+        AsyncAlert({
+          title: "Error",
+          message: "You have reached your limit",
+        });
+      } else {
+        console.error(data);
+        const message =
+          data?.body?.error?.message ?? "An unknown error occurred";
+        AsyncAlert({
+          message: (
+            <div className="flex flex-col gap-2 mb-4">
+              <h1 className="text-xl strong">Error</h1>
+              <p>{message}</p>
+              <p>
+                Could be upstream, check{" "}
+                <a href="https://status.openrouter.ai/" target="_blank">
+                  https://status.openrouter.ai/
+                </a>
+              </p>
+            </div>
+          ),
+        });
+      }
+      // Restore the original message
+      if (assistantMessage.current !== null) {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMessage.current?.id
+              ? (assistantMessage.current as Message)
+              : msg,
+          ),
+        );
+      } else {
+        setMessages((prev) => [...prev.slice(0, -1)]);
+      }
+
+      setIsLoading(false);
+      setStreamingMessageId(null);
+      streamingRef.current = null;
+    }
+  }, []);
+
+  React.useEffect(() => {
+    wsClient.on("message", wsStream);
+    return () => {
+      wsClient.off("message", wsStream);
+    };
+  }, []);
 
   // Initialize selectedModel based on context
   const getInitialModel = () => {
@@ -433,13 +554,6 @@ export function ChatInterface({
 
   const [selectedModel, setSelectedModel] =
     React.useState<string>(getInitialModel());
-
-  const streamingRef = React.useRef<NodeJS.Timeout | null>(null);
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [streamingMessageId, setStreamingMessageId] = React.useState<
-    string | null
-  >(null);
-  const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
   // Update messages when initialMessages changes (e.g., when switching chats)
   React.useEffect(() => {
@@ -569,7 +683,7 @@ export function ChatInterface({
     setIsLoading(true);
 
     // Create empty assistant message to start streaming
-    const assistantMessage: Message = {
+    assistantMessage.current = {
       id: (Date.now() + 1).toString(),
       content: "",
       role: "assistant",
@@ -578,116 +692,17 @@ export function ChatInterface({
       timeToFinish: 0,
     };
 
-    setMessages((prev) => [...prev, assistantMessage]);
-    setStreamingMessageId(assistantMessage.id);
+    setMessages((prev) => [...prev, assistantMessage.current as Message]);
+    setStreamingMessageId(assistantMessage.current.id);
     setTimeout(scrollNewMessage, 100);
 
-    const streamResp = await post<StreamResponse | Response>(
+    post<StreamResponse | Response>(
       `/chat/${chatId}`,
       { messages: msgsRef, model: selectedModel },
       {
-        returnResponse: true,
+        resolveImmediately: true,
       },
     );
-
-    if (streamResp.status !== 200 && streamResp instanceof Response) {
-      const text = await streamResp.text();
-      const _message = text[0] === "{" ? JSON.parse(text).error : text;
-      const raw = _message?.metadata?.raw
-        ? JSON.parse(_message.metadata.raw)
-        : { detail: "" };
-      const message = _message.message
-        ? `${_message.message} ${raw.detail}`
-        : "Unknown Error Occurred, check console log for details";
-      console.error(streamResp, text);
-      AsyncAlert({ title: "Error", message });
-      //remove the last assistant message
-      setMessages((prev) => [...prev.slice(0, -1)]);
-    } else if ("stream" in streamResp) {
-      assistantMessage.id = streamResp.headers.newMessageId;
-      const reader = streamResp.stream.getReader();
-
-      while (true) {
-        const { done, value } = await reader.read();
-
-        if (done) break;
-
-        const usage = value?.usage;
-
-        if (usage) {
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === assistantMessage.id
-                ? {
-                    ...msg,
-                    promptTokens: usage.prompt_tokens,
-                    completionTokens: usage.completion_tokens,
-                    totalTokens: usage.total_tokens,
-                  }
-                : msg,
-            ),
-          );
-        }
-
-        const delta = value?.choices?.[0]?.delta;
-        const role = delta.role;
-        if (role !== "assistant") {
-          console.error(
-            "obviously we forgot to plan for message roles that aren't assistant",
-            value,
-          );
-          continue;
-        }
-
-        if (!delta) {
-          console.error("delta is not defined", value);
-          continue;
-        }
-        const msgKey = delta.reasoning ? "reasoning" : "content";
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === assistantMessage.id
-              ? {
-                  ...msg,
-                  [msgKey]: (msg[msgKey] ?? "") + (delta[msgKey] || ""),
-                }
-              : msg,
-          ),
-        );
-      }
-    }
-
-    setMessages((prev) =>
-      prev.map((msg) =>
-        msg.id === assistantMessage.id
-          ? { ...msg, timeToFinish: Date.now() - msg.timestamp }
-          : msg,
-      ),
-    );
-
-    // Streaming complete
-    streamingRef.current = null;
-    setIsLoading(false);
-    setStreamingMessageId(null);
-
-    // Generate title for new chats after first response
-    if (isNewChat) {
-      // Fire and forget - don't wait for title generation
-      post(`/chat/${chatId}/generate-title`, {})
-        .then(() => {
-          // Invalidate chats query to refresh the title
-          setTimeout(() => {
-            queryClient.invalidateQueries({ queryKey: ["chats"] });
-            queryClient.invalidateQueries({ queryKey: ["APIKEYINFO"] });
-          }, 1000);
-        })
-        .catch((err) => console.error("Failed to generate title:", err));
-    } else {
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["APIKEYINFO"] });
-        queryClient.invalidateQueries({ queryKey: ["chats"] });
-      }, 1000);
-    }
   };
 
   const handleRetry = async (
@@ -697,12 +712,16 @@ export function ChatInterface({
     if (isLoading) return;
 
     // Get the message to retry and ensure it's an assistant message
-    const messageToRetry = messages[messageIndex];
-    if (messageToRetry.role !== "assistant") {
-      console.error("messageToRetry was not assistant", messageToRetry);
+    assistantMessage.current = messages[messageIndex];
+
+    if (assistantMessage.current.role !== "assistant") {
+      console.error(
+        "messageToRetry was not assistant",
+        assistantMessage.current,
+      );
       AsyncAlert({
         title: "Hmmmm...",
-        message: `Normally the message we are going to retry is an assistant message, but we got role: ${messageToRetry.role}`,
+        message: `Normally the message we are going to retry is an assistant message, but we got role: ${assistantMessage.current.role}`,
       });
       return;
     }
@@ -715,12 +734,13 @@ export function ChatInterface({
       prevUserMsg.content = opts?.newContentForPreviousMessage;
 
     // Update the model if a new one was selected
-    const modelToUse = opts?.newModel || messageToRetry.model || selectedModel;
+    const modelToUse =
+      opts?.newModel || assistantMessage.current.model || selectedModel;
 
     setIsLoading(true);
 
     // Mark this specific message as being regenerated
-    setStreamingMessageId(messageToRetry.id);
+    setStreamingMessageId(assistantMessage.current.id);
 
     // Clear the content of the message being retried
     setMessages((prev) =>
@@ -731,112 +751,17 @@ export function ChatInterface({
       ),
     );
 
-    const streamResp = await post<StreamResponse | Response>(
+    post<StreamResponse | Response>(
       `/chat/${chatId}`,
       {
         messages: messagesUpToRetry,
         model: modelToUse,
-        messageIdToReplace: messageToRetry.id,
+        messageIdToReplace: assistantMessage.current.id,
       },
       {
-        returnResponse: true,
+        resolveImmediately: true,
       },
     );
-
-    if (streamResp.status !== 200 && streamResp instanceof Response) {
-      const text = await streamResp.text();
-      const _message = text[0] === "{" ? JSON.parse(text).error : text;
-      const raw = _message?.metadata?.raw
-        ? JSON.parse(_message.metadata.raw)
-        : { detail: "" };
-      const message = _message.message
-        ? `${_message.message} ${raw.detail}`
-        : "Unknown Error Occurred, check console log for details";
-      console.error(streamResp, text);
-      if (
-        streamResp.status === 403 &&
-        message.toLowerCase().includes("key limit exceeded")
-      ) {
-        AsyncAlert({
-          title: "Error",
-          message:
-            "You have reached your limit, please purchase more credits to continue.",
-        });
-      } else {
-        AsyncAlert({ title: "Error", message });
-      }
-      // Restore the original message
-      setMessages((prev) =>
-        prev.map((msg, idx) => (idx === messageIndex ? messageToRetry : msg)),
-      );
-    } else if ("stream" in streamResp) {
-      const reader = streamResp.stream.getReader();
-
-      while (true) {
-        const { done, value } = await reader.read();
-
-        if (done) break;
-
-        const usage = value?.usage;
-
-        if (usage) {
-          setMessages((prev) =>
-            prev.map((msg, idx) =>
-              idx === messageIndex
-                ? {
-                    ...msg,
-                    promptTokens: usage.prompt_tokens,
-                    completionTokens: usage.completion_tokens,
-                    totalTokens: usage.total_tokens,
-                  }
-                : msg,
-            ),
-          );
-        }
-
-        const delta = value?.choices?.[0]?.delta;
-        const role = delta.role;
-        if (role !== "assistant") {
-          console.error(
-            "obviously we forgot to plan for message roles that aren't assistant",
-            value,
-          );
-          continue;
-        }
-
-        if (!delta) {
-          console.error("delta is not defined", value);
-          continue;
-        }
-        const msgKey = delta.reasoning ? "reasoning" : "content";
-        setMessages((prev) =>
-          prev.map((msg, idx) =>
-            idx === messageIndex
-              ? {
-                  ...msg,
-                  [msgKey]: (msg[msgKey] ?? "") + (delta[msgKey] || ""),
-                }
-              : msg,
-          ),
-        );
-      }
-    }
-
-    setMessages((prev) =>
-      prev.map((msg, idx) =>
-        idx === messageIndex
-          ? { ...msg, timeToFinish: Date.now() - msg.timestamp }
-          : msg,
-      ),
-    );
-
-    // Streaming complete
-    streamingRef.current = null;
-    setIsLoading(false);
-    setStreamingMessageId(null);
-    setTimeout(() => {
-      queryClient.invalidateQueries({ queryKey: ["chats"] });
-    }, 1000);
   };
 
   const handleBranch = async (messageId: string, messageIndex: number) => {
@@ -989,6 +914,7 @@ export function ChatInterface({
                   <path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                 </svg>
               </div>
+
               <h2 className="text-2xl font-semibold mb-2">
                 Start a conversation
               </h2>
@@ -1313,5 +1239,66 @@ export function ChatInterface({
         apiKeyInfo={apiKeyInfo?.data}
       />
     </div>
+  );
+}
+
+function handleChunk({
+  value,
+  setMessages,
+  assistantMessage,
+}: {
+  value: any;
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  assistantMessage: Message;
+}) {
+  const usage = value?.usage;
+
+  if (usage) {
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === assistantMessage.id
+          ? {
+              ...msg,
+              promptTokens: usage.prompt_tokens,
+              completionTokens: usage.completion_tokens,
+              totalTokens: usage.total_tokens,
+            }
+          : msg,
+      ),
+    );
+  }
+
+  const delta = value?.choices?.[0]?.delta;
+  const role = delta.role;
+  if (role !== "assistant") {
+    console.error(
+      "obviously we forgot to plan for message roles that aren't assistant",
+      value,
+    );
+    return;
+  }
+
+  if (!delta) {
+    console.error("delta is not defined", value);
+    return;
+  }
+  const msgKey = delta.reasoning ? "reasoning" : "content";
+  setMessages((prev) =>
+    prev.map((msg) =>
+      msg.id === assistantMessage.id
+        ? {
+            ...msg,
+            [msgKey]: (msg[msgKey] ?? "") + (delta[msgKey] || ""),
+          }
+        : msg,
+    ),
+  );
+
+  setMessages((prev) =>
+    prev.map((msg) =>
+      msg.id === assistantMessage.id
+        ? { ...msg, timeToFinish: Date.now() - msg.timestamp }
+        : msg,
+    ),
   );
 }

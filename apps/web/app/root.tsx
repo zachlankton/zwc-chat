@@ -57,7 +57,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
           options={{
             api_host: import.meta.env.VITE_PUBLIC_POSTHOG_HOST,
             capture_exceptions: true,
-            debug: import.meta.env.MODE === "development",
+            debug: false, //import.meta.env.MODE === "development",
+            disable_session_recording: import.meta.env.MODE === "development",
           }}
         >
           <QueryClientProvider client={queryClient}>

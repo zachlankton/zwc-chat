@@ -162,6 +162,11 @@ export const POST = apiHandler(
 					exclude: false, // Set to true to exclude reasoning tokens from response
 				},
 			}),
+		}).then((r) => {
+			r.headers.set("x-zwc-chat-id", userChatId);
+			if (messageIdToReplace)
+				r.headers.set("x-zwc-message-to-replace-id", messageIdToReplace);
+			return r;
 		});
 	}
 );

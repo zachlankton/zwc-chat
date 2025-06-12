@@ -83,7 +83,7 @@ interface WebSocketClientOptions {
 type EventHandler<T> = (data: T) => void;
 
 interface EventHandlers {
-  message: EventHandler<Message>[];
+  message: EventHandler<Message | ArrayBuffer>[];
   open: EventHandler<Event>[];
   close: EventHandler<CloseEvent>[];
   error: EventHandler<Event>[];
@@ -271,16 +271,11 @@ class WebSocketClient {
       this.socket.onmessage = (event: MessageEvent) => {
         try {
           if (event.data instanceof ArrayBuffer) {
-            const view = new Uint8Array(event.data);
-            const headerLength = new DataView(view.buffer).getUint32(0, true);
-            const header = JSON.parse(
-              txtDecoder.decode(view.slice(4, 4 + headerLength)),
-            );
-            const data = view.slice(4 + headerLength);
-            const text = txtDecoder.decode(data);
+            this._triggerEvent("message", event.data);
+            const { header, text } = getHeaderAndText(event.data);
+            const pendingRequest = this.requestMap.get(header.id);
 
             if (header.status !== 200) {
-              const pendingRequest = this.requestMap.get(header.id);
               if (pendingRequest) {
                 clearTimeout(pendingRequest.timeoutId);
                 this.requestMap.delete(header.id);
@@ -299,7 +294,7 @@ class WebSocketClient {
             }
 
             let pendingResponse = this.responseMap.get(header.id);
-            if (!pendingResponse) {
+            if (!pendingResponse && pendingRequest) {
               let stashController: ReadableStreamDefaultController<any> | null =
                 null;
               const stream = new ReadableStream({
@@ -334,47 +329,50 @@ class WebSocketClient {
               this.responseMap.set(header.id, pendingResponse!);
             }
 
-            // Append new text to buffer
-            pendingResponse.buffer += text;
+            if (pendingResponse) {
+              // Append new text to buffer
+              pendingResponse.buffer += text;
 
-            const pendingRequest = this.requestMap.get(header.id);
-            if (pendingRequest) {
-              clearTimeout(pendingRequest.timeoutId);
-              this.requestMap.delete(header.id);
+              if (pendingRequest) {
+                clearTimeout(pendingRequest.timeoutId);
+                this.requestMap.delete(header.id);
 
-              //@ts-ignore
-              pendingRequest.resolve(pendingResponse.response);
-            }
+                //@ts-ignore
+                pendingRequest.resolve(pendingResponse.response);
+              }
 
-            // Process complete SSE events (delimited by \n\n)
-            const events = pendingResponse.buffer.split("\n\n");
+              // Process complete SSE events (delimited by \n\n)
+              const events = pendingResponse.buffer.split("\n\n");
 
-            // Keep the last item as it might be incomplete
-            pendingResponse.buffer = events.pop() || "";
+              // Keep the last item as it might be incomplete
+              pendingResponse.buffer = events.pop() || "";
 
-            // Process all complete events
-            for (const event of events) {
-              if (event.trim() === "") continue;
+              // Process all complete events
+              for (const event of events) {
+                if (event.trim() === "") continue;
 
-              // Extract data from SSE event
-              const dataMatch = event.match(/^data: (.+)$/m);
-              if (dataMatch) {
-                const data = dataMatch[1];
+                // Extract data from SSE event
+                const dataMatch = event.match(/^data: (.+)$/m);
+                if (dataMatch) {
+                  const data = dataMatch[1];
 
-                if (data.trim() === "[DONE]") {
-                  this._log("Received message:", { header, data });
-                  clearTimeout(pendingResponse.timeoutId);
-                  pendingResponse.controller.close();
-                  this.responseMap.delete(header.id);
-                } else {
-                  // Try to parse as JSON
-                  const parsed = tryParseJson(data);
-                  if (parsed !== null) {
-                    pendingResponse.controller.enqueue(parsed);
+                  if (data.trim() === "[DONE]") {
+                    this._log("Received message:", { header, data });
+                    clearTimeout(pendingResponse.timeoutId);
+                    pendingResponse.controller.close();
+                    this.responseMap.delete(header.id);
+                  } else {
+                    // Try to parse as JSON
+                    const parsed = tryParseJson(data);
+                    if (parsed !== null) {
+                      pendingResponse.controller.enqueue(parsed);
+                    }
                   }
                 }
               }
             }
+
+            return;
           }
 
           const data = JSON.parse(event.data) as Message;
@@ -394,9 +392,6 @@ class WebSocketClient {
                 }),
               );
             }
-          }
-
-          if (data.type === "response-chunked" && data.id) {
           }
 
           // Call event handlers
@@ -445,15 +440,18 @@ class WebSocketClient {
   public request(
     requestMsg: Omit<RequestMessage, "id" | "type">,
     timeout?: number,
+    resolveImmediately?: boolean,
   ): Promise<Response>;
   public request(
     requestMsg: RequestMessage,
     timeout?: number,
+    resolveImmediately?: boolean,
   ): Promise<Response>;
   public request(
     requestMsg: Partial<RequestMessage> &
       Pick<RequestMessage, "method" | "path">,
     timeout: number = this.options.requestTimeout,
+    resolveImmediately?: boolean,
   ): Promise<Response> {
     return new Promise<Response>((resolve, reject) => {
       const hdrs = requestMsg.headers
@@ -470,20 +468,24 @@ class WebSocketClient {
         body: requestMsg.body,
       };
 
-      // Set up timeout for this request
-      const timeoutId: number = window.setTimeout(() => {
-        this.requestMap.delete(message.id);
-        reject(new Error(`Request timeout: ${message.id}`));
-      }, timeout);
+      let timeoutId: number | undefined = undefined;
 
-      // Store request data
-      this.requestMap.set(message.id, {
-        request: message,
-        timeoutId,
-        resolve,
-        reject,
-        timestamp: Date.now(),
-      });
+      if (!resolveImmediately) {
+        // Set up timeout for this request
+        timeoutId = window.setTimeout(() => {
+          this.requestMap.delete(message.id);
+          reject(new Error(`Request timeout: ${message.id}`));
+        }, timeout);
+
+        // Store request data
+        this.requestMap.set(message.id, {
+          request: message,
+          timeoutId,
+          resolve,
+          reject,
+          timestamp: Date.now(),
+        });
+      }
 
       // Send the message
       const sent = this.send(message);
@@ -494,6 +496,8 @@ class WebSocketClient {
         this.requestMap.delete(message.id);
         reject(new Error("Failed to send request: socket is not connected"));
       }
+
+      if (resolveImmediately) resolve(new Response("ok"));
     });
   }
 
@@ -637,11 +641,20 @@ export {
   type HttpMethod,
 };
 
-function tryParseJson(txt: string) {
+export function tryParseJson(txt: string) {
   try {
     return JSON.parse(txt);
   } catch (error) {
     console.error("FAILED TO PARSE CHUNK", txt);
     return null;
   }
+}
+
+export function getHeaderAndText(d: ArrayBuffer) {
+  const view = new Uint8Array(d);
+  const headerLength = new DataView(view.buffer).getUint32(0, true);
+  const header = JSON.parse(txtDecoder.decode(view.slice(4, 4 + headerLength)));
+  const data = view.slice(4 + headerLength);
+  const text = txtDecoder.decode(data);
+  return { header, text };
 }
