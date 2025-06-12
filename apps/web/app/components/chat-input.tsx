@@ -60,7 +60,7 @@ export function ChatInput({
 
   // Calculate usage percentage and determine status
   const getUsageStatus = () => {
-    if (!apiKeyInfo) return null;
+    if (!apiKeyInfo || apiKeyInfo.limit === 0) return null;
 
     const usagePercentage = (apiKeyInfo.usage / apiKeyInfo.limit) * 100;
     const remainingPercentage = Math.max(0, 100 - usagePercentage);
