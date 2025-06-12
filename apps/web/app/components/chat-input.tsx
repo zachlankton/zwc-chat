@@ -267,55 +267,53 @@ export function ChatInput({
             <div className="flex items-center gap-4 text-xs text-muted-foreground">
               <span>Press Enter to send, Shift+Enter for new line</span>
             </div>
-            <div className="flex items-center gap-4">
-              {/* API Key Usage Indicator */}
-              {usageStatus && (
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1.5">
-                    {usageStatus.status === "critical" ? (
-                      <XCircle className="h-3.5 w-3.5 text-destructive" />
-                    ) : usageStatus.status === "warning" ? (
-                      <AlertCircle className="h-3.5 w-3.5 text-yellow-500" />
-                    ) : (
-                      <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+            {/* API Key Usage Indicator */}
+            {usageStatus && (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  {usageStatus.status === "critical" ? (
+                    <XCircle className="h-3.5 w-3.5 text-destructive" />
+                  ) : usageStatus.status === "warning" ? (
+                    <AlertCircle className="h-3.5 w-3.5 text-yellow-500" />
+                  ) : (
+                    <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                  )}
+                  <span
+                    className={cn(
+                      "text-xs font-medium",
+                      usageStatus.status === "critical" && "text-destructive",
+                      usageStatus.status === "warning" && "text-yellow-500",
+                      usageStatus.status === "good" && "text-green-500",
                     )}
-                    <span
-                      className={cn(
-                        "text-xs font-medium",
-                        usageStatus.status === "critical" && "text-destructive",
-                        usageStatus.status === "warning" && "text-yellow-500",
-                        usageStatus.status === "good" && "text-green-500",
-                      )}
-                    >
-                      {usageStatus.remaining > 0
-                        ? `${usageStatus.percentage.toFixed(1)}% credits remain`
-                        : "No credits remaining"}
-                    </span>
-                  </div>
-                  {/* Progress bar */}
-                  <div className="relative w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className={cn(
-                        "absolute left-0 top-0 h-full transition-all duration-300",
-                        usageStatus.status === "critical" && "bg-destructive",
-                        usageStatus.status === "warning" && "bg-yellow-500",
-                        usageStatus.status === "good" && "bg-green-500",
-                      )}
-                      style={{ width: `${usageStatus.percentage}%` }}
-                    />
-                  </div>
+                  >
+                    {usageStatus.remaining > 0
+                      ? `${usageStatus.percentage.toFixed(1)}% credits remain`
+                      : "No credits remaining"}
+                  </span>
                 </div>
-              )}
-              {selectedModel && onModelChange && (
-                <ModelSelector
-                  selectedModel={selectedModel}
-                  onModelChange={onModelChange}
-                  data={modelsData}
-                  isLoading={modelsLoading}
-                  error={modelsError}
-                />
-              )}
-            </div>
+                {/* Progress bar */}
+                <div className="relative w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={cn(
+                      "absolute left-0 top-0 h-full transition-all duration-300",
+                      usageStatus.status === "critical" && "bg-destructive",
+                      usageStatus.status === "warning" && "bg-yellow-500",
+                      usageStatus.status === "good" && "bg-green-500",
+                    )}
+                    style={{ width: `${usageStatus.percentage}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            {selectedModel && onModelChange && (
+              <ModelSelector
+                selectedModel={selectedModel}
+                onModelChange={onModelChange}
+                data={modelsData}
+                isLoading={modelsLoading}
+                error={modelsError}
+              />
+            )}
           </div>
         </div>
       </div>
