@@ -1,3 +1,4 @@
+import posthog from "posthog-js";
 import { LS_REDIRECTED_TO_LOGIN, LS_TOKEN } from "~/lib/fetchWrapper";
 import { fetchSession, setSession, type SessionData } from "~/stores/session";
 
@@ -21,6 +22,7 @@ export async function checkLogin() {
     if (response.status === 201) {
       const session = (await response.json()) as SessionData;
       setSession(session);
+      posthog.identify(session.email);
       localStorage.removeItem(LS_REDIRECTED_TO_LOGIN);
       localStorage.setItem(LS_TOKEN, session.token);
       calledAuthAlready = false;
@@ -48,10 +50,13 @@ export async function checkLogin() {
   );
 
   const response = await fetchSession(originalUrlPath);
+
   if (response.status === 302) {
     localStorage.setItem(LS_REDIRECTED_TO_LOGIN, "true");
     // we are redirecting to login
     const { authorizationUrl } = response;
     return { authorizationUrl, originalUrlPath };
+  } else {
+    posthog.identify(response.email);
   }
 }
