@@ -98,7 +98,7 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 	}
 
 	const url = new URL(req.url);
-	const path = url.pathname.replace(/^\/api\/posthog/, "");
+	const path = url.pathname.replace(/^\/ph/, "");
 
 	// Determine which PostHog endpoint to use
 	if (path.startsWith("/static/")) {
