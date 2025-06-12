@@ -333,6 +333,11 @@ async function parseStreamingChunks(
 
 				// Extract content or reasoning
 				const delta = value?.choices?.[0]?.delta;
+				if (!delta) {
+					console.error("expected delta, but undefined, skipping for now");
+					continue;
+				}
+
 				const role = delta.role;
 
 				if (delta.annotations) {

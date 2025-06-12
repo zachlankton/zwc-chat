@@ -1,11 +1,7 @@
 import type { RequestWithSession } from "api/auth/session/sessionCache";
 import { getCurrentSession } from "api/auth/session/utils";
 import { apiHandler, badRequest, notAuthorized } from "lib/utils";
-import {
-	getMessagesCollection,
-	getChatsCollection,
-	type OpenRouterMessage,
-} from "lib/database";
+import { getMessagesCollection, getChatsCollection } from "lib/database";
 
 // UUID v4 validation regex
 const UUID_V4_REGEX =
@@ -68,8 +64,7 @@ export const POST = apiHandler(
 				.join("\n");
 
 			// Use user's API key from session, or fall back to environment key
-			const apiKey =
-				req.session.openRouterApiKey || process.env.OPENROUTER_API_KEY;
+			const apiKey = req.session.openRouterApiKey;
 
 			if (!apiKey) {
 				return Response.json(
