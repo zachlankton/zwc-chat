@@ -28,6 +28,7 @@ export function AppSidebar({ onNewChat, ...props }: AppSidebarProps) {
   const [titleText, setTitleText] = React.useState(
     isCollapsed ? "ZWC" : "ZWC Chat",
   );
+  const isMobile = sb.isMobile;
   const [titleFading, setTitleFading] = React.useState(false);
 
   const handleChatSelect = (chatId: string) => {
@@ -91,10 +92,10 @@ export function AppSidebar({ onNewChat, ...props }: AppSidebarProps) {
       </SidebarHeader>
 
       <SidebarContent className="px-0">
-        {!hideElements && (
+        {hideElements && !isMobile ? null : (
           <div
             className={`transition-opacity duration-300 h-full ${
-              showContent ? "opacity-100" : "opacity-0"
+              showContent || isMobile ? "opacity-100" : "opacity-0"
             }`}
           >
             <ChatList

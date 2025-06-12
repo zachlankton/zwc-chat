@@ -57,6 +57,8 @@ export function ChatInput({
   const textareaScrollHeightRef = useRef<HTMLTextAreaElement>(null);
   const sidebar = useSidebar();
   const sidebarCollapsed = sidebar.state === "collapsed";
+  const isMobile = sidebar.isMobile;
+  console.log({ isMobile });
 
   // Calculate usage percentage and determine status
   const getUsageStatus = () => {
@@ -114,15 +116,18 @@ export function ChatInput({
 
       const message = textarea.value;
 
-      if (message.length === 0) return (textarea.style.height = "20px");
+      const textSize = sidebar.isMobile ? 30 : 20;
+
+      if (message.length === 0)
+        return (textarea.style.height = `${textSize}px`);
 
       const count = Math.max(message.split("\n").length, 1);
-      textarea.style.height = `${count * 20}px`;
+      textarea.style.height = `${count * textSize}px`;
 
       // Get the scroll height (content height)
       const scrollHeight = textScroll.scrollHeight;
 
-      textarea.style.height = `${Math.max(scrollHeight, count * 20)}px`;
+      textarea.style.height = `${Math.max(scrollHeight, count * textSize)}px`;
     }, 100);
   };
 
@@ -137,7 +142,7 @@ export function ChatInput({
 
   return (
     <div
-      className={`fixed bottom-0 ${sidebarCollapsed ? "left-[48px]" : "left-[256px]"} right-0 z-40 bg-gradient-to-t from-background via-background to-transparent pt-6 pb-4 animate-in slide-in-from-bottom duration-300`}
+      className={`fixed bottom-0 ${isMobile ? "left-0" : sidebarCollapsed ? "left-[48px]" : "left-[256px]"} right-0 z-40 bg-gradient-to-t from-background via-background to-transparent pt-6 pb-4 animate-in slide-in-from-bottom duration-300`}
     >
       <div className="max-w-4xl mx-auto px-6">
         {/* Attachments Preview */}
@@ -162,7 +167,7 @@ export function ChatInput({
         )}
 
         {/* Main Input Container */}
-        <div>
+        <div className="@container">
           <div
             className={cn(
               "relative flex items-end gap-2 rounded-2xl border-2 bg-background/95 backdrop-blur-sm transition-all duration-200",
@@ -206,10 +211,11 @@ export function ChatInput({
                 className={cn(
                   "w-full absolute bottom-[-9000px] bg-transparent text-transparent mt-2 mb-1 resize-none text-sm",
                   "min-h-[24px] max-h-[200px]",
+                  isMobile ? "text-xl" : "",
                 )}
                 style={{
                   scrollbarWidth: "thin",
-                  height: "20px",
+                  height: isMobile ? "30px" : "20px",
                 }}
               />
               <textarea
@@ -224,10 +230,11 @@ export function ChatInput({
                 className={cn(
                   "w-full mt-2 mb-1 transition-all duration-50 resize-none bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none",
                   "min-h-[24px] max-h-[200px]",
+                  isMobile ? "text-xl" : "",
                 )}
                 style={{
                   scrollbarWidth: "thin",
-                  height: "20px",
+                  height: isMobile ? "30px" : "20px",
                 }}
               />
             </div>
@@ -263,13 +270,15 @@ export function ChatInput({
           </div>
 
           {/* Helper Text and Model Selector */}
-          <div className="mt-2 flex items-center justify-between px-2">
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <span>Press Enter to send, Shift+Enter for new line</span>
-            </div>
+          <div className="mt-2 flex gap-2 @max-[570px]:flex-col-reverse items-center justify-between px-2">
+            {isMobile ? null : (
+              <div className="flex items-center gap-4 @max-[815px]:hidden text-xs text-muted-foreground">
+                <span>Press Enter to send, Shift+Enter for new line</span>
+              </div>
+            )}
             {/* API Key Usage Indicator */}
             {usageStatus && (
-              <div className="flex items-center gap-2">
+              <div className="flex @max-[600px]:text-center items-center gap-2">
                 <div className="flex items-center gap-1.5">
                   {usageStatus.status === "critical" ? (
                     <XCircle className="h-3.5 w-3.5 text-destructive" />

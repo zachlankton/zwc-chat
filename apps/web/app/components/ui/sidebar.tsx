@@ -306,7 +306,12 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
   );
 }
 
-function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
+function SidebarInset({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<"main">) {
+  const { isMobile } = useSidebar();
   return (
     <main
       data-slot="sidebar-inset"
@@ -316,7 +321,14 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
         className,
       )}
       {...props}
-    />
+    >
+      {children}
+      {isMobile ? (
+        <div className="fixed top-2 left-2">
+          <SidebarTrigger className="bg-background" />
+        </div>
+      ) : null}
+    </main>
   );
 }
 

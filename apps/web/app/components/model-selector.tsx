@@ -52,7 +52,6 @@ export function ModelSelector({
           m.id.toLowerCase().includes(searchQuery.toLowerCase())),
     ) || [];
 
-
   const formatPrice = (price: string) => {
     const num = parseFloat(price);
     if (num === 0) return "Free";
@@ -199,4 +198,3 @@ export function ModelSelector({
     </DropdownMenu>
   );
 }
-

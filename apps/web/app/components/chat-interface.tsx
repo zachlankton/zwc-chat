@@ -972,8 +972,8 @@ export function ChatInterface({
   return (
     <div className="flex flex-col h-full">
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto pb-32">
-        <div className="max-w-5xl mx-auto px-4 mb-[70vh]">
+      <div className="@container flex-1 overflow-y-auto pb-32">
+        <div className="max-w-5xl mx-auto px-4 @max-[560px]:px-1 mb-[70vh]">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full min-h-[60vh] text-center">
               <div className="rounded-full bg-primary/10 p-6 mb-6">
@@ -1044,7 +1044,7 @@ export function ChatInterface({
                 message.role === "user" ? "flex-row-reverse" : "",
               )}
             >
-              <Avatar className="h-8 w-8">
+              <Avatar className="h-8 w-8 @max-[560px]:hidden">
                 {message.role === "assistant" ? (
                   <>
                     <AvatarFallback>AI</AvatarFallback>
@@ -1057,20 +1057,20 @@ export function ChatInterface({
               </Avatar>
               <div
                 className={cn(
-                  "flex-1 space-y-2",
+                  "flex-1 space-y-2 max-w-[88%] @max-[560px]:max-w-full",
                   message.role === "user" ? "flex flex-col items-end" : "",
                 )}
               >
                 <div
                   className={cn(
-                    "rounded-2xl px-5 py-3 max-w-4xl shadow-sm",
+                    "rounded-2xl px-5 py-3 max-w-full shadow-sm",
                     message.role === "user"
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted/50 border border-border/50",
                   )}
                 >
                   {message.role === "user" ? (
-                    <div className="prose prose-sm text-sm whitespace-pre-wrap user-message max-w-2xl max-h-[30vh] overflow-y-auto">
+                    <div className="prose prose-sm text-sm whitespace-pre-wrap user-message max-w-full max-h-[30vh] overflow-y-auto">
                       {typeof message.content === "string" ? (
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
@@ -1239,8 +1239,8 @@ export function ChatInterface({
                     </div>
                   )}
                 </div>
-                <div className="flex max-w-4xl items-center justify-between text-xs text-muted-foreground">
-                  <div className="flex items-center gap-2">
+                <div className="flex @max-[560px]:px-10 max-w-4xl items-center justify-between text-xs text-muted-foreground">
+                  <div className="flex @max-[560px]:hidden items-center gap-2">
                     {message.model && message.role === "assistant" && (
                       <>
                         <span className="flex items-center gap-1">
