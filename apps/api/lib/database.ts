@@ -17,6 +17,7 @@ export interface OpenRouterMessage {
 	content: string | OpenRouterContent[];
 	reasoning?: string;
 	role: "system" | "developer" | "user" | "assistant" | "tool";
+	model?: string; // The model used for this message
 	timestamp: number;
 	promptTokens?: number;
 	completionTokens?: number;
@@ -39,6 +40,11 @@ export interface Chat {
 	updatedAt: Date;
 	lastMessage?: string;
 	messageCount: number;
+	branchedFrom?: {
+		chatId: string;
+		messageId: string;
+		branchedAt: Date;
+	};
 }
 
 export interface User {
@@ -65,6 +71,13 @@ let client: MongoClient | null = new MongoClient(MONGODB_URI, {
 	maxConnecting: 10,
 	serverSelectionTimeoutMS: 5000,
 	socketTimeoutMS: 45000,
+	// Ensure strong consistency
+	writeConcern: {
+		w: "majority",
+		wtimeout: 5000,
+	},
+	readPreference: "primary",
+	readConcern: { level: "majority" },
 });
 
 export function getMongoClient() {

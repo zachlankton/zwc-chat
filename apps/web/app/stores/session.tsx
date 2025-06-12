@@ -24,6 +24,10 @@ export const SESSION_Q_FUN_W_PATH = (path: string) =>
   );
 export const SESSION_Q_STALETIME = ONE_MINUTE;
 
+export const APIKEYINFO_Q_KEY = "APIKEYINFO";
+export const APIKEYINFO_Q_FUN = () => get<any>(`/auth/key-status`);
+export const APIKEYINFO_Q_STALETIME = ONE_MINUTE;
+
 export function fetchSession(originalUrlPath: string) {
   return queryClient.fetchQuery({
     queryKey: [SESSION_Q_KEY],
@@ -51,7 +55,13 @@ export function useSession() {
   return q.data;
 }
 
-export function logOut() {
-  post("/auth/logout", {});
-  localStorage.removeItem("pulse_session");
+export const apiKeyInfoQuery: FetchQueryOptions<any> = {
+  queryKey: [APIKEYINFO_Q_KEY],
+  queryFn: APIKEYINFO_Q_FUN,
+  staleTime: ONE_MINUTE * 5,
+};
+
+export function useApiKeyInfo() {
+  const q = useQuery(apiKeyInfoQuery);
+  return q.data;
 }

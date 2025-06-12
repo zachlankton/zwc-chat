@@ -170,7 +170,9 @@ export const routePaths: string[] = [];
 export const routeImportPromises: Promise<any>[] = [];
 for (const [path, route] of Object.entries(router.routes)) {
 	const isRoute = path.split("/").at(-1) === "route";
-	if (!isRoute) continue;
+	const isCatchAll = path.split("/").at(-1) === "[[...catchall]]";
+
+	if (!isRoute && !isCatchAll) continue;
 	console.log(`Importing route module ${path}`);
 	routeImportPromises.push(import(route));
 	routePaths.push(path);

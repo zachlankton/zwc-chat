@@ -289,6 +289,7 @@ class WebSocketClient {
                   new Response(text, {
                     status: header.status,
                     statusText: header.statusText,
+                    headers: { newMessageId: header.newMessageId },
                   }),
                 );
               }
@@ -324,6 +325,7 @@ class WebSocketClient {
                     "Transfer-Encoding": "chunked",
                     "Content-Type": "text/html; charset=UTF-8",
                     "X-Content-Type-Options": "nosniff",
+                    newMessageId: header.newMessageId,
                   },
                 },
                 buffer: "", // Initialize empty buffer for SSE events

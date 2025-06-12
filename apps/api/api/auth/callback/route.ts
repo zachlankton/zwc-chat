@@ -24,6 +24,9 @@ if (!cookiePW) throw "WORKOS_COOKIE_PW env var is not set";
 
 const workos = new WorkOS(workosApiKey, { clientId });
 
+// Maximum number of users allowed in the system
+const MAX_USER_LIMIT = Number(process.env.MAX_USER_LIMIT) || 10;
+
 export const GET = apiHandler(async (req: RequestWithSession) => {
 	// The authorization code returned by AuthKit
 	const url = new URL(req.url);
@@ -52,6 +55,15 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 
 			// If new user, create user record
 			if (!user) {
+				// Check if we've reached the user limit
+				const userCount = await usersCollection.countDocuments();
+				if (userCount >= MAX_USER_LIMIT) {
+					console.log(
+						`User limit reached (${userCount}/${MAX_USER_LIMIT}). Rejecting new user: ${auth.user.email}`
+					);
+					throw new Error("USER_LIMIT_REACHED");
+				}
+
 				const now = new Date();
 				const newUser: User = {
 					userId: auth.user.id,
@@ -190,6 +202,14 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 			return new Response("Authorization code is currently being processed", {
 				status: 429,
 			});
+		}
+		if (error.message === "USER_LIMIT_REACHED") {
+			return new Response(
+				"Sorry, we aren't accepting new users at the moment, please try again tomorrow",
+				{
+					status: 503,
+				}
+			);
 		}
 
 		// Other errors

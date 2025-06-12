@@ -1,5 +1,13 @@
 import * as React from "react";
-import { Copy, Check } from "lucide-react";
+import {
+  Copy,
+  Check,
+  Sparkles,
+  RotateCcw,
+  GitBranchPlus,
+  Trash2,
+  Pencil,
+} from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { cn } from "~/lib/utils";
@@ -7,11 +15,44 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github-dark.css";
-import { post } from "~/lib/fetchWrapper";
-import { AsyncAlert } from "./async-modals";
+import { get, post, del, put } from "~/lib/fetchWrapper";
+import { AsyncAlert, AsyncConfirm, AsyncModal } from "./async-modals";
 import type { StreamResponse } from "~/lib/webSocketClient";
 import { queryClient } from "~/providers/queryClient";
 import { ChatInput } from "./chat-input";
+import {
+  DialogTitle,
+  DialogDescription,
+  DialogClose,
+} from "~/components/ui/dialog";
+import { Textarea } from "~/components/ui/textarea";
+import { Checkbox } from "~/components/ui/checkbox";
+import { Label } from "~/components/ui/label";
+
+export interface Model {
+  id: string;
+  name: string;
+  description: string;
+  context_length: number;
+  pricing: {
+    prompt: string;
+    completion: string;
+  };
+}
+
+export interface ModelsResponse {
+  favorites: Model[];
+  all: Model[];
+}
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
+import { useQuery } from "@tanstack/react-query";
+import { useApiKeyInfo } from "~/stores/session";
 
 interface Message {
   id: string;
@@ -25,6 +66,7 @@ interface Message {
       }>;
   reasoning?: string;
   role: "system" | "developer" | "user" | "assistant" | "tool";
+  model?: string; // Model used for this message
   timestamp: number;
   promptTokens?: number;
   completionTokens?: number;
@@ -36,6 +78,262 @@ interface Message {
 interface ChatInterfaceProps {
   chatId: string;
   initialMessages: Message[];
+}
+
+function MessageCopyButton({
+  content,
+  reasoning,
+}: {
+  content: string | any[];
+  reasoning?: string;
+}) {
+  const [copied, setCopied] = React.useState(false);
+
+  const handleCopy = async () => {
+    // Convert content to markdown string
+    let markdownContent = "";
+
+    // Add reasoning if present
+    if (reasoning) {
+      markdownContent = `# Reasoning\n\n${reasoning}\n\n---\n\n`;
+    }
+
+    if (typeof content === "string") {
+      markdownContent += content;
+    } else if (Array.isArray(content)) {
+      // Handle array content (mixed text/images/files)
+      markdownContent += content
+        .map((item) => {
+          if (item.type === "text") {
+            return item.text || "";
+          } else if (item.type === "image_url") {
+            return `![Image](${item.image_url?.url})`;
+          } else if (item.type === "file") {
+            return `[${item.file?.filename}]`;
+          }
+          return "";
+        })
+        .join("\n\n");
+    }
+
+    try {
+      await navigator.clipboard.writeText(markdownContent);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      // Fallback for older browsers
+      const textarea = document.createElement("textarea");
+      textarea.value = markdownContent;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleCopy}
+      className="h-6 has-[>svg]:px-2 has-[>svg]:py-4 text-xs hover:bg-muted/50"
+    >
+      {copied ? <Check className="h-3" /> : <Copy className="h-3" />}
+    </Button>
+  );
+}
+
+function MessageRetryButton({
+  messageIndex,
+  messageModel,
+  currentModel,
+  onRetry,
+}: {
+  messageIndex: number;
+  messageModel: string;
+  currentModel: string;
+  onRetry: (messageIndex: number, opts?: { newModel?: string }) => void;
+}) {
+  const modelsAreSame = messageModel === currentModel;
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 has-[>svg]:px-2 has-[>svg]:py-4 text-xs hover:bg-muted/50"
+          >
+            <RotateCcw className="h-3" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            onClick={() => onRetry(messageIndex, { newModel: messageModel })}
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Retry With {messageModel.split("/")[1] || messageModel}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => onRetry(messageIndex, { newModel: currentModel })}
+            disabled={modelsAreSame}
+          >
+            {modelsAreSame ? (
+              <span className="flex text-muted-foreground">
+                <Sparkles className="h-4 w-4 mr-2" />
+                Change your current model to retry with that
+              </span>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4 mr-2" />
+                Retry with {currentModel.split("/")[1] || currentModel}
+              </>
+            )}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  );
+}
+
+function MessageBranchButton({
+  messageId,
+  messageIndex,
+  onBranch,
+}: {
+  messageId: string;
+  messageIndex: number;
+  onBranch: (messageId: string, messageIndex: number) => void;
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => onBranch(messageId, messageIndex)}
+      className="h-6 has-[>svg]:px-2 has-[>svg]:py-4 text-xs hover:bg-muted/50"
+      title="Branch conversation from here"
+    >
+      <GitBranchPlus className="h-3" />
+    </Button>
+  );
+}
+
+function MessageEditButton({
+  messageId,
+  content,
+  onEdit,
+  isUserMessage,
+  hasNextAssistantMessage,
+}: {
+  messageId: string;
+  content: string | any[];
+  onEdit: (
+    messageId: string,
+    newContent: string,
+    regenerateNext: boolean,
+  ) => void;
+  isUserMessage: boolean;
+  hasNextAssistantMessage: boolean;
+}) {
+  const handleEdit = async () => {
+    // Extract text content from message
+    let textContent = "";
+    if (typeof content === "string") {
+      textContent = content;
+    } else if (Array.isArray(content)) {
+      // Extract text from content array
+      const textPart = content.find((item: any) => item.type === "text") as any;
+      textContent = textPart?.text || "";
+    }
+
+    const result = await AsyncModal(
+      <>
+        <DialogTitle className="mb-4 text-xl font-bold">
+          Edit Message
+        </DialogTitle>
+        <DialogDescription className="mb-4">
+          Edit the message content below:
+        </DialogDescription>
+        <div className="mb-4">
+          <Textarea
+            name="content"
+            defaultValue={textContent}
+            className="min-h-[50vh] w-full resize-y"
+            placeholder="Enter your message..."
+            autoFocus
+          />
+        </div>
+        {isUserMessage && hasNextAssistantMessage && (
+          <div className="mb-6 flex items-center space-x-2">
+            <Checkbox id="regenerate" name="regenerate" defaultChecked={true} />
+            <Label
+              htmlFor="regenerate"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Regenerate assistant response after editing
+            </Label>
+          </div>
+        )}
+        <div className="grid grid-flow-row-dense grid-cols-2 gap-3">
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Cancel
+            </Button>
+          </DialogClose>
+          <Button type="submit" variant="default">
+            Save
+          </Button>
+        </div>
+      </>,
+      {
+        style: { maxWidth: "80vw" },
+        initialData: {
+          content: textContent,
+          regenerate: true,
+        },
+      },
+    );
+
+    if (result.ok && result.data.content?.trim()) {
+      const regenerateNext =
+        isUserMessage && hasNextAssistantMessage && result.data.regenerate;
+      onEdit(messageId, result.data.content.trim(), regenerateNext);
+    }
+  };
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleEdit}
+      className="h-6 has-[>svg]:px-2 has-[>svg]:py-4 text-xs hover:bg-muted/50"
+      title="Edit message"
+    >
+      <Pencil className="h-3" />
+    </Button>
+  );
+}
+
+function MessageDeleteButton({
+  messageId,
+  onDelete,
+}: {
+  messageId: string;
+  onDelete: (messageId: string) => void;
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => onDelete(messageId)}
+      className="h-6 has-[>svg]:px-2 has-[>svg]:py-4 text-xs hover:bg-destructive/20 hover:text-destructive"
+      title="Delete message"
+    >
+      <Trash2 className="h-3" />
+    </Button>
+  );
 }
 
 function CodeBlock({ children }: { children: React.ReactNode }) {
@@ -68,7 +366,7 @@ function CodeBlock({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="relative group">
-      <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute right-2 top-2 text-white opacity-0 group-hover:opacity-100 transition-opacity">
         <Button
           variant="ghost"
           size="icon"
@@ -97,7 +395,44 @@ export function ChatInterface({
   chatId,
   initialMessages = [],
 }: ChatInterfaceProps) {
+  const {
+    data: modelsData,
+    isLoading: modelsLoading,
+    error: modelsError,
+  } = useQuery<ModelsResponse>({
+    queryKey: ["models"],
+    queryFn: () => get("/api/models"),
+    staleTime: 60 * 60 * 1000, // 1 hour
+  });
+
+  const apiKeyInfo = useApiKeyInfo();
+
   const [messages, setMessages] = React.useState<Message[]>(initialMessages);
+
+  // Initialize selectedModel based on context
+  const getInitialModel = () => {
+    // For existing chats, use the model from the last assistant message
+    if (initialMessages.length > 0) {
+      const lastAssistantMessage = [...initialMessages]
+        .reverse()
+        .find((msg) => msg.role === "assistant" && msg.model);
+      if (lastAssistantMessage?.model) {
+        return lastAssistantMessage.model;
+      }
+    }
+
+    // For new chats, use localStorage
+    const savedModel = localStorage.getItem("selectedModel");
+    if (savedModel) {
+      return savedModel;
+    }
+
+    // Default fallback
+    return "openai/gpt-4o-mini";
+  };
+
+  const [selectedModel, setSelectedModel] =
+    React.useState<string>(getInitialModel());
 
   const streamingRef = React.useRef<NodeJS.Timeout | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -109,7 +444,22 @@ export function ChatInterface({
   // Update messages when initialMessages changes (e.g., when switching chats)
   React.useEffect(() => {
     setMessages(initialMessages);
+
+    // Also update the selected model based on the new chat's messages
+    if (initialMessages.length > 0) {
+      const lastAssistantMessage = [...initialMessages]
+        .reverse()
+        .find((msg) => msg.role === "assistant" && msg.model);
+      if (lastAssistantMessage?.model) {
+        setSelectedModel(lastAssistantMessage.model);
+      }
+    }
   }, [initialMessages]);
+
+  // Save selected model to localStorage whenever it changes
+  React.useEffect(() => {
+    localStorage.setItem("selectedModel", selectedModel);
+  }, [selectedModel]);
 
   // Add cleanup effect
   React.useEffect(() => {
@@ -144,6 +494,8 @@ export function ChatInterface({
 
   const handleSubmit = async (input: string, attachments: File[]) => {
     if (!input.trim() || isLoading) return;
+    const stashMessageLength = messages.length;
+    const isNewChat = initialMessages.length === 0 && stashMessageLength === 0;
 
     // Convert files to base64
     const fileToBase64 = async (file: File): Promise<string> => {
@@ -181,8 +533,32 @@ export function ChatInterface({
       }
     }
 
+    // If this is a new chat, immediately add a placeholder to the chat list
+    if (isNewChat) {
+      queryClient.setQueryData(["chats"], (oldData: any) => {
+        if (!oldData) return oldData;
+
+        const placeholderChat = {
+          id: chatId,
+          title: "Generating...",
+          lastMessage:
+            typeof content === "string"
+              ? content.slice(0, 50)
+              : "New conversation",
+          updatedAt: new Date().toISOString(),
+          messageCount: 1,
+        };
+
+        return {
+          ...oldData,
+          chats: [placeholderChat, ...oldData.chats],
+          total: oldData.total + 1,
+        };
+      });
+    }
+
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       content: content,
       role: "user",
       timestamp: Date.now(),
@@ -197,6 +573,7 @@ export function ChatInterface({
       id: (Date.now() + 1).toString(),
       content: "",
       role: "assistant",
+      model: selectedModel, // Include the model being used
       timestamp: Date.now(),
       timeToFinish: 0,
     };
@@ -207,7 +584,7 @@ export function ChatInterface({
 
     const streamResp = await post<StreamResponse | Response>(
       `/chat/${chatId}`,
-      { messages: msgsRef },
+      { messages: msgsRef, model: selectedModel },
       {
         returnResponse: true,
       },
@@ -227,6 +604,7 @@ export function ChatInterface({
       //remove the last assistant message
       setMessages((prev) => [...prev.slice(0, -1)]);
     } else if ("stream" in streamResp) {
+      assistantMessage.id = streamResp.headers.newMessageId;
       const reader = streamResp.stream.getReader();
 
       while (true) {
@@ -291,9 +669,304 @@ export function ChatInterface({
     streamingRef.current = null;
     setIsLoading(false);
     setStreamingMessageId(null);
+
+    // Generate title for new chats after first response
+    if (isNewChat) {
+      // Fire and forget - don't wait for title generation
+      post(`/chat/${chatId}/generate-title`, {})
+        .then(() => {
+          // Invalidate chats query to refresh the title
+          setTimeout(() => {
+            queryClient.invalidateQueries({ queryKey: ["chats"] });
+            queryClient.invalidateQueries({ queryKey: ["APIKEYINFO"] });
+          }, 1000);
+        })
+        .catch((err) => console.error("Failed to generate title:", err));
+    } else {
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["APIKEYINFO"] });
+        queryClient.invalidateQueries({ queryKey: ["chats"] });
+      }, 1000);
+    }
+  };
+
+  const handleRetry = async (
+    messageIndex: number,
+    opts?: { newModel?: string; newContentForPreviousMessage?: string },
+  ) => {
+    if (isLoading) return;
+
+    // Get the message to retry and ensure it's an assistant message
+    const messageToRetry = messages[messageIndex];
+    if (messageToRetry.role !== "assistant") {
+      console.error("messageToRetry was not assistant", messageToRetry);
+      AsyncAlert({
+        title: "Hmmmm...",
+        message: `Normally the message we are going to retry is an assistant message, but we got role: ${messageToRetry.role}`,
+      });
+      return;
+    }
+
+    // Find all messages up to and including the user message before this assistant message
+    const messagesUpToRetry = messages.slice(0, messageIndex);
+    const prevUserMsg = messagesUpToRetry.at(-1);
+
+    if (opts?.newContentForPreviousMessage && prevUserMsg)
+      prevUserMsg.content = opts?.newContentForPreviousMessage;
+
+    // Update the model if a new one was selected
+    const modelToUse = opts?.newModel || messageToRetry.model || selectedModel;
+
+    setIsLoading(true);
+
+    // Mark this specific message as being regenerated
+    setStreamingMessageId(messageToRetry.id);
+
+    // Clear the content of the message being retried
+    setMessages((prev) =>
+      prev.map((msg, idx) =>
+        idx === messageIndex
+          ? { ...msg, content: "", reasoning: undefined, model: modelToUse }
+          : msg,
+      ),
+    );
+
+    const streamResp = await post<StreamResponse | Response>(
+      `/chat/${chatId}`,
+      {
+        messages: messagesUpToRetry,
+        model: modelToUse,
+        messageIdToReplace: messageToRetry.id,
+      },
+      {
+        returnResponse: true,
+      },
+    );
+
+    if (streamResp.status !== 200 && streamResp instanceof Response) {
+      const text = await streamResp.text();
+      const _message = text[0] === "{" ? JSON.parse(text).error : text;
+      const raw = _message?.metadata?.raw
+        ? JSON.parse(_message.metadata.raw)
+        : { detail: "" };
+      const message = _message.message
+        ? `${_message.message} ${raw.detail}`
+        : "Unknown Error Occurred, check console log for details";
+      console.error(streamResp, text);
+      if (
+        streamResp.status === 403 &&
+        message.toLowerCase().includes("key limit exceeded")
+      ) {
+        AsyncAlert({
+          title: "Error",
+          message:
+            "You have reached your limit, please purchase more credits to continue.",
+        });
+      } else {
+        AsyncAlert({ title: "Error", message });
+      }
+      // Restore the original message
+      setMessages((prev) =>
+        prev.map((msg, idx) => (idx === messageIndex ? messageToRetry : msg)),
+      );
+    } else if ("stream" in streamResp) {
+      const reader = streamResp.stream.getReader();
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        const usage = value?.usage;
+
+        if (usage) {
+          setMessages((prev) =>
+            prev.map((msg, idx) =>
+              idx === messageIndex
+                ? {
+                    ...msg,
+                    promptTokens: usage.prompt_tokens,
+                    completionTokens: usage.completion_tokens,
+                    totalTokens: usage.total_tokens,
+                  }
+                : msg,
+            ),
+          );
+        }
+
+        const delta = value?.choices?.[0]?.delta;
+        const role = delta.role;
+        if (role !== "assistant") {
+          console.error(
+            "obviously we forgot to plan for message roles that aren't assistant",
+            value,
+          );
+          continue;
+        }
+
+        if (!delta) {
+          console.error("delta is not defined", value);
+          continue;
+        }
+        const msgKey = delta.reasoning ? "reasoning" : "content";
+        setMessages((prev) =>
+          prev.map((msg, idx) =>
+            idx === messageIndex
+              ? {
+                  ...msg,
+                  [msgKey]: (msg[msgKey] ?? "") + (delta[msgKey] || ""),
+                }
+              : msg,
+          ),
+        );
+      }
+    }
+
+    setMessages((prev) =>
+      prev.map((msg, idx) =>
+        idx === messageIndex
+          ? { ...msg, timeToFinish: Date.now() - msg.timestamp }
+          : msg,
+      ),
+    );
+
+    // Streaming complete
+    streamingRef.current = null;
+    setIsLoading(false);
+    setStreamingMessageId(null);
     setTimeout(() => {
       queryClient.invalidateQueries({ queryKey: ["chats"] });
     }, 1000);
+  };
+
+  const handleBranch = async (messageId: string, messageIndex: number) => {
+    try {
+      const response = await post<{
+        success: boolean;
+        newChatId: string;
+        branchedFrom: {
+          chatId: string;
+          messageId: string;
+        };
+      }>(`/chat/${chatId}/branch`, {
+        messageId,
+        messageIndex,
+      });
+
+      if (response.success && response.newChatId) {
+        // Navigate to the new branched chat
+        window.location.href = `/chat/${response.newChatId}`;
+      }
+    } catch (error) {
+      console.error("Failed to branch chat:", error);
+      AsyncAlert({
+        title: "Error",
+        message: "Failed to branch conversation. Please try again.",
+      });
+    }
+  };
+
+  const handleDelete = async (messageId: string) => {
+    const { ok } = await AsyncConfirm({
+      destructive: true,
+      title: "Delete Message",
+      message:
+        "Are you sure you want to delete this message? This action cannot be undone.",
+    });
+
+    if (!ok) return;
+
+    try {
+      // Call API to delete message
+      const response = await del<Response>(
+        `/chat/${chatId}/message/${messageId}`,
+        {
+          returnResponse: true,
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to delete message");
+      }
+
+      // Remove message from local state
+      setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
+
+      // Invalidate chat list to update last message if needed
+      queryClient.invalidateQueries({ queryKey: ["chats"] });
+    } catch (error) {
+      console.error("Failed to delete message:", error);
+      AsyncAlert({
+        title: "Error",
+        message: "Failed to delete message. Please try again.",
+      });
+    }
+  };
+
+  const handleEdit = async (
+    messageId: string,
+    newContent: string,
+    regenerateNext: boolean,
+  ) => {
+    try {
+      // Find the message to edit
+      const messageIndex = messages.findIndex((msg) => msg.id === messageId);
+      if (messageIndex === -1) return;
+
+      const originalMessage = messages[messageIndex];
+
+      // Optimistically update the message
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId
+            ? {
+                ...msg,
+                content:
+                  typeof msg.content === "string"
+                    ? newContent
+                    : [{ type: "text", text: newContent }],
+              }
+            : msg,
+        ),
+      );
+
+      // Call API to update message
+      const response = await put<Response>(
+        `/chat/${chatId}/message/${messageId}`,
+        { content: newContent },
+        { returnResponse: true },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to update message");
+      }
+
+      // If this was a user message and we should regenerate the next assistant message
+      if (regenerateNext && originalMessage.role === "user") {
+        const nextMessageIndex = messageIndex + 1;
+        if (
+          nextMessageIndex < messages.length &&
+          messages[nextMessageIndex].role === "assistant"
+        ) {
+          // Use handleRetry to regenerate the assistant response
+          setTimeout(() => {
+            handleRetry(nextMessageIndex, {
+              newContentForPreviousMessage: newContent,
+            });
+          }, 100);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to edit message:", error);
+
+      // Revert the optimistic update on error
+      setMessages((prev) => [...prev]);
+
+      AsyncAlert({
+        title: "Error",
+        message: "Failed to edit message. Please try again.",
+      });
+    }
   };
 
   return (
@@ -363,7 +1036,7 @@ export function ChatInterface({
               </div>
             </div>
           )}
-          {messages.map((message) => (
+          {messages.map((message, index) => (
             <div
               key={message.id}
               className={cn(
@@ -566,16 +1239,60 @@ export function ChatInterface({
                     </div>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {new Date(
-                    message.role === "user"
-                      ? message.timestamp
-                      : message.timestamp + (message.timeToFinish ?? 0),
-                  ).toLocaleTimeString()}
-                  {message.totalTokens
-                    ? ` Total Tokens: ${message.totalTokens}`
-                    : ""}
-                </p>
+                <div className="flex max-w-4xl items-center justify-between text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    {message.model && message.role === "assistant" && (
+                      <>
+                        <span className="flex items-center gap-1">
+                          <Sparkles className="h-3 w-3" />
+                          {message.model.split("/")[1] || message.model}
+                        </span>
+                      </>
+                    )}
+                    {message.totalTokens && (
+                      <>
+                        <span>•</span>
+                        <span>{message.totalTokens} tokens</span>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {message.role === "assistant" && (
+                      <>
+                        <MessageRetryButton
+                          messageIndex={index}
+                          messageModel={message.model ?? ""}
+                          currentModel={selectedModel}
+                          onRetry={handleRetry}
+                        />
+                        <MessageBranchButton
+                          messageId={message.id}
+                          messageIndex={index}
+                          onBranch={handleBranch}
+                        />
+                        <MessageCopyButton
+                          content={message.content}
+                          reasoning={message.reasoning}
+                        />
+                      </>
+                    )}
+                    <MessageEditButton
+                      messageId={message.id}
+                      content={message.content}
+                      onEdit={handleEdit}
+                      isUserMessage={message.role === "user"}
+                      hasNextAssistantMessage={
+                        message.role === "user" &&
+                        index < messages.length - 1 &&
+                        messages[index + 1].role === "assistant"
+                      }
+                    />
+                    <MessageDeleteButton
+                      messageId={message.id}
+                      onDelete={handleDelete}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           ))}
@@ -585,7 +1302,16 @@ export function ChatInterface({
       </div>
 
       {/* Modern Chat Input */}
-      <ChatInput onSubmit={handleSubmit} isLoading={isLoading} />
+      <ChatInput
+        onSubmit={handleSubmit}
+        isLoading={isLoading}
+        selectedModel={selectedModel}
+        onModelChange={setSelectedModel}
+        modelsData={modelsData}
+        modelsLoading={modelsLoading}
+        modelsError={modelsError}
+        apiKeyInfo={apiKeyInfo?.data}
+      />
     </div>
   );
 }

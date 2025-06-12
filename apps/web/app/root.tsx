@@ -17,6 +17,7 @@ import { checkLogin } from "../login";
 import { ThemeProvider } from "./providers/theme-provider.js";
 import { queryClient } from "./providers/queryClient.js";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { PostHogProvider } from "posthog-js/react";
 
 // Lazy load ReactQueryDevtools only in development
 const ReactQueryDevtools =
@@ -51,14 +52,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body>
-        <QueryClientProvider client={queryClient}>
-          <ThemeProvider>{children}</ThemeProvider>
-          {process.env.NODE_ENV === "development" && (
-            <React.Suspense fallback={null}>
-              <ReactQueryDevtools initialIsOpen={false} />
-            </React.Suspense>
-          )}
-        </QueryClientProvider>
+        <PostHogProvider
+          apiKey={import.meta.env.VITE_PUBLIC_POSTHOG_KEY}
+          options={{
+            api_host: import.meta.env.VITE_PUBLIC_POSTHOG_HOST,
+            capture_exceptions: true,
+            debug: import.meta.env.MODE === "development",
+          }}
+        >
+          <QueryClientProvider client={queryClient}>
+            <ThemeProvider>{children}</ThemeProvider>
+            {process.env.NODE_ENV === "development" && (
+              <React.Suspense fallback={null}>
+                <ReactQueryDevtools initialIsOpen={false} />
+              </React.Suspense>
+            )}
+          </QueryClientProvider>
+        </PostHogProvider>
         <ScrollRestoration />
         <Scripts />
       </body>

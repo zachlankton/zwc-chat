@@ -1,38 +1,87 @@
 import * as React from "react";
-import { Send, Paperclip, Mic, Sparkles, X } from "lucide-react";
+import {
+  Send,
+  Paperclip,
+  Mic,
+  X,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+} from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { cn } from "~/lib/utils";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useSidebar } from "./ui/sidebar";
+import { ModelSelector } from "./model-selector";
+import type { ModelsResponse } from "./chat-interface";
+
+interface ApiKeyInfo {
+  label: string;
+  limit: number;
+  usage: number;
+  is_provisioning_key: boolean;
+  limit_remaining: number;
+  is_free_tier: boolean;
+  rate_limit: {
+    requests: number;
+    interval: string;
+  };
+}
 
 interface ChatInputProps {
   onSubmit: (message: string, attachments: File[]) => void;
   isLoading?: boolean;
   placeholder?: string;
+  selectedModel?: string;
+  onModelChange?: (model: string) => void;
+  modelsData?: ModelsResponse;
+  modelsLoading: any;
+  modelsError: any;
+  apiKeyInfo?: ApiKeyInfo | null;
 }
 
 export function ChatInput({
   onSubmit,
   isLoading = false,
   placeholder = "Message AI assistant...",
+  selectedModel,
+  onModelChange,
+  modelsData,
+  modelsLoading,
+  modelsError,
+  apiKeyInfo,
 }: ChatInputProps) {
-  const [message, setMessage] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const textareaScrollHeightRef = useRef<HTMLTextAreaElement>(null);
   const sidebar = useSidebar();
   const sidebarCollapsed = sidebar.state === "collapsed";
 
-  // Auto-resize textarea
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${Math.min(
-        textareaRef.current.scrollHeight,
-        200,
-      )}px`;
+  // Calculate usage percentage and determine status
+  const getUsageStatus = () => {
+    if (!apiKeyInfo || apiKeyInfo.limit === 0) return null;
+
+    const usagePercentage = (apiKeyInfo.usage / apiKeyInfo.limit) * 100;
+    const remainingPercentage = Math.max(0, 100 - usagePercentage);
+
+    let status: "good" | "warning" | "critical" = "good";
+    if (usagePercentage >= 90) {
+      status = "critical";
+    } else if (usagePercentage >= 80) {
+      status = "warning";
     }
-  }, [message]);
+
+    return {
+      percentage: remainingPercentage,
+      status,
+      remaining: apiKeyInfo.limit_remaining,
+      limit: apiKeyInfo.limit,
+      usage: apiKeyInfo.usage,
+    };
+  };
+
+  const usageStatus = getUsageStatus();
 
   const handleSubmit = () => {
     if (!textareaRef.current) return;
@@ -40,31 +89,41 @@ export function ChatInput({
 
     if (message.trim() && !isLoading) {
       onSubmit(message, attachments);
-      setMessage("");
       setAttachments([]);
       textareaRef.current.value = "";
       textareaRef.current.style.height = "20px";
     }
   };
 
-  const handleKeyUp = (extra?: any) => {
-    if (!textareaRef.current) return;
-    const message = textareaRef.current.value;
-    const extraNumber = typeof extra === "number" ? extra : 0;
-
-    const count = Math.max(message.split("\n").length, 1) + extraNumber;
-    console.log(count);
-    if (textareaRef.current) {
-      textareaRef.current.style.height = `${count * 20}px`;
-    }
-  };
-
   const handleKeyDown = (e: any) => {
-    if (e.key === "Enter") handleKeyUp(1);
+    if (textareaRef.current && textareaScrollHeightRef.current) {
+      textareaScrollHeightRef.current.value = textareaRef.current.value;
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
     }
+
+    setTimeout(() => {
+      if (!textareaRef.current) return;
+      if (!textareaScrollHeightRef.current) return;
+
+      const textarea = textareaRef.current;
+      const textScroll = textareaScrollHeightRef.current;
+
+      const message = textarea.value;
+
+      if (message.length === 0) return (textarea.style.height = "20px");
+
+      const count = Math.max(message.split("\n").length, 1);
+      textarea.style.height = `${count * 20}px`;
+
+      // Get the scroll height (content height)
+      const scrollHeight = textScroll.scrollHeight;
+
+      textarea.style.height = `${Math.max(scrollHeight, count * 20)}px`;
+    }, 100);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -80,7 +139,7 @@ export function ChatInput({
     <div
       className={`fixed bottom-0 ${sidebarCollapsed ? "left-[48px]" : "left-[256px]"} right-0 z-40 bg-gradient-to-t from-background via-background to-transparent pt-6 pb-4 animate-in slide-in-from-bottom duration-300`}
     >
-      <div className="max-w-4xl mx-auto px-20">
+      <div className="max-w-4xl mx-auto px-6">
         {/* Attachments Preview */}
         {attachments.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-2">
@@ -139,12 +198,23 @@ export function ChatInput({
             </label>
 
             {/* Textarea */}
-            <div className="flex-1">
+            <div className="flex-1 relative">
+              <textarea
+                ref={textareaScrollHeightRef}
+                disabled={isLoading}
+                rows={1}
+                className={cn(
+                  "w-full absolute bottom-[-9000px] bg-transparent text-transparent mt-2 mb-1 resize-none text-sm",
+                  "min-h-[24px] max-h-[200px]",
+                )}
+                style={{
+                  scrollbarWidth: "thin",
+                  height: "20px",
+                }}
+              />
               <textarea
                 ref={textareaRef}
-                onKeyUp={() => handleKeyUp()}
                 onKeyDown={handleKeyDown}
-                onChange={(e) => setMessage(e.target.value)}
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => setIsFocused(false)}
                 placeholder={placeholder}
@@ -181,43 +251,71 @@ export function ChatInput({
                 size="icon"
                 disabled={isLoading}
                 onClick={handleSubmit}
-                className={cn(
-                  "h-8 w-8 rounded-lg transition-all duration-200",
-                  message.trim()
-                    ? "bg-primary hover:bg-primary/90 shadow-sm"
-                    : "bg-muted text-muted-foreground",
-                )}
+                className={cn("h-8 w-8 rounded-lg transition-all duration-200")}
               >
                 {isLoading ? (
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent" />
                 ) : (
-                  <Send
-                    className={cn(
-                      "h-4 w-4 transition-transform",
-                      message.trim() && "translate-x-0.5",
-                    )}
-                  />
+                  <Send className={cn("h-4 w-4 transition-transform")} />
                 )}
               </Button>
             </div>
           </div>
 
-          {/* Helper Text */}
-          <div className="mt-2 flex items-center justify-between px-2 text-xs text-muted-foreground">
-            <div className="flex items-center gap-4">
+          {/* Helper Text and Model Selector */}
+          <div className="mt-2 flex items-center justify-between px-2">
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
               <span>Press Enter to send, Shift+Enter for new line</span>
-              {isFocused && (
-                <div className="flex items-center gap-1 animate-in fade-in duration-300">
-                  <Sparkles className="h-3 w-3" />
-                  <span>AI is ready to help</span>
+            </div>
+            <div className="flex items-center gap-4">
+              {/* API Key Usage Indicator */}
+              {usageStatus && (
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    {usageStatus.status === "critical" ? (
+                      <XCircle className="h-3.5 w-3.5 text-destructive" />
+                    ) : usageStatus.status === "warning" ? (
+                      <AlertCircle className="h-3.5 w-3.5 text-yellow-500" />
+                    ) : (
+                      <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                    )}
+                    <span
+                      className={cn(
+                        "text-xs font-medium",
+                        usageStatus.status === "critical" && "text-destructive",
+                        usageStatus.status === "warning" && "text-yellow-500",
+                        usageStatus.status === "good" && "text-green-500",
+                      )}
+                    >
+                      {usageStatus.remaining > 0
+                        ? `${usageStatus.percentage.toFixed(1)}% credits remain`
+                        : "No credits remaining"}
+                    </span>
+                  </div>
+                  {/* Progress bar */}
+                  <div className="relative w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        "absolute left-0 top-0 h-full transition-all duration-300",
+                        usageStatus.status === "critical" && "bg-destructive",
+                        usageStatus.status === "warning" && "bg-yellow-500",
+                        usageStatus.status === "good" && "bg-green-500",
+                      )}
+                      style={{ width: `${usageStatus.percentage}%` }}
+                    />
+                  </div>
                 </div>
               )}
+              {selectedModel && onModelChange && (
+                <ModelSelector
+                  selectedModel={selectedModel}
+                  onModelChange={onModelChange}
+                  data={modelsData}
+                  isLoading={modelsLoading}
+                  error={modelsError}
+                />
+              )}
             </div>
-            {message.length > 0 && (
-              <span className="animate-in fade-in duration-300">
-                {message.length} / 4000
-              </span>
-            )}
           </div>
         </div>
       </div>

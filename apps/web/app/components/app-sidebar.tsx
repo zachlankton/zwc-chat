@@ -1,5 +1,4 @@
 import * as React from "react";
-import { Star, Archive, Trash2 } from "lucide-react";
 
 import { NavUser } from "~/components/nav-user";
 import { ChatList } from "~/components/chat-list";
@@ -10,12 +9,6 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
   useSidebar,
   SidebarTrigger,
 } from "~/components/ui/sidebar";
@@ -114,41 +107,6 @@ export function AppSidebar({ onNewChat, ...props }: AppSidebarProps) {
       </SidebarContent>
 
       <SidebarFooter className="border-t">
-        {!hideElements && (
-          <div
-            className={`transition-opacity duration-300 ${
-              showContent ? "opacity-100" : "opacity-0"
-            }`}
-          >
-            <SidebarGroup className="px-2 mt-auto">
-              <SidebarGroupLabel className="px-2 text-sm">
-                <span>Collections</span>
-              </SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu className="">
-                  <SidebarMenuItem className="h-6">
-                    <SidebarMenuButton className="px-3 gap-3 py-0">
-                      <Star className="h-4 w-4" />
-                      <span className="text-sm">Starred</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem className="h-6">
-                    <SidebarMenuButton className="px-3 gap-3">
-                      <Archive className="h-4 w-4" />
-                      <span className="text-sm">Archived</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem className="h-6">
-                    <SidebarMenuButton className="px-3 gap-3">
-                      <Trash2 className="h-4 w-4" />
-                      <span className="text-sm">Trash</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </div>
-        )}
         <NavUser />
       </SidebarFooter>
       <SidebarRail />
