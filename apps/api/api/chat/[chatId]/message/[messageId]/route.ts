@@ -148,6 +148,14 @@ export const DELETE = apiHandler(
         return Response.json({ error: "Message not found" }, { status: 404 });
       }
 
+      // Decrement the message count in the chat
+      await chatsCollection.updateOne(
+        { id: chatId },
+        {
+          $inc: { messageCount: -1 },
+        }
+      );
+
       // Update chat's last message if needed
       // Get the latest remaining message
       const latestMessage = await messagesCollection
