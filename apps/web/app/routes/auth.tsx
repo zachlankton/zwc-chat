@@ -9,7 +9,10 @@ async function getAuthUrl() {
 export default function AuthPage() {
   const newUrl = new URL(location.href);
   const authUrl = newUrl.searchParams.get("authorizationUrl");
-  console.log(authUrl);
+  const status = newUrl.searchParams.get("status") ?? "Authentication Error";
+  const msg =
+    newUrl.searchParams.get("msg") ??
+    "We couldn't complete the authentication process. This might be a temporary issue. Try again in a few moments";
 
   if (!authUrl) {
     return (
@@ -37,12 +40,9 @@ export default function AuthPage() {
 
             {/* Error Message */}
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-              Authentication Error
+              {status}
             </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-8">
-              We couldn't complete the authentication process. This might be a
-              temporary issue.
-            </p>
+            <p className="text-gray-600 dark:text-gray-400 mb-8">{msg}</p>
 
             {/* Action Buttons */}
             <div className="space-y-3">
@@ -53,17 +53,6 @@ export default function AuthPage() {
                 Return to Home
               </Button>
             </div>
-
-            {/* Help Text */}
-            <p className="mt-6 text-sm text-gray-600 dark:text-gray-400">
-              If this problem persists, please{" "}
-              <a
-                href="mailto:support@z3chat.com"
-                className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400"
-              >
-                contact support
-              </a>
-            </p>
           </div>
         </div>
       </div>

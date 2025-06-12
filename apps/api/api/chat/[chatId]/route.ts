@@ -24,7 +24,6 @@ interface ChatUpdateData {
 	lastMessage?: string;
 }
 
-
 const openRouterApiKey = process.env.OPENROUTER_KEY;
 if (!openRouterApiKey)
 	throw new Error("OPENROUTER_KEY env var needs to be defined");
@@ -42,10 +41,10 @@ export const POST = apiHandler(
 		const body = await req.json().catch(() => null);
 		if (body === null) throw badRequest("Could not parse the body");
 		if (!body.messages) throw badRequest("messages[] key is required");
-		
+
 		// Extract model from request body, use default if not provided
 		const model = body.model || DEFAULT_MODEL;
-		
+
 		// Extract messageIdToReplace if this is a retry
 		const messageIdToReplace = body.messageIdToReplace;
 
@@ -61,7 +60,10 @@ export const POST = apiHandler(
 				const lastMessage = messages[messages.length - 1];
 				if (lastMessage.role === "user") {
 					const chatId = userChatId;
-					const userMessageId = crypto.randomUUID();
+					const validMessageId = validateUUID(lastMessage.id);
+					const userMessageId = validMessageId
+						? lastMessage.id
+						: crypto.randomUUID();
 					const userMessage: OpenRouterMessage = {
 						id: userMessageId,
 						chatId,
@@ -131,7 +133,7 @@ export const POST = apiHandler(
 				{ status: 500 }
 			);
 		}
-		
+
 		// Store messageIdToReplace in the request for websocket handler
 		if (messageIdToReplace) {
 			// The request becomes ExtendedRequest in the websocket handler

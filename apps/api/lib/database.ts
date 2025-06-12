@@ -71,6 +71,13 @@ let client: MongoClient | null = new MongoClient(MONGODB_URI, {
 	maxConnecting: 10,
 	serverSelectionTimeoutMS: 5000,
 	socketTimeoutMS: 45000,
+	// Ensure strong consistency
+	writeConcern: {
+		w: "majority",
+		wtimeout: 5000,
+	},
+	readPreference: "primary",
+	readConcern: { level: "majority" },
 });
 
 export function getMongoClient() {

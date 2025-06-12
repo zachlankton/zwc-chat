@@ -26,6 +26,8 @@ import {
   DialogClose,
 } from "~/components/ui/dialog";
 import { Textarea } from "~/components/ui/textarea";
+import { Checkbox } from "~/components/ui/checkbox";
+import { Label } from "~/components/ui/label";
 
 export interface Model {
   id: string;
@@ -152,7 +154,7 @@ function MessageRetryButton({
   messageIndex: number;
   messageModel: string;
   currentModel: string;
-  onRetry: (messageIndex: number, newModel?: string) => void;
+  onRetry: (messageIndex: number, opts?: { newModel?: string }) => void;
 }) {
   const modelsAreSame = messageModel === currentModel;
   return (
@@ -168,12 +170,14 @@ function MessageRetryButton({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => onRetry(messageIndex, messageModel)}>
+          <DropdownMenuItem
+            onClick={() => onRetry(messageIndex, { newModel: messageModel })}
+          >
             <RotateCcw className="h-4 w-4 mr-2" />
             Retry With {messageModel.split("/")[1] || messageModel}
           </DropdownMenuItem>
           <DropdownMenuItem
-            onClick={() => onRetry(messageIndex, currentModel)}
+            onClick={() => onRetry(messageIndex, { newModel: currentModel })}
             disabled={modelsAreSame}
           >
             {modelsAreSame ? (
@@ -220,10 +224,18 @@ function MessageEditButton({
   messageId,
   content,
   onEdit,
+  isUserMessage,
+  hasNextAssistantMessage,
 }: {
   messageId: string;
   content: string | any[];
-  onEdit: (messageId: string, newContent: string) => void;
+  onEdit: (
+    messageId: string,
+    newContent: string,
+    regenerateNext: boolean,
+  ) => void;
+  isUserMessage: boolean;
+  hasNextAssistantMessage: boolean;
 }) {
   const handleEdit = async () => {
     // Extract text content from message
@@ -244,7 +256,7 @@ function MessageEditButton({
         <DialogDescription className="mb-4">
           Edit the message content below:
         </DialogDescription>
-        <div className="mb-6">
+        <div className="mb-4">
           <Textarea
             name="content"
             defaultValue={textContent}
@@ -253,6 +265,17 @@ function MessageEditButton({
             autoFocus
           />
         </div>
+        {isUserMessage && hasNextAssistantMessage && (
+          <div className="mb-6 flex items-center space-x-2">
+            <Checkbox id="regenerate" name="regenerate" defaultChecked={true} />
+            <Label
+              htmlFor="regenerate"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Regenerate assistant response after editing
+            </Label>
+          </div>
+        )}
         <div className="grid grid-flow-row-dense grid-cols-2 gap-3">
           <DialogClose asChild>
             <Button type="button" variant="outline">
@@ -266,12 +289,17 @@ function MessageEditButton({
       </>,
       {
         style: { maxWidth: "80vw" },
-        initialData: { content: textContent },
+        initialData: {
+          content: textContent,
+          regenerate: true,
+        },
       },
     );
 
     if (result.ok && result.data.content?.trim()) {
-      onEdit(messageId, result.data.content.trim());
+      const regenerateNext =
+        isUserMessage && hasNextAssistantMessage && result.data.regenerate;
+      onEdit(messageId, result.data.content.trim(), regenerateNext);
     }
   };
 
@@ -378,7 +406,6 @@ export function ChatInterface({
   });
 
   const apiKeyInfo = useApiKeyInfo();
-  console.log(apiKeyInfo);
 
   const [messages, setMessages] = React.useState<Message[]>(initialMessages);
 
@@ -531,7 +558,7 @@ export function ChatInterface({
     }
 
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       content: content,
       role: "user",
       timestamp: Date.now(),
@@ -577,6 +604,7 @@ export function ChatInterface({
       //remove the last assistant message
       setMessages((prev) => [...prev.slice(0, -1)]);
     } else if ("stream" in streamResp) {
+      assistantMessage.id = streamResp.headers.newMessageId;
       const reader = streamResp.stream.getReader();
 
       while (true) {
@@ -650,28 +678,44 @@ export function ChatInterface({
           // Invalidate chats query to refresh the title
           setTimeout(() => {
             queryClient.invalidateQueries({ queryKey: ["chats"] });
+            queryClient.invalidateQueries({ queryKey: ["APIKEYINFO"] });
           }, 1000);
         })
         .catch((err) => console.error("Failed to generate title:", err));
     } else {
       setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["APIKEYINFO"] });
         queryClient.invalidateQueries({ queryKey: ["chats"] });
       }, 1000);
     }
   };
 
-  const handleRetry = async (messageIndex: number, newModel?: string) => {
+  const handleRetry = async (
+    messageIndex: number,
+    opts?: { newModel?: string; newContentForPreviousMessage?: string },
+  ) => {
     if (isLoading) return;
 
     // Get the message to retry and ensure it's an assistant message
     const messageToRetry = messages[messageIndex];
-    if (messageToRetry.role !== "assistant") return;
+    if (messageToRetry.role !== "assistant") {
+      console.error("messageToRetry was not assistant", messageToRetry);
+      AsyncAlert({
+        title: "Hmmmm...",
+        message: `Normally the message we are going to retry is an assistant message, but we got role: ${messageToRetry.role}`,
+      });
+      return;
+    }
 
     // Find all messages up to and including the user message before this assistant message
     const messagesUpToRetry = messages.slice(0, messageIndex);
+    const prevUserMsg = messagesUpToRetry.at(-1);
+
+    if (opts?.newContentForPreviousMessage && prevUserMsg)
+      prevUserMsg.content = opts?.newContentForPreviousMessage;
 
     // Update the model if a new one was selected
-    const modelToUse = newModel || messageToRetry.model || selectedModel;
+    const modelToUse = opts?.newModel || messageToRetry.model || selectedModel;
 
     setIsLoading(true);
 
@@ -859,7 +903,11 @@ export function ChatInterface({
     }
   };
 
-  const handleEdit = async (messageId: string, newContent: string) => {
+  const handleEdit = async (
+    messageId: string,
+    newContent: string,
+    regenerateNext: boolean,
+  ) => {
     try {
       // Find the message to edit
       const messageIndex = messages.findIndex((msg) => msg.id === messageId);
@@ -893,8 +941,21 @@ export function ChatInterface({
         throw new Error("Failed to update message");
       }
 
-      // Invalidate chat list to update last message if needed
-      queryClient.invalidateQueries({ queryKey: ["chats"] });
+      // If this was a user message and we should regenerate the next assistant message
+      if (regenerateNext && originalMessage.role === "user") {
+        const nextMessageIndex = messageIndex + 1;
+        if (
+          nextMessageIndex < messages.length &&
+          messages[nextMessageIndex].role === "assistant"
+        ) {
+          // Use handleRetry to regenerate the assistant response
+          setTimeout(() => {
+            handleRetry(nextMessageIndex, {
+              newContentForPreviousMessage: newContent,
+            });
+          }, 100);
+        }
+      }
     } catch (error) {
       console.error("Failed to edit message:", error);
 
@@ -1219,6 +1280,12 @@ export function ChatInterface({
                       messageId={message.id}
                       content={message.content}
                       onEdit={handleEdit}
+                      isUserMessage={message.role === "user"}
+                      hasNextAssistantMessage={
+                        message.role === "user" &&
+                        index < messages.length - 1 &&
+                        messages[index + 1].role === "assistant"
+                      }
                     />
                     <MessageDeleteButton
                       messageId={message.id}

@@ -10,7 +10,7 @@ import crypto from "crypto";
 import { asyncLocalStorage } from "./asyncLocalStore";
 import type { OpenRouterMessage } from "./database";
 import { getMessagesCollection, getChatsCollection } from "./database";
-//import { appendFile } from "node:fs/promises";
+import { appendFile } from "node:fs/promises";
 
 const txtDecoder = new TextDecoder();
 
@@ -194,6 +194,7 @@ function tryParseJson(txt: string) {
 	try {
 		return JSON.parse(txt);
 	} catch (error) {
+		console.error("TRY PARSE ERROR", txt);
 		return null;
 	}
 }
@@ -294,55 +295,63 @@ interface EventType {
 }
 
 // Helper function to parse streaming chunks and extract message content
-function parseStreamingChunks(
+async function parseStreamingChunks(
 	dataChunks: number[],
 	newMessage: OpenRouterMessage
-): void {
+): Promise<void> {
 	const view = new Uint8Array(dataChunks);
 	const text = txtDecoder.decode(view);
-	const chunks = text.split("data: ");
+	const chunks = text.split("\n\n");
 	if (chunks[0] === "") chunks.shift();
 
 	for (const chunk of chunks) {
-		if (chunk[0] === "{") {
-			//appendFile("debug-chunks.txt", chunk);
+		//await appendFile("debug-chunks.txt", chunk);
 
-			const value = tryParseJson(chunk) as EventType;
-			if (!value) continue;
+		// Extract data from SSE event
+		const dataMatch = chunk.match(/^data: (.+)$/m);
+		if (dataMatch) {
+			const data = dataMatch[1];
 
-			// Extract model information
-			if (value.model && !newMessage.model) {
-				newMessage.model = value.model;
-			}
+			if (data.trim() === "[DONE]") {
+				console.log("Received message:", { data });
+			} else {
+				const value = tryParseJson(data) as EventType;
+				if (!value) continue;
 
-			// Extract usage information
-			const usage = value?.usage;
-			if (usage) {
-				newMessage.promptTokens = usage.prompt_tokens;
-				newMessage.completionTokens = usage.completion_tokens;
-				newMessage.totalTokens = usage.total_tokens;
-			}
+				// Extract model information
+				if (value.model && !newMessage.model) {
+					newMessage.model = value.model;
+				}
 
-			// Extract content or reasoning
-			const delta = value?.choices?.[0]?.delta;
-			const role = delta.role;
+				// Extract usage information
+				const usage = value?.usage;
+				if (usage) {
+					newMessage.promptTokens = usage.prompt_tokens;
+					newMessage.completionTokens = usage.completion_tokens;
+					newMessage.totalTokens = usage.total_tokens;
+				}
 
-			if (delta.annotations) {
-				newMessage.annotations = delta.annotations;
-			}
+				// Extract content or reasoning
+				const delta = value?.choices?.[0]?.delta;
+				const role = delta.role;
 
-			if (role !== "assistant") {
-				console.error(
-					"obviously we forgot to plan for message roles that aren't assistant",
-					value
-				);
-				continue;
-			}
+				if (delta.annotations) {
+					newMessage.annotations = delta.annotations;
+				}
 
-			if (delta) {
-				const msgKey = delta.reasoning ? "reasoning" : "content";
-				if (delta[msgKey]) {
-					newMessage[msgKey] = (newMessage[msgKey] ?? "") + delta[msgKey];
+				if (role !== "assistant") {
+					console.error(
+						"obviously we forgot to plan for message roles that aren't assistant",
+						value
+					);
+					continue;
+				}
+
+				if (delta) {
+					const msgKey = delta.reasoning ? "reasoning" : "content";
+					if (delta[msgKey]) {
+						newMessage[msgKey] = (newMessage[msgKey] ?? "") + delta[msgKey];
+					}
 				}
 			}
 		}
@@ -355,25 +364,34 @@ async function saveMessageAndUpdateChat(
 	messageIdToReplace?: string
 ): Promise<void> {
 	const messagesCollection = await getMessagesCollection();
-	
+	console.log("messageIdToReplace", messageIdToReplace);
+
 	if (messageIdToReplace) {
 		// Get the original message to preserve its timestamp
 		const originalMessage = await messagesCollection.findOne({
 			id: messageIdToReplace,
 			chatId: newMessage.chatId,
-			userEmail: newMessage.userEmail
+			userEmail: newMessage.userEmail,
 		});
-		
+
+		console.log("ORIGINAL MESSAGE", originalMessage);
+
 		if (originalMessage) {
 			// Preserve the original timestamp
 			newMessage.timestamp = originalMessage.timestamp;
 		}
-		
+
 		// Update existing message
 		await messagesCollection.replaceOne(
-			{ id: messageIdToReplace, chatId: newMessage.chatId, userEmail: newMessage.userEmail },
+			{
+				id: messageIdToReplace,
+				chatId: newMessage.chatId,
+				userEmail: newMessage.userEmail,
+			},
 			newMessage
 		);
+
+		console.log("newMessage", newMessage);
 	} else {
 		// Insert new message
 		await messagesCollection.insertOne(newMessage);
@@ -383,30 +401,6 @@ async function saveMessageAndUpdateChat(
 	const chatsCollection = await getChatsCollection();
 	const chatId = newMessage.chatId;
 	const userEmail = newMessage.userEmail;
-
-	// Get the first user message to use for title (if creating new chat)
-	const firstUserMessage = await messagesCollection.findOne(
-		{ chatId, userEmail, role: "user" },
-		{ sort: { timestamp: 1 } }
-	);
-
-	// Extract text content from user message
-	let userTextContent = "";
-	if (firstUserMessage?.content) {
-		if (typeof firstUserMessage.content === "string") {
-			userTextContent = firstUserMessage.content;
-		} else if (Array.isArray(firstUserMessage.content)) {
-			const textPart = firstUserMessage.content.find(
-				(item: any) => item.type === "text"
-			) as any;
-			userTextContent = textPart?.text || "Sent attachments";
-		}
-	}
-
-	const title = userTextContent
-		? userTextContent.substring(0, 50) +
-			(userTextContent.length > 50 ? "..." : "")
-		: "New Chat";
 
 	// Use atomic upsert operation to update or create the chat
 	await chatsCollection.updateOne(
@@ -423,7 +417,7 @@ async function saveMessageAndUpdateChat(
 			$setOnInsert: {
 				id: chatId,
 				userEmail,
-				title,
+				title: "We should never see this",
 				createdAt: new Date(),
 			},
 			$inc: { messageCount: messageIdToReplace ? 0 : 1 }, // Only increment if it's a new message
@@ -444,7 +438,7 @@ async function streamedChunks(
 
 	if (response.body === null) return;
 	const reader = response.body.getReader();
-	
+
 	// Get messageIdToReplace from context if this is a retry
 	const messageIdToReplace = ctx.messageIdToReplace;
 
@@ -484,10 +478,9 @@ async function streamedChunks(
 
 	// Record completion time
 	newMessage.timeToFinish = Date.now() - newMessage.timestamp;
-	console.log("WSURL", ctx?.url.toString());
 
 	// Parse the collected chunks to extract message content
-	parseStreamingChunks(dataChunks, newMessage);
+	await parseStreamingChunks(dataChunks, newMessage);
 
 	// Save message and update chat
 	await saveMessageAndUpdateChat(newMessage, messageIdToReplace);

@@ -17,6 +17,7 @@ export async function checkLogin() {
   if (code && !calledAuthAlready) {
     calledAuthAlready = true;
     const response = await fetch(`${api_url}/auth/callback?code=${code}`);
+
     if (response.status === 201) {
       const session = (await response.json()) as SessionData;
       setSession(session);
@@ -31,7 +32,10 @@ export async function checkLogin() {
       localStorage.getItem(LS_REDIRECTED_TO_LOGIN)
     ) {
       localStorage.removeItem(LS_REDIRECTED_TO_LOGIN);
-      location.assign("/auth");
+      const txt = await response.text();
+      location.assign(
+        `/auth?status=${response.status}&msg=${encodeURIComponent(txt)}`,
+      );
       calledAuthAlready = false;
       return;
     }
