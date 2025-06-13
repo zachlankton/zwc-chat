@@ -8,6 +8,8 @@ import {
   AlertCircle,
   CheckCircle,
   XCircle,
+  CornerDownLeft,
+  Keyboard,
 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { cn } from "~/lib/utils";
@@ -59,6 +61,7 @@ export function ChatInput({
   const [speechSupported, setSpeechSupported] = useState(false);
   const [pendingSubmit, setPendingSubmit] = useState(false);
   const [showVoiceHint, setShowVoiceHint] = useState(false);
+  const [enterToSend, setEnterToSend] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const textareaScrollHeightRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -93,15 +96,28 @@ export function ChatInput({
 
   const usageStatus = getUsageStatus();
 
-  // Check for speech recognition support
+  // Check for speech recognition support and load preferences
   useEffect(() => {
     if (typeof window !== "undefined") {
       const SpeechRecognition =
         (window as any).SpeechRecognition ||
         (window as any).webkitSpeechRecognition;
       setSpeechSupported(!!SpeechRecognition);
+      
+      // Load enter key preference
+      const savedPref = localStorage.getItem("enterToSend");
+      if (savedPref !== null) {
+        setEnterToSend(savedPref === "true");
+      }
     }
   }, []);
+  
+  // Save enter key preference
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("enterToSend", String(enterToSend));
+    }
+  }, [enterToSend]);
 
   // Initialize speech recognition
   useEffect(() => {
@@ -241,9 +257,14 @@ export function ChatInput({
       textareaScrollHeightRef.current.value = textareaRef.current.value;
     }
 
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit();
+    if (e.key === "Enter") {
+      if (enterToSend && !e.shiftKey) {
+        e.preventDefault();
+        handleSubmit();
+      } else if (!enterToSend && e.shiftKey) {
+        e.preventDefault();
+        handleSubmit();
+      }
     }
 
     setTimeout(() => {
@@ -469,11 +490,29 @@ export function ChatInput({
 
           {/* Helper Text and Model Selector */}
           <div className="mt-2 flex gap-2 @max-[570px]:flex-col-reverse items-center justify-between px-2">
-            {isMobile ? null : (
-              <div className="flex items-center gap-4 @max-[815px]:hidden text-xs text-muted-foreground">
-                <span>Press Enter to send, Shift+Enter for new line</span>
-              </div>
-            )}
+            {/* Enter key toggle */}
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setEnterToSend(!enterToSend)}
+                className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+                title={enterToSend ? "Enter sends message" : "Shift+Enter sends message"}
+              >
+                {enterToSend ? (
+                  <>
+                    <CornerDownLeft className="h-3 w-3" />
+                    <span className="@max-[600px]:hidden">to send</span>
+                  </>
+                ) : (
+                  <>
+                    <Keyboard className="h-3 w-3" />
+                    <span className="@max-[600px]:hidden">⇧+↵ to send</span>
+                  </>
+                )}
+              </Button>
+            </div>
             {/* API Key Usage Indicator */}
             {usageStatus && (
               <div className="flex @max-[600px]:text-center items-center gap-2">
