@@ -447,14 +447,18 @@ export function ChatInterface({
   const buffer = React.useRef("");
   const assistantMessage = React.useRef<null | Message>(null);
   const messagesRef = React.useRef<Message[]>(messages);
-  
+
   // TTS state
   const [ttsEnabled, setTtsEnabled] = React.useState(false);
   const [selectedVoice, setSelectedVoice] = React.useState<string>("");
-  const [speakingMessageId, setSpeakingMessageId] = React.useState<string | null>(null);
+  const [speakingMessageId, setSpeakingMessageId] = React.useState<
+    string | null
+  >(null);
   const ttsQueueRef = React.useRef<string[]>([]);
   const isSpeakingRef = React.useRef(false);
-  const speechSynthesisRef = React.useRef<SpeechSynthesisUtterance | null>(null);
+  const speechSynthesisRef = React.useRef<SpeechSynthesisUtterance | null>(
+    null,
+  );
   const ttsBufferRef = React.useRef<string>("");
   const ttsBufferTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
@@ -462,7 +466,7 @@ export function ChatInterface({
   React.useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
-  
+
   // Load TTS preferences
   React.useEffect(() => {
     if (typeof window !== "undefined") {
@@ -470,68 +474,72 @@ export function ChatInterface({
       if (savedTts !== null) {
         setTtsEnabled(savedTts === "true");
       }
-      
+
       const savedVoice = localStorage.getItem("ttsVoice");
       if (savedVoice) {
         setSelectedVoice(savedVoice);
       }
     }
   }, []);
-  
+
   // Save TTS preferences
   React.useEffect(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem("ttsEnabled", String(ttsEnabled));
     }
   }, [ttsEnabled]);
-  
+
   React.useEffect(() => {
     if (typeof window !== "undefined" && selectedVoice) {
       localStorage.setItem("ttsVoice", selectedVoice);
     }
   }, [selectedVoice]);
-  
+
   // TTS queue processor
   const processTtsQueue = React.useCallback(() => {
-    if (isSpeakingRef.current || ttsQueueRef.current.length === 0 || !ttsEnabled) {
+    if (
+      isSpeakingRef.current ||
+      ttsQueueRef.current.length === 0 ||
+      !ttsEnabled
+    ) {
       return;
     }
-    
+
     const text = ttsQueueRef.current.shift();
     if (!text) return;
-    
+
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 1.1; // Slightly faster
     utterance.pitch = 1.0;
     utterance.volume = 0.9;
-    
+
     // Set selected voice if available
     if (selectedVoice) {
       const voices = window.speechSynthesis.getVoices();
-      const voice = voices.find(v => v.voiceURI === selectedVoice);
+      const voice = voices.find((v) => v.voiceURI === selectedVoice);
       if (voice) {
         utterance.voice = voice;
       }
     }
-    
+
     utterance.onstart = () => {
       isSpeakingRef.current = true;
     };
-    
+
     utterance.onend = () => {
       isSpeakingRef.current = false;
       processTtsQueue(); // Process next in queue
     };
-    
+
     utterance.onerror = () => {
       isSpeakingRef.current = false;
       ttsQueueRef.current = []; // Clear queue on error
     };
-    
+
     speechSynthesisRef.current = utterance;
     window.speechSynthesis.speak(utterance);
   }, [ttsEnabled, selectedVoice]);
-  
+
   // TTS buffer processor - flushes buffer and queues for speech
   const flushTtsBuffer = React.useCallback(() => {
     if (ttsBufferRef.current.trim()) {
@@ -544,82 +552,88 @@ export function ChatInterface({
       ttsBufferTimeoutRef.current = null;
     }
   }, [processTtsQueue]);
-  
+
   // Speak a specific message
-  const speakMessage = React.useCallback((messageId: string) => {
-    const message = messages.find(m => m.id === messageId);
-    if (!message || message.role !== "assistant") return;
-    
-    // Extract text content
-    let textToSpeak = "";
-    if (message.reasoning) {
-      textToSpeak += "Reasoning: " + message.reasoning + ". ";
-    }
-    
-    if (typeof message.content === "string") {
-      textToSpeak += message.content;
-    } else if (Array.isArray(message.content)) {
-      textToSpeak += message.content
-        .filter(item => item.type === "text")
-        .map(item => item.text || "")
-        .join(" ");
-    }
-    
-    // Clean up markdown formatting for better speech
-    textToSpeak = textToSpeak
-      .replace(/```[\s\S]*?```/g, " code block ") // Replace code blocks
-      .replace(/`([^`]+)`/g, "$1") // Remove inline code backticks
-      .replace(/\*\*([^*]+)\*\*/g, "$1") // Remove bold
-      .replace(/\*([^*]+)\*/g, "$1") // Remove italic
-      .replace(/#+\s/g, "") // Remove headers
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // Convert links to text
-      .replace(/\n+/g, ". ") // Convert newlines to periods
-      .replace(/\s+/g, " ") // Normalize whitespace
-      .trim();
-    
-    if (!textToSpeak) return;
-    
-    // Stop any current speech
-    window.speechSynthesis.cancel();
-    setSpeakingMessageId(messageId);
-    
-    const utterance = new SpeechSynthesisUtterance(textToSpeak);
-    utterance.rate = 1.0; // Normal speed for full messages
-    utterance.pitch = 1.0;
-    utterance.volume = 0.9;
-    
-    // Set selected voice if available
-    if (selectedVoice) {
-      const voices = window.speechSynthesis.getVoices();
-      const voice = voices.find(v => v.voiceURI === selectedVoice);
-      if (voice) {
-        utterance.voice = voice;
+  const speakMessage = React.useCallback(
+    (messageId: string) => {
+      const message = messages.find((m) => m.id === messageId);
+      if (!message || message.role !== "assistant") return;
+
+      // Extract text content
+      let textToSpeak = "";
+      if (message.reasoning) {
+        textToSpeak += "Reasoning: " + message.reasoning + ". ";
       }
-    }
-    
-    utterance.onend = () => {
-      setSpeakingMessageId(null);
-    };
-    
-    utterance.onerror = () => {
-      setSpeakingMessageId(null);
-    };
-    
-    window.speechSynthesis.speak(utterance);
-  }, [messages, selectedVoice]);
-  
-  // Toggle speak for a message
-  const toggleSpeakMessage = React.useCallback((messageId: string) => {
-    if (speakingMessageId === messageId) {
-      // Stop speaking
+
+      if (typeof message.content === "string") {
+        textToSpeak += message.content;
+      } else if (Array.isArray(message.content)) {
+        textToSpeak += message.content
+          .filter((item) => item.type === "text")
+          .map((item) => item.text || "")
+          .join(" ");
+      }
+
+      // Clean up markdown formatting for better speech
+      textToSpeak = textToSpeak
+        .replace(/```[\s\S]*?```/g, " code block ") // Replace code blocks
+        .replace(/`([^`]+)`/g, "$1") // Remove inline code backticks
+        .replace(/\*\*([^*]+)\*\*/g, "$1") // Remove bold
+        .replace(/\*([^*]+)\*/g, "$1") // Remove italic
+        .replace(/#+\s/g, "") // Remove headers
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // Convert links to text
+        .replace(/\n+/g, ". ") // Convert newlines to periods
+        .replace(/\s+/g, " ") // Normalize whitespace
+        .trim();
+
+      if (!textToSpeak) return;
+
+      // Stop any current speech
       window.speechSynthesis.cancel();
-      setSpeakingMessageId(null);
-    } else {
-      // Start speaking
-      speakMessage(messageId);
-    }
-  }, [speakingMessageId, speakMessage]);
-  
+      setSpeakingMessageId(messageId);
+
+      const utterance = new SpeechSynthesisUtterance(textToSpeak);
+      utterance.rate = 1.0; // Normal speed for full messages
+      utterance.pitch = 1.0;
+      utterance.volume = 0.9;
+
+      // Set selected voice if available
+      if (selectedVoice) {
+        const voices = window.speechSynthesis.getVoices();
+        const voice = voices.find((v) => v.voiceURI === selectedVoice);
+        if (voice) {
+          utterance.voice = voice;
+        }
+      }
+
+      utterance.onend = () => {
+        setSpeakingMessageId(null);
+      };
+
+      utterance.onerror = () => {
+        setSpeakingMessageId(null);
+      };
+
+      window.speechSynthesis.speak(utterance);
+    },
+    [messages, selectedVoice],
+  );
+
+  // Toggle speak for a message
+  const toggleSpeakMessage = React.useCallback(
+    (messageId: string) => {
+      if (speakingMessageId === messageId) {
+        // Stop speaking
+        window.speechSynthesis.cancel();
+        setSpeakingMessageId(null);
+      } else {
+        // Start speaking
+        speakMessage(messageId);
+      }
+    },
+    [speakingMessageId, speakMessage],
+  );
+
   // Stop TTS when disabled or component unmounts
   React.useEffect(() => {
     return () => {
@@ -628,7 +642,7 @@ export function ChatInterface({
       }
     };
   }, []);
-  
+
   React.useEffect(() => {
     if (!ttsEnabled && window.speechSynthesis) {
       window.speechSynthesis.cancel();
@@ -642,153 +656,160 @@ export function ChatInterface({
     }
   }, [ttsEnabled]);
 
-  const wsStream = React.useCallback((data: any) => {
-    if (assistantMessage.current === null) return;
-    const messageHasThisChatId =
-      data.type &&
-      data.headers &&
-      data.headers["x-zwc-chat-id"] &&
-      data.headers["x-zwc-chat-id"] === chatId;
+  const wsStream = React.useCallback(
+    (data: any) => {
+      if (assistantMessage.current === null) return;
+      const messageHasThisChatId =
+        data.type &&
+        data.headers &&
+        data.headers["x-zwc-chat-id"] &&
+        data.headers["x-zwc-chat-id"] === chatId;
 
-    if (data instanceof ArrayBuffer) {
-      const { header, text } = getHeaderAndText(data);
-      if (!header.chatId) return;
-      if (header.chatId !== chatId) return;
+      if (data instanceof ArrayBuffer) {
+        const { header, text } = getHeaderAndText(data);
+        if (!header.chatId) return;
+        if (header.chatId !== chatId) return;
+        const messageId = header.newMessageId;
+        assistantMessage.current.id = messageId;
 
-      const stashMessageLength = messagesRef.current.length;
-      const isNewChat =
-        initialMessages.length === 0 && stashMessageLength === 0;
+        const stashMessageLength = messagesRef.current.length;
+        const isNewChat =
+          initialMessages.length === 0 && stashMessageLength === 0;
 
-      for (const chunk of parseSSEEvents(text, buffer)) {
-        if (chunk.type === "data" && assistantMessage.current) {
-          handleChunk({
-            value: chunk.parsed,
-            setMessages,
-            assistantMessage: assistantMessage.current,
-            onNewContent: (content) => {
-              if (ttsEnabled && content) {
-                // Add to buffer
-                ttsBufferRef.current += content;
-                
-                // Clear existing timeout
-                if (ttsBufferTimeoutRef.current) {
-                  clearTimeout(ttsBufferTimeoutRef.current);
-                }
-                
-                // Check for natural break points
-                const breakPattern = /([.!?;,\n]+)/;
-                const parts = ttsBufferRef.current.split(breakPattern);
-                
-                // Process complete chunks (everything except possibly the last part)
-                for (let i = 0; i < parts.length - 1; i += 2) {
-                  const chunk = parts[i].trim();
-                  const punctuation = parts[i + 1] || '';
-                  
-                  if (chunk) {
-                    // Include punctuation for natural pauses
-                    ttsQueueRef.current.push(chunk + punctuation);
+        for (const chunk of parseSSEEvents(text, buffer)) {
+          if (chunk.type === "data" && assistantMessage.current) {
+            handleChunk({
+              value: chunk.parsed,
+              setMessages,
+              assistantMessage: assistantMessage.current,
+              onNewContent: (content) => {
+                if (ttsEnabled && content) {
+                  // Add to buffer
+                  ttsBufferRef.current += content;
+
+                  // Clear existing timeout
+                  if (ttsBufferTimeoutRef.current) {
+                    clearTimeout(ttsBufferTimeoutRef.current);
                   }
-                }
-                
-                // Keep the last part in buffer (might be incomplete)
-                ttsBufferRef.current = parts[parts.length - 1] || '';
-                
-                // Process queue if we have chunks
-                if (ttsQueueRef.current.length > 0) {
-                  processTtsQueue();
-                }
-                
-                // Set timeout to flush buffer after 800ms of no new content
-                ttsBufferTimeoutRef.current = setTimeout(() => {
-                  flushTtsBuffer();
-                }, 800);
-              }
-            },
-          });
-        } else if (chunk.type === "done") {
-          setIsLoading(false);
-          setStreamingMessageId(null);
-          streamingRef.current = null;
 
-          assistantMessage.current = null;
-          
-          // Flush any remaining TTS buffer
-          if (ttsEnabled) {
-            flushTtsBuffer();
-          }
+                  // Check for natural break points
+                  const breakPattern = /([.!?;,\n]+)/;
+                  const parts = ttsBufferRef.current.split(breakPattern);
 
-          // Generate title for new chats after first response
-          if (isNewChat) {
-            // Fire and forget - don't wait for title generation
-            post(`/chat/${chatId}/generate-title`, {})
-              .then(() => {
-                // Invalidate chats query to refresh the title
-                setTimeout(() => {
-                  queryClient.invalidateQueries({ queryKey: ["chats"] });
-                  queryClient.invalidateQueries({ queryKey: ["APIKEYINFO"] });
-                }, 1000);
-              })
-              .catch((err) => console.error("Failed to generate title:", err));
+                  // Process complete chunks (everything except possibly the last part)
+                  for (let i = 0; i < parts.length - 1; i += 2) {
+                    const chunk = parts[i].trim();
+                    const punctuation = parts[i + 1] || "";
+
+                    if (chunk) {
+                      // Include punctuation for natural pauses
+                      ttsQueueRef.current.push(chunk + punctuation);
+                    }
+                  }
+
+                  // Keep the last part in buffer (might be incomplete)
+                  ttsBufferRef.current = parts[parts.length - 1] || "";
+
+                  // Process queue if we have chunks
+                  if (ttsQueueRef.current.length > 0) {
+                    processTtsQueue();
+                  }
+
+                  // Set timeout to flush buffer after 800ms of no new content
+                  ttsBufferTimeoutRef.current = setTimeout(() => {
+                    flushTtsBuffer();
+                  }, 800);
+                }
+              },
+            });
+          } else if (chunk.type === "done") {
+            setIsLoading(false);
+            setStreamingMessageId(null);
+            streamingRef.current = null;
+
+            assistantMessage.current = null;
+
+            // Flush any remaining TTS buffer
+            if (ttsEnabled) {
+              flushTtsBuffer();
+            }
+
+            // Generate title for new chats after first response
+            if (isNewChat) {
+              // Fire and forget - don't wait for title generation
+              post(`/chat/${chatId}/generate-title`, {})
+                .then(() => {
+                  // Invalidate chats query to refresh the title
+                  setTimeout(() => {
+                    queryClient.invalidateQueries({ queryKey: ["chats"] });
+                    queryClient.invalidateQueries({ queryKey: ["APIKEYINFO"] });
+                  }, 1000);
+                })
+                .catch((err) =>
+                  console.error("Failed to generate title:", err),
+                );
+            } else {
+              setTimeout(() => {
+                queryClient.invalidateQueries({ queryKey: ["APIKEYINFO"] });
+                queryClient.invalidateQueries({ queryKey: ["chats"] });
+              }, 1000);
+            }
           } else {
-            setTimeout(() => {
-              queryClient.invalidateQueries({ queryKey: ["APIKEYINFO"] });
-              queryClient.invalidateQueries({ queryKey: ["chats"] });
-            }, 1000);
+            console.log({ text, chunk });
           }
-        } else {
-          console.log({ text, chunk });
         }
-      }
-    } else {
-      if (!messageHasThisChatId) return;
-
-      if (
-        data.status === 403 &&
-        data.body &&
-        data.body.error &&
-        data.body.error.message.toLowerCase().includes("key limit exceeded")
-      ) {
-        AsyncAlert({
-          title: "Error",
-          message: "You have reached your limit",
-        });
       } else {
-        console.error(data);
-        const message =
-          data?.body?.error?.message ?? "An unknown error occurred";
-        AsyncAlert({
-          message: (
-            <div className="flex flex-col gap-2 mb-4">
-              <h1 className="text-xl strong">Error</h1>
-              <p>{message}</p>
-              <p>
-                Could be upstream, check{" "}
-                <a href="https://status.openrouter.ai/" target="_blank">
-                  https://status.openrouter.ai/
-                </a>
-              </p>
-            </div>
-          ),
-        });
-      }
-      // Restore the original message
-      if (assistantMessage.current !== null) {
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === assistantMessage.current?.id
-              ? (assistantMessage.current as Message)
-              : msg,
-          ),
-        );
-      } else {
-        setMessages((prev) => [...prev.slice(0, -1)]);
-      }
+        if (!messageHasThisChatId) return;
 
-      setIsLoading(false);
-      setStreamingMessageId(null);
-      streamingRef.current = null;
-    }
-  }, [ttsEnabled, processTtsQueue, flushTtsBuffer]);
+        if (
+          data.status === 403 &&
+          data.body &&
+          data.body.error &&
+          data.body.error.message.toLowerCase().includes("key limit exceeded")
+        ) {
+          AsyncAlert({
+            title: "Error",
+            message: "You have reached your limit",
+          });
+        } else {
+          console.error(data);
+          const message =
+            data?.body?.error?.message ?? "An unknown error occurred";
+          AsyncAlert({
+            message: (
+              <div className="flex flex-col gap-2 mb-4">
+                <h1 className="text-xl strong">Error</h1>
+                <p>{message}</p>
+                <p>
+                  Could be upstream, check{" "}
+                  <a href="https://status.openrouter.ai/" target="_blank">
+                    https://status.openrouter.ai/
+                  </a>
+                </p>
+              </div>
+            ),
+          });
+        }
+        // Restore the original message
+        if (assistantMessage.current !== null) {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMessage.current?.id
+                ? (assistantMessage.current as Message)
+                : msg,
+            ),
+          );
+        } else {
+          setMessages((prev) => [...prev.slice(0, -1)]);
+        }
+
+        setIsLoading(false);
+        setStreamingMessageId(null);
+        streamingRef.current = null;
+      }
+    },
+    [ttsEnabled, processTtsQueue, flushTtsBuffer],
+  );
 
   React.useEffect(() => {
     wsClient.on("message", wsStream);
@@ -1554,7 +1575,7 @@ function handleChunk({
   }
   const msgKey = delta.reasoning ? "reasoning" : "content";
   const newContent = delta[msgKey] || "";
-  
+
   setMessages((prev) =>
     prev.map((msg) =>
       msg.id === assistantMessage.id
@@ -1565,7 +1586,7 @@ function handleChunk({
         : msg,
     ),
   );
-  
+
   // Notify about new content for TTS
   if (newContent && onNewContent) {
     onNewContent(newContent);
