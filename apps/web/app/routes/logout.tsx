@@ -9,14 +9,14 @@ export default function LogoutPage() {
   }, []);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted">
       <div className="w-full max-w-md px-6">
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 p-8 text-center">
+        <div className="bg-card rounded-2xl shadow-xl border border-border p-8 text-center">
           {/* Success Icon */}
           <div className="mb-6 flex justify-center">
-            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
+            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
               <svg
-                className="w-8 h-8 text-green-600 dark:text-green-400"
+                className="w-8 h-8 text-primary"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -32,10 +32,10 @@ export default function LogoutPage() {
           </div>
 
           {/* Logout Message */}
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+          <h1 className="text-2xl font-bold text-foreground mb-2">
             You've been logged out
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-8">
+          <p className="text-muted-foreground mb-8">
             Thanks for using ZWC Chat. You've been securely signed out of your
             account.
           </p>
@@ -44,7 +44,7 @@ export default function LogoutPage() {
           <div className="space-y-3">
             <Button
               onClick={() => (window.location.href = "/")}
-              className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-500 dark:hover:bg-blue-600"
+              className="w-full h-11"
             >
               Sign In Again
             </Button>
@@ -52,17 +52,17 @@ export default function LogoutPage() {
             <Button
               onClick={() => (window.location.href = "/")}
               variant="outline"
-              className="w-full h-11 border-gray-300 dark:border-gray-600"
+              className="w-full h-11"
             >
               Go to Homepage
             </Button>
           </div>
 
           {/* Security Notice */}
-          <div className="mt-8 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+          <div className="mt-8 p-4 bg-muted/50 rounded-lg">
+            <p className="text-sm text-muted-foreground">
               <svg
-                className="w-4 h-4 inline mr-2 text-gray-500"
+                className="w-4 h-4 inline mr-2 text-muted-foreground"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -82,16 +82,16 @@ export default function LogoutPage() {
 
         {/* Footer Links */}
         <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-muted-foreground">
             <a
               href="#"
-              className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 mr-4"
+              className="font-medium text-primary hover:text-primary/80 mr-4"
             >
               Privacy Policy
             </a>
             <a
               href="#"
-              className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400"
+              className="font-medium text-primary hover:text-primary/80"
             >
               Terms of Service
             </a>

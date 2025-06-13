@@ -52,7 +52,7 @@ function useSidebar() {
 }
 
 const _defaultSidebar = localStorage.getItem("sidebar-collapsed");
-const defaultSidebar = _defaultSidebar ? JSON.parse(_defaultSidebar) : false;
+const defaultSidebar = _defaultSidebar ? JSON.parse(_defaultSidebar) : true;
 
 function SidebarProvider({
   defaultOpen = true,

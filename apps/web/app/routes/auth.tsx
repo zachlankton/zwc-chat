@@ -16,14 +16,14 @@ export default function AuthPage() {
 
   if (!authUrl) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted">
         <div className="w-full max-w-md px-6">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 p-8 text-center">
+          <div className="bg-card rounded-2xl shadow-xl border border-border p-8 text-center">
             {/* Error Icon */}
             <div className="mb-6 flex justify-center">
-              <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center">
+              <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center">
                 <svg
-                  className="w-8 h-8 text-red-600 dark:text-red-400"
+                  className="w-8 h-8 text-destructive"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -39,16 +39,16 @@ export default function AuthPage() {
             </div>
 
             {/* Error Message */}
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+            <h2 className="text-xl font-semibold text-foreground mb-2">
               {status}
             </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-8">{msg}</p>
+            <p className="text-muted-foreground mb-8">{msg}</p>
 
             {/* Action Buttons */}
             <div className="space-y-3">
               <Button
                 onClick={() => (window.location.href = "/")}
-                className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-500 dark:hover:bg-blue-600"
+                className="w-full h-11"
               >
                 Return to Home
               </Button>
@@ -60,9 +60,9 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted">
       <div className="w-full max-w-md px-6">
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 p-8">
+        <div className="bg-card rounded-2xl shadow-xl border border-border p-8">
           {/* Logo */}
           <div className="mb-8 flex justify-center">
             <div className="w-48">
@@ -81,10 +81,10 @@ export default function AuthPage() {
 
           {/* Welcome Text */}
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+            <h1 className="text-2xl font-bold text-foreground mb-2">
               Welcome back
             </h1>
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-muted-foreground">
               Sign in to continue to ZWC Chat
             </p>
           </div>
@@ -92,7 +92,7 @@ export default function AuthPage() {
           {/* Google Login Button */}
           <Button
             onClick={getAuthUrl}
-            className="w-full h-12 flex items-center justify-center gap-3 bg-white hover:bg-gray-50 text-gray-900 border border-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-100 dark:border-gray-600 transition-colors"
+            className="w-full h-12 flex items-center justify-center gap-3 bg-background hover:bg-accent text-foreground border border-border transition-colors"
           >
             <svg
               className="w-5 h-5"
@@ -120,18 +120,18 @@ export default function AuthPage() {
           </Button>
 
           {/* Terms and Privacy */}
-          <p className="mt-8 text-center text-sm text-gray-600 dark:text-gray-400">
+          <p className="mt-8 text-center text-sm text-muted-foreground">
             By continuing, you agree to our{" "}
             <a
               href="#"
-              className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400"
+              className="font-medium text-primary hover:text-primary/80"
             >
               Terms of Service
             </a>{" "}
             and{" "}
             <a
               href="#"
-              className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400"
+              className="font-medium text-primary hover:text-primary/80"
             >
               Privacy Policy
             </a>
@@ -140,11 +140,11 @@ export default function AuthPage() {
 
         {/* Additional Help */}
         <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-muted-foreground">
             Having trouble signing in?{" "}
             <a
               href="#"
-              className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400"
+              className="font-medium text-primary hover:text-primary/80"
             >
               Get help
             </a>
