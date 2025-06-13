@@ -81,14 +81,6 @@ bun run mongo:start
 Run both the API server and web app simultaneously:
 
 ```bash
-# From the root directory
-bun run dev:api  # API server on https://localhost:3000
-bun run dev:web  # Web app on https://localhost:5173
-```
-
-Or run them individually:
-
-```bash
 # API server
 cd apps/api && bun run dev
 
@@ -99,13 +91,6 @@ cd apps/web && bun run dev
 ## Building for Production
 
 Build both applications:
-
-```bash
-# From root directory
-bun run build
-```
-
-Or build individually:
 
 ```bash
 # API
