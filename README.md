@@ -11,6 +11,7 @@ A modern, real-time chat application with AI integration, built with Bun, React,
 - 🎨 **Modern UI** - React 19 with TailwindCSS v4 and Radix UI components
 - 📱 **Responsive Design** - Works seamlessly on desktop and mobile devices
 - 🚀 **High Performance** - Built on Bun runtime for blazing-fast performance
+- 🎙️ **Speech Recognition** - Talk to the LLM instead of typing, say 'send message' to send it
 
 ## Tech Stack
 
