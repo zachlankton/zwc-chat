@@ -3,15 +3,24 @@ import {
   Send,
   Paperclip,
   Mic,
-  MicOff,
   X,
   AlertCircle,
   CheckCircle,
   XCircle,
   CornerDownLeft,
   Keyboard,
+  Volume2,
+  VolumeX,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 import { Button } from "~/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
 import { cn } from "~/lib/utils";
 import { useRef, useState, useEffect } from "react";
 import { useSidebar } from "./ui/sidebar";
@@ -41,6 +50,10 @@ interface ChatInputProps {
   modelsLoading: any;
   modelsError: any;
   apiKeyInfo?: ApiKeyInfo | null;
+  ttsEnabled?: boolean;
+  onTtsToggle?: (enabled: boolean) => void;
+  selectedVoice?: string;
+  onVoiceChange?: (voice: string) => void;
 }
 
 export function ChatInput({
@@ -53,15 +66,21 @@ export function ChatInput({
   modelsLoading,
   modelsError,
   apiKeyInfo,
+  ttsEnabled = false,
+  onTtsToggle,
+  selectedVoice,
+  onVoiceChange,
 }: ChatInputProps) {
   const [isFocused, setIsFocused] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [isListening, setIsListening] = useState(false);
-  const [transcript, setTranscript] = useState("");
   const [speechSupported, setSpeechSupported] = useState(false);
   const [pendingSubmit, setPendingSubmit] = useState(false);
   const [showVoiceHint, setShowVoiceHint] = useState(false);
   const [enterToSend, setEnterToSend] = useState(true);
+  const [availableVoices, setAvailableVoices] = useState<
+    SpeechSynthesisVoice[]
+  >([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const textareaScrollHeightRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -103,15 +122,38 @@ export function ChatInput({
         (window as any).SpeechRecognition ||
         (window as any).webkitSpeechRecognition;
       setSpeechSupported(!!SpeechRecognition);
-      
+
       // Load enter key preference
       const savedPref = localStorage.getItem("enterToSend");
       if (savedPref !== null) {
         setEnterToSend(savedPref === "true");
       }
+
+      // Load available voices
+      const loadVoices = () => {
+        const allVoices = window.speechSynthesis.getVoices();
+        // Get user's locale
+        const userLocale = navigator.language || "en-US";
+        const userLang = userLocale.split("-")[0]; // e.g., 'en' from 'en-US'
+
+        // Filter for local voices that match user's language
+        const localVoices = allVoices.filter((voice) => {
+          const voiceLang = voice.lang.split("-")[0];
+          return (
+            voice.localService &&
+            (voice.lang.startsWith(userLocale) || // Exact locale match
+              voiceLang === userLang)
+          ); // Language match
+        });
+
+        setAvailableVoices(localVoices);
+      };
+
+      loadVoices();
+      window.speechSynthesis.onvoiceschanged = loadVoices;
     }
   }, []);
-  
+
   // Save enter key preference
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -163,7 +205,6 @@ export function ChatInput({
         const currentValue = textareaRef.current.value;
         const newValue = currentValue + finalTranscript;
         textareaRef.current.value = newValue;
-        setTranscript(newValue);
 
         // Trigger resize
         const event = new Event("input", { bubbles: true });
@@ -490,32 +531,110 @@ export function ChatInput({
 
           {/* Helper Text and Model Selector */}
           <div className="mt-2 flex gap-2 @max-[570px]:flex-col-reverse items-center justify-between px-2">
-            {/* Enter key toggle */}
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setEnterToSend(!enterToSend)}
-                className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
-                title={enterToSend ? "Enter sends message" : "Shift+Enter sends message"}
-              >
-                {enterToSend ? (
-                  <>
-                    <CornerDownLeft className="h-3 w-3" />
-                    <span className="@max-[600px]:hidden">to send</span>
-                  </>
-                ) : (
-                  <>
-                    <Keyboard className="h-3 w-3" />
-                    <span className="@max-[600px]:hidden">⇧+↵ to send</span>
-                  </>
+            <div className="@max-[570px]:hidden">
+              {/* Enter key toggle */}
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEnterToSend(!enterToSend)}
+                  className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+                  title={
+                    enterToSend
+                      ? "Enter sends message"
+                      : "Shift+Enter sends message"
+                  }
+                >
+                  {enterToSend ? (
+                    <>
+                      <CornerDownLeft className="h-3 w-3" />
+                      <span className="@max-[600px]:hidden">to send</span>
+                    </>
+                  ) : (
+                    <>
+                      <Keyboard className="h-3 w-3" />
+                      <span className="@max-[600px]:hidden">⇧+↵ to send</span>
+                    </>
+                  )}
+                </Button>
+
+                {/* TTS Toggle */}
+                {onTtsToggle && (
+                  <div className="flex items-center">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onTtsToggle(!ttsEnabled)}
+                      className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-foreground rounded-r-none"
+                      title={
+                        ttsEnabled
+                          ? "Disable text-to-speech"
+                          : "Enable text-to-speech"
+                      }
+                    >
+                      {ttsEnabled ? (
+                        <>
+                          <Volume2 className="h-3 w-3" />
+                          <span className="@max-[700px]:hidden">TTS</span>
+                        </>
+                      ) : (
+                        <>
+                          <VolumeX className="h-3 w-3" />
+                          <span className="@max-[700px]:hidden">TTS</span>
+                        </>
+                      )}
+                    </Button>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger disabled={!onVoiceChange} asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-1.5 text-xs text-muted-foreground hover:text-foreground rounded-l-none border-l"
+                          title="Select voice"
+                        >
+                          <ChevronDown className="h-3 w-3 rotate-180" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="end"
+                        className="w-56 max-h-80 overflow-y-auto"
+                      >
+                        {availableVoices.length === 0 ? (
+                          <DropdownMenuItem disabled>
+                            No voices available
+                          </DropdownMenuItem>
+                        ) : (
+                          <>
+                            {availableVoices.map((voice) => (
+                              <DropdownMenuItem
+                                key={voice.voiceURI}
+                                onClick={() =>
+                                  onVoiceChange && onVoiceChange(voice.voiceURI)
+                                }
+                                className="gap-2"
+                              >
+                                <span className="flex-1">{voice.name}</span>
+                                {selectedVoice === voice.voiceURI && (
+                                  <Check className="h-3 w-3" />
+                                )}
+                              </DropdownMenuItem>
+                            ))}
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 )}
-              </Button>
+              </div>
             </div>
+
             {/* API Key Usage Indicator */}
             {usageStatus && (
-              <div className="flex @max-[600px]:text-center items-center gap-2">
+              <div className="flex min-w-[225px] @max-[600px]:text-center items-center gap-2">
                 <div className="flex items-center gap-1.5">
                   {usageStatus.status === "critical" ? (
                     <XCircle className="h-3.5 w-3.5 text-destructive" />

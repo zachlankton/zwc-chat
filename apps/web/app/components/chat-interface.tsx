@@ -7,6 +7,8 @@ import {
   GitBranchPlus,
   Trash2,
   Pencil,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
@@ -79,6 +81,32 @@ interface Message {
 interface ChatInterfaceProps {
   chatId: string;
   initialMessages: Message[];
+}
+
+function MessageSpeakButton({
+  messageId,
+  content,
+  reasoning,
+  isPlaying,
+  onToggleSpeak,
+}: {
+  messageId: string;
+  content: string | any[];
+  reasoning?: string;
+  isPlaying: boolean;
+  onToggleSpeak: (messageId: string) => void;
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => onToggleSpeak(messageId)}
+      className="h-6 has-[>svg]:px-2 has-[>svg]:py-4 text-xs hover:bg-muted/50"
+      title={isPlaying ? "Stop speaking" : "Speak message"}
+    >
+      {isPlaying ? <VolumeX className="h-3" /> : <Volume2 className="h-3" />}
+    </Button>
+  );
 }
 
 function MessageCopyButton({
@@ -419,11 +447,200 @@ export function ChatInterface({
   const buffer = React.useRef("");
   const assistantMessage = React.useRef<null | Message>(null);
   const messagesRef = React.useRef<Message[]>(messages);
+  
+  // TTS state
+  const [ttsEnabled, setTtsEnabled] = React.useState(false);
+  const [selectedVoice, setSelectedVoice] = React.useState<string>("");
+  const [speakingMessageId, setSpeakingMessageId] = React.useState<string | null>(null);
+  const ttsQueueRef = React.useRef<string[]>([]);
+  const isSpeakingRef = React.useRef(false);
+  const speechSynthesisRef = React.useRef<SpeechSynthesisUtterance | null>(null);
+  const ttsBufferRef = React.useRef<string>("");
+  const ttsBufferTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // Keep messagesRef in sync with messages state
   React.useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+  
+  // Load TTS preferences
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedTts = localStorage.getItem("ttsEnabled");
+      if (savedTts !== null) {
+        setTtsEnabled(savedTts === "true");
+      }
+      
+      const savedVoice = localStorage.getItem("ttsVoice");
+      if (savedVoice) {
+        setSelectedVoice(savedVoice);
+      }
+    }
+  }, []);
+  
+  // Save TTS preferences
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("ttsEnabled", String(ttsEnabled));
+    }
+  }, [ttsEnabled]);
+  
+  React.useEffect(() => {
+    if (typeof window !== "undefined" && selectedVoice) {
+      localStorage.setItem("ttsVoice", selectedVoice);
+    }
+  }, [selectedVoice]);
+  
+  // TTS queue processor
+  const processTtsQueue = React.useCallback(() => {
+    if (isSpeakingRef.current || ttsQueueRef.current.length === 0 || !ttsEnabled) {
+      return;
+    }
+    
+    const text = ttsQueueRef.current.shift();
+    if (!text) return;
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.1; // Slightly faster
+    utterance.pitch = 1.0;
+    utterance.volume = 0.9;
+    
+    // Set selected voice if available
+    if (selectedVoice) {
+      const voices = window.speechSynthesis.getVoices();
+      const voice = voices.find(v => v.voiceURI === selectedVoice);
+      if (voice) {
+        utterance.voice = voice;
+      }
+    }
+    
+    utterance.onstart = () => {
+      isSpeakingRef.current = true;
+    };
+    
+    utterance.onend = () => {
+      isSpeakingRef.current = false;
+      processTtsQueue(); // Process next in queue
+    };
+    
+    utterance.onerror = () => {
+      isSpeakingRef.current = false;
+      ttsQueueRef.current = []; // Clear queue on error
+    };
+    
+    speechSynthesisRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+  }, [ttsEnabled, selectedVoice]);
+  
+  // TTS buffer processor - flushes buffer and queues for speech
+  const flushTtsBuffer = React.useCallback(() => {
+    if (ttsBufferRef.current.trim()) {
+      ttsQueueRef.current.push(ttsBufferRef.current.trim());
+      ttsBufferRef.current = "";
+      processTtsQueue();
+    }
+    if (ttsBufferTimeoutRef.current) {
+      clearTimeout(ttsBufferTimeoutRef.current);
+      ttsBufferTimeoutRef.current = null;
+    }
+  }, [processTtsQueue]);
+  
+  // Speak a specific message
+  const speakMessage = React.useCallback((messageId: string) => {
+    const message = messages.find(m => m.id === messageId);
+    if (!message || message.role !== "assistant") return;
+    
+    // Extract text content
+    let textToSpeak = "";
+    if (message.reasoning) {
+      textToSpeak += "Reasoning: " + message.reasoning + ". ";
+    }
+    
+    if (typeof message.content === "string") {
+      textToSpeak += message.content;
+    } else if (Array.isArray(message.content)) {
+      textToSpeak += message.content
+        .filter(item => item.type === "text")
+        .map(item => item.text || "")
+        .join(" ");
+    }
+    
+    // Clean up markdown formatting for better speech
+    textToSpeak = textToSpeak
+      .replace(/```[\s\S]*?```/g, " code block ") // Replace code blocks
+      .replace(/`([^`]+)`/g, "$1") // Remove inline code backticks
+      .replace(/\*\*([^*]+)\*\*/g, "$1") // Remove bold
+      .replace(/\*([^*]+)\*/g, "$1") // Remove italic
+      .replace(/#+\s/g, "") // Remove headers
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // Convert links to text
+      .replace(/\n+/g, ". ") // Convert newlines to periods
+      .replace(/\s+/g, " ") // Normalize whitespace
+      .trim();
+    
+    if (!textToSpeak) return;
+    
+    // Stop any current speech
+    window.speechSynthesis.cancel();
+    setSpeakingMessageId(messageId);
+    
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.rate = 1.0; // Normal speed for full messages
+    utterance.pitch = 1.0;
+    utterance.volume = 0.9;
+    
+    // Set selected voice if available
+    if (selectedVoice) {
+      const voices = window.speechSynthesis.getVoices();
+      const voice = voices.find(v => v.voiceURI === selectedVoice);
+      if (voice) {
+        utterance.voice = voice;
+      }
+    }
+    
+    utterance.onend = () => {
+      setSpeakingMessageId(null);
+    };
+    
+    utterance.onerror = () => {
+      setSpeakingMessageId(null);
+    };
+    
+    window.speechSynthesis.speak(utterance);
+  }, [messages, selectedVoice]);
+  
+  // Toggle speak for a message
+  const toggleSpeakMessage = React.useCallback((messageId: string) => {
+    if (speakingMessageId === messageId) {
+      // Stop speaking
+      window.speechSynthesis.cancel();
+      setSpeakingMessageId(null);
+    } else {
+      // Start speaking
+      speakMessage(messageId);
+    }
+  }, [speakingMessageId, speakMessage]);
+  
+  // Stop TTS when disabled or component unmounts
+  React.useEffect(() => {
+    return () => {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+  
+  React.useEffect(() => {
+    if (!ttsEnabled && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      ttsQueueRef.current = [];
+      ttsBufferRef.current = "";
+      isSpeakingRef.current = false;
+      if (ttsBufferTimeoutRef.current) {
+        clearTimeout(ttsBufferTimeoutRef.current);
+        ttsBufferTimeoutRef.current = null;
+      }
+    }
+  }, [ttsEnabled]);
 
   const wsStream = React.useCallback((data: any) => {
     if (assistantMessage.current === null) return;
@@ -448,6 +665,45 @@ export function ChatInterface({
             value: chunk.parsed,
             setMessages,
             assistantMessage: assistantMessage.current,
+            onNewContent: (content) => {
+              if (ttsEnabled && content) {
+                // Add to buffer
+                ttsBufferRef.current += content;
+                
+                // Clear existing timeout
+                if (ttsBufferTimeoutRef.current) {
+                  clearTimeout(ttsBufferTimeoutRef.current);
+                }
+                
+                // Check for natural break points
+                const breakPattern = /([.!?;,\n]+)/;
+                const parts = ttsBufferRef.current.split(breakPattern);
+                
+                // Process complete chunks (everything except possibly the last part)
+                for (let i = 0; i < parts.length - 1; i += 2) {
+                  const chunk = parts[i].trim();
+                  const punctuation = parts[i + 1] || '';
+                  
+                  if (chunk) {
+                    // Include punctuation for natural pauses
+                    ttsQueueRef.current.push(chunk + punctuation);
+                  }
+                }
+                
+                // Keep the last part in buffer (might be incomplete)
+                ttsBufferRef.current = parts[parts.length - 1] || '';
+                
+                // Process queue if we have chunks
+                if (ttsQueueRef.current.length > 0) {
+                  processTtsQueue();
+                }
+                
+                // Set timeout to flush buffer after 800ms of no new content
+                ttsBufferTimeoutRef.current = setTimeout(() => {
+                  flushTtsBuffer();
+                }, 800);
+              }
+            },
           });
         } else if (chunk.type === "done") {
           setIsLoading(false);
@@ -455,6 +711,11 @@ export function ChatInterface({
           streamingRef.current = null;
 
           assistantMessage.current = null;
+          
+          // Flush any remaining TTS buffer
+          if (ttsEnabled) {
+            flushTtsBuffer();
+          }
 
           // Generate title for new chats after first response
           if (isNewChat) {
@@ -527,14 +788,14 @@ export function ChatInterface({
       setStreamingMessageId(null);
       streamingRef.current = null;
     }
-  }, []);
+  }, [ttsEnabled, processTtsQueue, flushTtsBuffer]);
 
   React.useEffect(() => {
     wsClient.on("message", wsStream);
     return () => {
       wsClient.off("message", wsStream);
     };
-  }, []);
+  }, [wsStream]);
 
   // Initialize selectedModel based on context
   const getInitialModel = () => {
@@ -1192,6 +1453,13 @@ export function ChatInterface({
                             messageIndex={index}
                             onBranch={handleBranch}
                           />
+                          <MessageSpeakButton
+                            messageId={message.id}
+                            content={message.content}
+                            reasoning={message.reasoning}
+                            isPlaying={speakingMessageId === message.id}
+                            onToggleSpeak={toggleSpeakMessage}
+                          />
                           <MessageCopyButton
                             content={message.content}
                             reasoning={message.reasoning}
@@ -1233,6 +1501,10 @@ export function ChatInterface({
         modelsLoading={modelsLoading}
         modelsError={modelsError}
         apiKeyInfo={apiKeyInfo?.data}
+        ttsEnabled={ttsEnabled}
+        onTtsToggle={setTtsEnabled}
+        selectedVoice={selectedVoice}
+        onVoiceChange={setSelectedVoice}
       />
     </div>
   );
@@ -1242,10 +1514,12 @@ function handleChunk({
   value,
   setMessages,
   assistantMessage,
+  onNewContent,
 }: {
   value: any;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   assistantMessage: Message;
+  onNewContent?: (content: string) => void;
 }) {
   const usage = value?.usage;
 
@@ -1279,16 +1553,23 @@ function handleChunk({
     return;
   }
   const msgKey = delta.reasoning ? "reasoning" : "content";
+  const newContent = delta[msgKey] || "";
+  
   setMessages((prev) =>
     prev.map((msg) =>
       msg.id === assistantMessage.id
         ? {
             ...msg,
-            [msgKey]: (msg[msgKey] ?? "") + (delta[msgKey] || ""),
+            [msgKey]: (msg[msgKey] ?? "") + newContent,
           }
         : msg,
     ),
   );
+  
+  // Notify about new content for TTS
+  if (newContent && onNewContent) {
+    onNewContent(newContent);
+  }
 
   setMessages((prev) =>
     prev.map((msg) =>
