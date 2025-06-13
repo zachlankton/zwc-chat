@@ -10,8 +10,9 @@ import {
   SidebarHeader,
   SidebarRail,
   useSidebar,
-  SidebarTrigger,
 } from "~/components/ui/sidebar";
+import { Menu } from "lucide-react";
+import { Button } from "./ui/button";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onNewChat?: () => void;
@@ -25,13 +26,17 @@ export function AppSidebar({ onNewChat, ...props }: AppSidebarProps) {
   const isCollapsed = sb.state === "collapsed";
   const [showContent, setShowContent] = React.useState(!isCollapsed);
   const [hideElements, setHideElements] = React.useState(isCollapsed);
+  const [newText, setNewText] = React.useState(isCollapsed ? "+" : "New Chat");
   const [titleText, setTitleText] = React.useState(
     isCollapsed ? "ZWC" : "ZWC Chat",
   );
   const isMobile = sb.isMobile;
+  const toggleSidebar = sb.toggleSidebar;
+
   const [titleFading, setTitleFading] = React.useState(false);
 
   const handleChatSelect = (chatId: string) => {
+    if (isMobile) toggleSidebar();
     navigate(`/chat/${chatId}`);
   };
 
@@ -41,6 +46,7 @@ export function AppSidebar({ onNewChat, ...props }: AppSidebarProps) {
     } else {
       // Generate a new chat ID and navigate
       const newChatId = crypto.randomUUID();
+      if (isMobile) toggleSidebar();
       navigate(`/chat/${newChatId}`);
     }
   };
@@ -52,6 +58,7 @@ export function AppSidebar({ onNewChat, ...props }: AppSidebarProps) {
       setTitleFading(true);
       const textTimer = setTimeout(() => {
         setTitleText("ZWC Chat");
+        setNewText("New Chat");
         setTitleFading(false);
       }, 250);
       const timer = setTimeout(() => setShowContent(true), 150);
@@ -65,8 +72,9 @@ export function AppSidebar({ onNewChat, ...props }: AppSidebarProps) {
       setTitleFading(true);
       const textTimer = setTimeout(() => {
         setTitleText("");
+        setNewText("+");
         setTitleFading(false);
-      }, 250);
+      }, 0);
       const timer = setTimeout(() => setHideElements(true), 300);
       return () => {
         clearTimeout(timer);
@@ -77,17 +85,35 @@ export function AppSidebar({ onNewChat, ...props }: AppSidebarProps) {
 
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader className={`border-b border-sidebar-border px-0`}>
+      <SidebarHeader className={` px-0`}>
         <div className="flex items-center justify-between px-2 py-1 overflow-hidden">
-          <SidebarTrigger className="" />
+          <Button
+            data-sidebar="trigger"
+            data-slot="sidebar-trigger"
+            variant="ghost"
+            size="lg"
+            className={"size-8"}
+            onClick={() => toggleSidebar()}
+          >
+            <Menu className="size-8 text-foreground" />
+            <span className="sr-only">Toggle Sidebar</span>
+          </Button>
 
           <h2
-            className={`${isCollapsed ? "text-xs" : "text-xl min-w-[238px]"} ml-12 h-6 w-full font-semibold transition-all duration-100 ${
+            className={`${isCollapsed && !isMobile ? "text-xs" : "text-xl min-w-[238px]"} ml-12 h-6 w-full font-semibold transition-all duration-100 ${
               titleFading ? "opacity-0" : "opacity-100"
             }`}
           >
-            {titleText}
+            {isMobile ? "ZWC Chat" : titleText}
           </h2>
+        </div>
+        <div className="p-1">
+          <button
+            onClick={handleNewChat}
+            className="button-87 flex py-2 gap-2 w-full"
+          >
+            {isMobile ? "New Chat" : newText}
+          </button>
         </div>
       </SidebarHeader>
 

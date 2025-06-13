@@ -586,7 +586,7 @@ export function ChatInterface({
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({
-      behavior: "smooth",
+      behavior: "instant",
       block: "end",
     });
   };
@@ -883,7 +883,7 @@ export function ChatInterface({
     <div className="flex flex-col h-full">
       {/* Messages Area */}
       <div className="@container flex-1 overflow-y-auto pb-32">
-        <div className="max-w-5xl mx-auto px-4 @max-[560px]:px-1 mb-[70vh]">
+        <div className="max-w-[1000px] mx-auto px-4 @max-[560px]:px-1 mb-[70vh]">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full min-h-[60vh] text-center">
               <div className="rounded-full bg-primary/10 p-6 mb-6">
@@ -977,12 +977,12 @@ export function ChatInterface({
                     className={cn(
                       "rounded-2xl px-5 py-3 max-w-full shadow-sm",
                       message.role === "user"
-                        ? "bg-primary text-primary-foreground"
+                        ? "bg-muted/100 text-foreground"
                         : "bg-muted/50 border border-border/50",
                     )}
                   >
                     {message.role === "user" ? (
-                      <div className="prose prose-sm text-sm whitespace-pre-wrap user-message max-w-full max-h-[30vh] overflow-y-auto">
+                      <div className="prose prose-sm text-sm user-message max-w-full max-h-[40vh] overflow-y-auto">
                         {typeof message.content === "string" ? (
                           <ReactMarkdown
                             remarkPlugins={[remarkGfm]}
