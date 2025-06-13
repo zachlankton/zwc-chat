@@ -29,20 +29,7 @@ export default function ChatRoute() {
   // Fetch chat history
   const { data, isLoading, error } = useQuery({
     queryKey: ["chat", chatId],
-    queryFn: async () => {
-      const response = await get<Response>(`/api/chat/${chatId}`, {
-        returnResponse: true,
-      });
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          // Chat doesn't exist yet, return empty
-          return { chatId, messages: [], hasMore: false };
-        }
-        throw new Error("Failed to fetch chat");
-      }
-      return response.json() as Promise<ChatResponse>;
-    },
+    queryFn: async () => get<{ messages: Message[] }>(`/api/chat/${chatId}`),
     enabled: !!chatId,
   });
 
@@ -56,7 +43,8 @@ export default function ChatRoute() {
     }
   }, [chatId]);
 
-  if (error || !chatId) {
+  const err = error as any;
+  if ((error && err?.status !== 404) || !chatId) {
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-destructive">Failed to load chat</p>

@@ -48,23 +48,14 @@ export function ChatList({
   // Fetch user's chats
   const { data, isLoading, error } = useQuery({
     queryKey: ["chats"],
-    queryFn: async () => {
-      const response = await get<Response>("/api/chat", {
-        returnResponse: true,
-      });
-      if (!response.ok) throw new Error("Failed to fetch chats");
-      return response.json() as Promise<ChatListResponse>;
-    },
+    queryFn: async () => get<ChatListResponse>("/api/chat"),
   });
 
   // Delete chat mutation
   const deleteChatMutation = useMutation({
     mutationFn: async (chatId: string) => {
-      const response = await del<Response>(`/api/chat/${chatId}`, {
-        returnResponse: true,
-      });
-      if (!response.ok) throw new Error("Failed to delete chat");
-      return response.json();
+      const response = await del<Response>(`/api/chat/${chatId}`);
+      return response;
     },
     onSuccess: (_, deletedChatId) => {
       queryClient.invalidateQueries({ queryKey: ["chats"] });
@@ -84,13 +75,8 @@ export function ChatList({
       chatId: string;
       title: string;
     }) => {
-      const response = await put<Response>(
-        `/api/chat/${chatId}`,
-        { title },
-        { returnResponse: true },
-      );
-      if (!response.ok) throw new Error("Failed to update chat");
-      return response.json();
+      const response = await put<Response>(`/api/chat/${chatId}`, { title });
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["chats"] });

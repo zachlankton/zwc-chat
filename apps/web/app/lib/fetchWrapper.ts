@@ -20,7 +20,6 @@ interface FetchOptions extends RequestInit {
   params?: Record<string, string>;
   baseUrl?: string;
   autoHandleStates?: boolean;
-  returnResponse?: boolean;
   resolveImmediately?: boolean;
 }
 
@@ -86,7 +85,7 @@ export async function fetchWrapper(
       });
     }
 
-    if (options.returnResponse) return response;
+    console.log(response);
 
     let data;
     const contentType = response.headers.get("content-type");

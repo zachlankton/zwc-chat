@@ -5,8 +5,10 @@ import {
   Links,
   Meta,
   Outlet,
+  redirect,
   Scripts,
   ScrollRestoration,
+  useNavigate,
 } from "react-router";
 
 import type { Route } from "./+types/root";
@@ -18,6 +20,7 @@ import { ThemeProvider } from "./providers/theme-provider.js";
 import { queryClient } from "./providers/queryClient.js";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { PostHogProvider } from "posthog-js/react";
+import AuthPage from "./routes/auth.js";
 
 // Lazy load ReactQueryDevtools only in development
 const ReactQueryDevtools =
@@ -77,19 +80,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-export async function clientLoader() {
+export async function clientLoader({ request }: Route.ClientLoaderArgs) {
+  if (new URL(request.url).pathname === "/auth") return;
   const ret = await checkLogin();
   if (ret === undefined) return;
-  if (ret.state) location.assign(ret.state);
+
+  if (ret.state === "/") return redirect(`/chat/${crypto.randomUUID()}`);
+  if (ret.state) return redirect(ret.state);
   if (ret.authorizationUrl) {
     const newUrl = new URL(location.origin);
+    if (newUrl.pathname === "/auth") return;
     newUrl.pathname = "/auth";
     newUrl.searchParams.set("authorizationUrl", ret.authorizationUrl);
-    location.assign(newUrl.toString());
+    return redirect(`${newUrl.pathname}?${newUrl.searchParams.toString()}`);
   }
 }
 
-export default function App() {
+export default function App({ loaderData }: any) {
   return <Outlet />;
 }
 
