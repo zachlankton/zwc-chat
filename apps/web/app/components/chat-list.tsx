@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, put } from "../lib/fetchWrapper";
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
-import { Trash2, Plus, Pencil, Check, X, MoreVertical } from "lucide-react";
+import { Trash2, Pencil, Check, X, MoreVertical } from "lucide-react";
 import { useNavigate } from "react-router";
 import { AsyncConfirm } from "./async-modals";
 import { useState } from "react";
@@ -35,11 +35,7 @@ interface ChatListProps {
   onNewChat: () => void;
 }
 
-export function ChatList({
-  currentChatId,
-  onChatSelect,
-  onNewChat,
-}: ChatListProps) {
+export function ChatList({ currentChatId, onChatSelect }: ChatListProps) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
@@ -48,23 +44,14 @@ export function ChatList({
   // Fetch user's chats
   const { data, isLoading, error } = useQuery({
     queryKey: ["chats"],
-    queryFn: async () => {
-      const response = await get<Response>("/api/chat", {
-        returnResponse: true,
-      });
-      if (!response.ok) throw new Error("Failed to fetch chats");
-      return response.json() as Promise<ChatListResponse>;
-    },
+    queryFn: async () => get<ChatListResponse>("/api/chat"),
   });
 
   // Delete chat mutation
   const deleteChatMutation = useMutation({
     mutationFn: async (chatId: string) => {
-      const response = await del<Response>(`/api/chat/${chatId}`, {
-        returnResponse: true,
-      });
-      if (!response.ok) throw new Error("Failed to delete chat");
-      return response.json();
+      const response = await del<Response>(`/api/chat/${chatId}`);
+      return response;
     },
     onSuccess: (_, deletedChatId) => {
       queryClient.invalidateQueries({ queryKey: ["chats"] });
@@ -84,13 +71,8 @@ export function ChatList({
       chatId: string;
       title: string;
     }) => {
-      const response = await put<Response>(
-        `/api/chat/${chatId}`,
-        { title },
-        { returnResponse: true },
-      );
-      if (!response.ok) throw new Error("Failed to update chat");
-      return response.json();
+      const response = await put<Response>(`/api/chat/${chatId}`, { title });
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["chats"] });
@@ -124,17 +106,6 @@ export function ChatList({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 border-b">
-        <Button
-          onClick={onNewChat}
-          className="w-full justify-start gap-2"
-          variant="default"
-        >
-          <Plus className="h-4 w-4" />
-          New Chat
-        </Button>
-      </div>
-
       <div className="flex-1 overflow-y-auto">
         {isLoading ? (
           <div className="p-4 text-sm text-muted-foreground">
@@ -151,7 +122,7 @@ export function ChatList({
                 key={chat.id}
                 className={cn(
                   "group relative rounded-lg pl-2 mb-1 hover:bg-muted cursor-pointer transition-colors",
-                  currentChatId === chat.id && "bg-muted",
+                  currentChatId === chat.id && "bg-muted ring ring-primary",
                 )}
                 onClick={() => onChatSelect(chat.id)}
               >

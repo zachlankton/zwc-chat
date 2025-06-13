@@ -10,7 +10,7 @@ import crypto from "crypto";
 import { asyncLocalStorage } from "./asyncLocalStore";
 import type { OpenRouterMessage } from "./database";
 import { getMessagesCollection, getChatsCollection } from "./database";
-import { appendFile } from "node:fs/promises";
+//import { appendFile } from "node:fs/promises";
 
 const txtDecoder = new TextDecoder();
 
@@ -244,6 +244,7 @@ function createWebSocketMessage(
 	msgObject: any,
 	response: Response,
 	newMessageId: string,
+	chatId: string,
 	value: Uint8Array
 ): Uint8Array {
 	const header = new TextEncoder().encode(
@@ -252,6 +253,7 @@ function createWebSocketMessage(
 			status: response.status,
 			statusText: response.statusText,
 			newMessageId,
+			chatId,
 			length: value.length,
 		})
 	);
@@ -476,6 +478,7 @@ async function streamedChunks(
 			msgObject,
 			response,
 			newMessageId,
+			ctx.params.chatId,
 			value
 		);
 		ws.send(message);

@@ -20,7 +20,7 @@ interface FetchOptions extends RequestInit {
   params?: Record<string, string>;
   baseUrl?: string;
   autoHandleStates?: boolean;
-  returnResponse?: boolean;
+  resolveImmediately?: boolean;
 }
 
 export class HttpError extends Error {
@@ -67,12 +67,16 @@ export async function fetchWrapper(
 
     if (currentSession?.token) {
       wsClient.setToken(currentSession.token);
-      response = await wsClient.request({
-        ...fetchOptions,
-        method: fetchOptions.method ?? "GET",
-        path: url.pathname + "?" + url.searchParams.toString(),
-        headers,
-      });
+      response = await wsClient.request(
+        {
+          ...fetchOptions,
+          method: fetchOptions.method ?? "GET",
+          path: url.pathname + "?" + url.searchParams.toString(),
+          headers,
+        },
+        undefined,
+        options.resolveImmediately,
+      );
     } else {
       response = await fetch(url.toString(), {
         ...fetchOptions,
@@ -81,7 +85,7 @@ export async function fetchWrapper(
       });
     }
 
-    if (options.returnResponse) return response;
+    console.log(response);
 
     let data;
     const contentType = response.headers.get("content-type");

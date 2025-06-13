@@ -5,6 +5,7 @@ import {
   Links,
   Meta,
   Outlet,
+  redirect,
   Scripts,
   ScrollRestoration,
 } from "react-router";
@@ -57,7 +58,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
           options={{
             api_host: import.meta.env.VITE_PUBLIC_POSTHOG_HOST,
             capture_exceptions: true,
-            debug: import.meta.env.MODE === "development",
+            debug: false, //import.meta.env.MODE === "development",
+            disable_session_recording: import.meta.env.MODE === "development",
           }}
         >
           <QueryClientProvider client={queryClient}>
@@ -76,15 +78,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-export async function clientLoader() {
+export async function clientLoader({ request }: Route.ClientLoaderArgs) {
+  if (new URL(request.url).pathname === "/auth") return;
   const ret = await checkLogin();
   if (ret === undefined) return;
-  if (ret.state) location.assign(ret.state);
+
+  if (ret.state === "/") return redirect(`/chat/${crypto.randomUUID()}`);
+  if (ret.state) return redirect(ret.state);
   if (ret.authorizationUrl) {
     const newUrl = new URL(location.origin);
+    if (newUrl.pathname === "/auth") return;
     newUrl.pathname = "/auth";
     newUrl.searchParams.set("authorizationUrl", ret.authorizationUrl);
-    location.assign(newUrl.toString());
+    return redirect(`${newUrl.pathname}?${newUrl.searchParams.toString()}`);
   }
 }
 

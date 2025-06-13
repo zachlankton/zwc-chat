@@ -58,7 +58,6 @@ export function ChatInput({
   const sidebar = useSidebar();
   const sidebarCollapsed = sidebar.state === "collapsed";
   const isMobile = sidebar.isMobile;
-  console.log({ isMobile });
 
   // Calculate usage percentage and determine status
   const getUsageStatus = () => {
