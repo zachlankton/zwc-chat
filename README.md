@@ -10,7 +10,6 @@ A modern, real-time chat application with AI integration, built with Bun, React,
 - 💾 **Persistent Chat History** - MongoDB-backed chat storage and retrieval
 - 🎨 **Modern UI** - React 19 with TailwindCSS v4 and Radix UI components
 - 📱 **Responsive Design** - Works seamlessly on desktop and mobile devices
-- 🔒 **SSL Support** - Built-in HTTPS for secure local development
 - 🚀 **High Performance** - Built on Bun runtime for blazing-fast performance
 
 ## Tech Stack
