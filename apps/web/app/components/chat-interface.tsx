@@ -467,7 +467,6 @@ export function ChatInterface({
     messagesRef.current = messages;
   }, [messages]);
 
-
   // TTS queue processor
   const processTtsQueue = React.useCallback(() => {
     if (
@@ -549,7 +548,7 @@ export function ChatInterface({
 
       // Clean up markdown formatting for better speech
       textToSpeak = textToSpeak
-        .replace(/```[\s\S]*?```/g, " code block ") // Replace code blocks
+        .replace(/```[\s\S]*?```/g, ",,, code block ,,,") // Replace code blocks
         .replace(/`([^`]+)`/g, "$1") // Remove inline code backticks
         .replace(/\*\*([^*]+)\*\*/g, "$1") // Remove bold
         .replace(/\*([^*]+)\*/g, "$1") // Remove italic
