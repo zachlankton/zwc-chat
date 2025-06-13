@@ -12,23 +12,23 @@ This project and everyone participating in it is governed by the [Z3Chat Code of
 
 Before creating bug reports, please check existing issues as you might find out that you don't need to create one. When you are creating a bug report, please include as many details as possible:
 
-* Use a clear and descriptive title
-* Describe the exact steps which reproduce the problem
-* Provide specific examples to demonstrate the steps
-* Describe the behavior you observed after following the steps
-* Explain which behavior you expected to see instead and why
-* Include screenshots if relevant
-* Include your environment details (OS, Bun version, etc.)
+- Use a clear and descriptive title
+- Describe the exact steps which reproduce the problem
+- Provide specific examples to demonstrate the steps
+- Describe the behavior you observed after following the steps
+- Explain which behavior you expected to see instead and why
+- Include screenshots if relevant
+- Include your environment details (OS, Bun version, etc.)
 
 ### Suggesting Enhancements
 
 Enhancement suggestions are tracked as GitHub issues. When creating an enhancement suggestion, please include:
 
-* Use a clear and descriptive title
-* Provide a step-by-step description of the suggested enhancement
-* Provide specific examples to demonstrate the steps
-* Describe the current behavior and explain which behavior you expected to see instead
-* Explain why this enhancement would be useful
+- Use a clear and descriptive title
+- Provide a step-by-step description of the suggested enhancement
+- Provide specific examples to demonstrate the steps
+- Describe the current behavior and explain which behavior you expected to see instead
+- Explain why this enhancement would be useful
 
 ### Pull Requests
 
@@ -62,41 +62,42 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 
 ### Code Style
 
-* Use TypeScript for all new code
-* Follow the existing code formatting (we recommend using Prettier)
-* Use meaningful variable and function names
-* Add comments for complex logic
-* Keep functions small and focused
-* Write self-documenting code where possible
+- Use TypeScript for all new code
+- Follow the existing code formatting (we recommend using Prettier)
+- Use meaningful variable and function names
+- Add comments for complex logic
+- Keep functions small and focused
+- Write self-documenting code where possible
 
 ### Testing
 
-* Write tests for new features
-* Ensure all tests pass before submitting PR
-* Test your changes manually in both development and production builds
-* Check for console errors and warnings
+- Write tests for new features
+- Ensure all tests pass before submitting PR
+- Test your changes manually in both development and production builds
+- Check for console errors and warnings
 
 ### Commit Messages
 
-* Use the present tense ("Add feature" not "Added feature")
-* Use the imperative mood ("Move cursor to..." not "Moves cursor to...")
-* Limit the first line to 72 characters or less
-* Reference issues and pull requests liberally after the first line
-* Consider starting the commit message with an applicable emoji:
-  * 🎨 `:art:` when improving the format/structure of the code
-  * 🐛 `:bug:` when fixing a bug
-  * 🔥 `:fire:` when removing code or files
-  * 📝 `:memo:` when writing docs
-  * 🚀 `:rocket:` when improving performance
-  * ✨ `:sparkles:` when introducing new features
+- Use the present tense ("Add feature" not "Added feature")
+- Use the imperative mood ("Move cursor to..." not "Moves cursor to...")
+- Limit the first line to 72 characters or less
+- Reference issues and pull requests liberally after the first line
+- Consider starting the commit message with an applicable emoji:
+  - 🎨 `:art:` when improving the format/structure of the code
+  - 🐛 `:bug:` when fixing a bug
+  - 🔥 `:fire:` when removing code or files
+  - 📝 `:memo:` when writing docs
+  - 🚀 `:rocket:` when improving performance
+  - ✨ `:sparkles:` when introducing new features
 
 ### Branch Naming
 
 Use descriptive branch names:
-* `feature/add-user-profiles`
-* `fix/websocket-connection-issue`
-* `docs/update-api-documentation`
-* `refactor/optimize-chat-rendering`
+
+- `feature/add-user-profiles`
+- `fix/websocket-connection-issue`
+- `docs/update-api-documentation`
+- `refactor/optimize-chat-rendering`
 
 ## Project Structure
 
@@ -113,19 +114,19 @@ z3chat/
 
 ## API Design Guidelines
 
-* Follow RESTful principles where applicable
-* Use consistent naming conventions
-* Implement proper error handling
-* Add appropriate TypeScript types
-* Document new endpoints in the code
+- Follow RESTful principles where applicable
+- Use consistent naming conventions
+- Implement proper error handling
+- Add appropriate TypeScript types
+- Document new endpoints in the code
 
 ## Frontend Guidelines
 
-* Use React hooks and functional components
-* Follow the existing component structure
-* Use TailwindCSS for styling
-* Ensure responsive design
-* Test on multiple browsers
+- Use React hooks and functional components
+- Follow the existing component structure
+- Use TailwindCSS for styling
+- Ensure responsive design
+- Test on multiple browsers
 
 ## Questions?
 

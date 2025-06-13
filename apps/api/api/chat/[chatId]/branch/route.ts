@@ -32,7 +32,8 @@ export const POST = apiHandler(
 		const body = await req.json().catch(() => null);
 		if (body === null) throw badRequest("Could not parse the body");
 		if (!body.messageId) throw badRequest("messageId is required");
-		if (body.messageIndex === undefined || body.messageIndex === null) throw badRequest("messageIndex is required");
+		if (body.messageIndex === undefined || body.messageIndex === null)
+			throw badRequest("messageIndex is required");
 
 		try {
 			// Verify the user owns this chat
@@ -136,4 +137,3 @@ export const POST = apiHandler(
 		}
 	}
 );
-

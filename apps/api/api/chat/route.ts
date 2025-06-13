@@ -9,21 +9,23 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 	if (!req.session.email) throw notAuthorized();
 
 	const url = new URL(req.url);
-	
+
 	// Parse and validate limit
-	const rawLimit = parseInt(url.searchParams.get('limit') || '20');
-	const limit = (!isNaN(rawLimit) && rawLimit > 0) ? Math.min(rawLimit, 100) : 20;
-	
+	const rawLimit = parseInt(url.searchParams.get("limit") || "20");
+	const limit = !isNaN(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 20;
+
 	// Parse and validate offset
-	const rawOffset = parseInt(url.searchParams.get('offset') || '0');
-	const offset = (!isNaN(rawOffset) && rawOffset >= 0) ? rawOffset : 0;
+	const rawOffset = parseInt(url.searchParams.get("offset") || "0");
+	const offset = !isNaN(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
 
 	try {
 		const chatsCollection = await getChatsCollection();
-		
+
 		// Get total count
-		const total = await chatsCollection.countDocuments({ userEmail: req.session.email });
-		
+		const total = await chatsCollection.countDocuments({
+			userEmail: req.session.email,
+		});
+
 		// Get paginated chats
 		const chats = await chatsCollection
 			.find({ userEmail: req.session.email })
@@ -33,22 +35,22 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 			.toArray();
 
 		// Format response
-		const formattedChats = chats.map(chat => ({
+		const formattedChats = chats.map((chat) => ({
 			id: chat.id,
 			title: chat.title,
 			lastMessage: chat.lastMessage,
 			updatedAt: chat.updatedAt.toISOString(),
-			messageCount: chat.messageCount
+			messageCount: chat.messageCount,
 		}));
 
 		return Response.json({
 			chats: formattedChats,
 			total,
 			limit,
-			offset
+			offset,
 		});
 	} catch (error) {
-		console.error('Failed to fetch chats:', error);
-		return Response.json({ error: 'Failed to fetch chats' }, { status: 500 });
+		console.error("Failed to fetch chats:", error);
+		return Response.json({ error: "Failed to fetch chats" }, { status: 500 });
 	}
 });

@@ -37,4 +37,3 @@
 - [ ] user profile/settings page with subscription management and billing history
 - [x] implement AI generated chat titles/summaries
 - [x] implement user credits remaining health bar
-

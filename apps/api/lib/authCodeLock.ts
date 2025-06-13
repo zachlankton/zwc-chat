@@ -55,4 +55,3 @@ export class AuthCodeLock {
 		processedCodes.clear();
 	}
 }
-

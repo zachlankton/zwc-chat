@@ -15,9 +15,11 @@ We take the security of z3chat seriously. If you have discovered a security vuln
 **Please do not report security vulnerabilities through public GitHub issues.**
 
 Instead, please report them via email to:
+
 - **Email**: security@z3chat.com (replace with your actual security email)
 
 Please include the following information in your report:
+
 - Type of issue (e.g. buffer overflow, SQL injection, cross-site scripting, etc.)
 - Full paths of source file(s) related to the manifestation of the issue
 - The location of the affected source code (tag/branch/commit or direct URL)
@@ -63,6 +65,7 @@ z3chat implements several security measures:
 ## Responsible Disclosure
 
 We believe in responsible disclosure. If you discover a vulnerability:
+
 - Give us reasonable time to address the issue before public disclosure
 - Make a good faith effort to avoid privacy violations, data destruction, and service disruption
 - We will acknowledge your contribution in our security advisories (unless you prefer to remain anonymous)

@@ -15,6 +15,7 @@ A modern, real-time chat application with AI integration, built with Bun, React,
 ## Tech Stack
 
 ### Backend
+
 - **Runtime**: [Bun](https://bun.sh/) - Fast all-in-one JavaScript runtime
 - **Database**: MongoDB with native driver
 - **Authentication**: WorkOS for secure, enterprise-ready auth
@@ -23,6 +24,7 @@ A modern, real-time chat application with AI integration, built with Bun, React,
 - **Email**: SendGrid for transactional emails
 
 ### Frontend
+
 - **Framework**: React 19 with React Router v7
 - **Styling**: TailwindCSS v4 with custom design system
 - **Components**: Radix UI primitives with shadcn/ui
@@ -40,12 +42,14 @@ A modern, real-time chat application with AI integration, built with Bun, React,
 ## Installation
 
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/yourusername/z3chat.git
 cd z3chat
 ```
 
 2. Install dependencies:
+
 ```bash
 bun install
 ```
@@ -55,6 +59,7 @@ bun install
 Create `.env.development` files in both `apps/api` and `apps/web` directories:
 
 **apps/api/.env.development**
+
 ```env
 PORT=3000
 MONGODB_URI=mongodb://localhost:27017/z3chat
@@ -66,11 +71,13 @@ OPENROUTER_API_KEY=your_openrouter_api_key
 ```
 
 **apps/web/.env.development**
+
 ```env
 VITE_API_URL=https://localhost:3000
 ```
 
 4. Start MongoDB (for local development):
+
 ```bash
 cd apps/api
 bun run mongo:start

@@ -103,4 +103,3 @@ export async function GET(request: RequestWithSession) {
 		return Response.json({ error: "Failed to fetch models" }, { status: 500 });
 	}
 }
-

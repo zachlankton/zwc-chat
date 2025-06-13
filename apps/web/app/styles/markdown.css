@@ -63,7 +63,7 @@
 
 .prose pre code {
   background: transparent;
-	color: white;
+  color: white;
   padding: 0;
   font-size: 0.875rem;
   line-height: 1.5;
@@ -97,7 +97,7 @@
   display: block;
   overflow-x: auto;
   padding: 1em;
-	background: var(--color-background);
+  background: var(--color-background);
   color: var(--color-foreground);
   border-radius: 0.5rem;
 }

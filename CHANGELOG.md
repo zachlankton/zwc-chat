@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - Initial open source release
 - WebSocket-based real-time chat streaming
 - Multi-model AI support (OpenAI, Anthropic, etc.) via OpenRouter
@@ -19,10 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docker deployment configuration
 
 ### Changed
+
 - Migrated from HTTP streaming to WebSocket architecture for better performance
 - Refactored message handling to prevent stale closure issues
 
 ### Security
+
 - Implemented secure session management
 - Added environment variable protection for sensitive data
 - WebSocket connections require authenticated sessions
@@ -30,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2025-06-13
 
 ### Added
+
 - Initial project setup with Bun runtime
 - Basic chat interface with AI streaming
 - Authentication system with WorkOS integration
