@@ -418,6 +418,12 @@ export function ChatInterface({
   const [messages, setMessages] = React.useState<Message[]>(initialMessages);
   const buffer = React.useRef("");
   const assistantMessage = React.useRef<null | Message>(null);
+  const messagesRef = React.useRef<Message[]>(messages);
+
+  // Keep messagesRef in sync with messages state
+  React.useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const wsStream = React.useCallback((data: any) => {
     if (assistantMessage.current === null) return;
@@ -432,7 +438,7 @@ export function ChatInterface({
       if (!header.chatId) return;
       if (header.chatId !== chatId) return;
 
-      const stashMessageLength = messages.length;
+      const stashMessageLength = messagesRef.current.length;
       const isNewChat =
         initialMessages.length === 0 && stashMessageLength === 0;
 
@@ -586,7 +592,7 @@ export function ChatInterface({
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({
-      behavior: "instant",
+      behavior: "auto",
       block: "end",
     });
   };

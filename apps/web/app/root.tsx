@@ -8,7 +8,6 @@ import {
   redirect,
   Scripts,
   ScrollRestoration,
-  useNavigate,
 } from "react-router";
 
 import type { Route } from "./+types/root";
@@ -20,7 +19,6 @@ import { ThemeProvider } from "./providers/theme-provider.js";
 import { queryClient } from "./providers/queryClient.js";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { PostHogProvider } from "posthog-js/react";
-import AuthPage from "./routes/auth.js";
 
 // Lazy load ReactQueryDevtools only in development
 const ReactQueryDevtools =
@@ -96,7 +94,7 @@ export async function clientLoader({ request }: Route.ClientLoaderArgs) {
   }
 }
 
-export default function App({ loaderData }: any) {
+export default function App() {
   return <Outlet />;
 }
 

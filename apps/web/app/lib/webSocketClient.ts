@@ -650,6 +650,12 @@ export function tryParseJson(txt: string) {
   }
 }
 
+/**
+ * Extracts header and text from ArrayBuffer WebSocket message.
+ * Format: [4 bytes: header length (little-endian)] [header JSON] [remaining text]
+ * @param d - ArrayBuffer containing the message
+ * @returns Object with parsed header and text content
+ */
 export function getHeaderAndText(d: ArrayBuffer) {
   const view = new Uint8Array(d);
   const headerLength = new DataView(view.buffer).getUint32(0, true);

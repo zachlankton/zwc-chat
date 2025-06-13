@@ -14,7 +14,7 @@ export default function Dashboard() {
     // Redirect to a new chat when landing on home
     const newChatId = crypto.randomUUID();
     navigate(`/chat/${newChatId}`, { replace: true });
-  }, []);
+  }, [navigate, session]);
 
   return (
     <SidebarProvider>

@@ -298,10 +298,6 @@ html {
   text-decoration: none;
 }
 
-.button-87:active {
-  //transform: scale(0.95);
-}
-
 /* Apply to all scrollable elements */
 * {
   scrollbar-width: thin;
