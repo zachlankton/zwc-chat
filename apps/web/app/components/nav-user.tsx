@@ -37,7 +37,7 @@ import {
 import { post } from "~/lib/fetchWrapper";
 import { useTheme } from "~/providers/theme-provider";
 import { useSession } from "~/stores/session";
-import { useState, useEffect } from "react";
+import { useChatSettings } from "~/stores/chat-settings";
 
 export function NavUser() {
   const { isMobile } = useSidebar();
@@ -48,73 +48,7 @@ export function NavUser() {
     : { name: "", email: "", avatar: "" };
 
   // Settings state
-  const [enterToSend, setEnterToSend] = useState(true);
-  const [ttsEnabled, setTtsEnabled] = useState(false);
-  const [selectedVoice, setSelectedVoice] = useState("");
-  const [availableVoices, setAvailableVoices] = useState<
-    SpeechSynthesisVoice[]
-  >([]);
-
-  // Load settings from localStorage
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      // Load enter key preference
-      const savedEnter = localStorage.getItem("enterToSend");
-      if (savedEnter !== null) {
-        setEnterToSend(savedEnter === "true");
-      }
-
-      // Load TTS preference
-      const savedTts = localStorage.getItem("ttsEnabled");
-      if (savedTts !== null) {
-        setTtsEnabled(savedTts === "true");
-      }
-
-      // Load voice preference
-      const savedVoice = localStorage.getItem("ttsVoice");
-      if (savedVoice) {
-        setSelectedVoice(savedVoice);
-      }
-
-      // Load available voices
-      const loadVoices = () => {
-        const allVoices = window.speechSynthesis.getVoices();
-        const userLocale = navigator.language || "en-US";
-        const userLang = userLocale.split("-")[0];
-
-        const localVoices = allVoices.filter((voice) => {
-          const voiceLang = voice.lang.split("-")[0];
-          return (
-            voice.localService &&
-            (voice.lang.startsWith(userLocale) || voiceLang === userLang)
-          );
-        });
-
-        setAvailableVoices(localVoices);
-      };
-
-      loadVoices();
-      window.speechSynthesis.onvoiceschanged = loadVoices;
-    }
-  }, []);
-
-  // Save settings to localStorage
-  const handleEnterToggle = () => {
-    const newValue = !enterToSend;
-    setEnterToSend(newValue);
-    localStorage.setItem("enterToSend", String(newValue));
-  };
-
-  const handleTtsToggle = () => {
-    const newValue = !ttsEnabled;
-    setTtsEnabled(newValue);
-    localStorage.setItem("ttsEnabled", String(newValue));
-  };
-
-  const handleVoiceChange = (voice: string) => {
-    setSelectedVoice(voice);
-    localStorage.setItem("ttsVoice", voice);
-  };
+  const { settings, updateEnterToSend, updateTtsEnabled, updateSelectedVoice } = useChatSettings();
 
   return (
     <SidebarMenu>
@@ -181,24 +115,24 @@ export function NavUser() {
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuCheckboxItem
-                checked={enterToSend}
-                onCheckedChange={handleEnterToggle}
+                checked={settings.enterToSend}
+                onCheckedChange={updateEnterToSend}
               >
                 <Keyboard className="mr-2 h-4 w-4" />
                 Enter to send
               </DropdownMenuCheckboxItem>
               <DropdownMenuCheckboxItem
-                checked={ttsEnabled}
-                onCheckedChange={handleTtsToggle}
+                checked={settings.ttsEnabled}
+                onCheckedChange={updateTtsEnabled}
               >
-                {ttsEnabled ? (
+                {settings.ttsEnabled ? (
                   <Volume2 className="mr-2 h-4 w-4" />
                 ) : (
                   <VolumeX className="mr-2 h-4 w-4" />
                 )}
                 Text-to-speech
               </DropdownMenuCheckboxItem>
-              {availableVoices.length > 0 && (
+              {settings.availableVoices.length > 0 && (
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>
                     <Volume2 className="mr-2 h-4 w-4" />
@@ -209,16 +143,16 @@ export function NavUser() {
                       sideOffset={-120}
                       className="max-h-80 overflow-y-auto"
                     >
-                      {availableVoices.map((voice) => (
+                      {settings.availableVoices.map((voice) => (
                         <DropdownMenuItem
                           key={voice.voiceURI}
-                          onClick={() => handleVoiceChange(voice.voiceURI)}
+                          onClick={() => updateSelectedVoice(voice.voiceURI)}
                           className="gap-2"
                         >
                           <span className="flex-1">
                             {voice.name?.slice(0, 10)}
                           </span>
-                          {selectedVoice === voice.voiceURI && (
+                          {settings.selectedVoice === voice.voiceURI && (
                             <Check className="h-3 w-3" />
                           )}
                         </DropdownMenuItem>

@@ -55,6 +55,7 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { useQuery } from "@tanstack/react-query";
 import { useApiKeyInfo } from "~/stores/session";
+import { useChatSettings } from "~/stores/chat-settings";
 import { parseSSEEvents } from "~/lib/llm-tools";
 
 interface Message {
@@ -449,8 +450,7 @@ export function ChatInterface({
   const messagesRef = React.useRef<Message[]>(messages);
 
   // TTS state
-  const [ttsEnabled, setTtsEnabled] = React.useState(false);
-  const [selectedVoice, setSelectedVoice] = React.useState<string>("");
+  const { settings, updateTtsEnabled, updateSelectedVoice } = useChatSettings();
   const [speakingMessageId, setSpeakingMessageId] = React.useState<
     string | null
   >(null);
@@ -467,40 +467,13 @@ export function ChatInterface({
     messagesRef.current = messages;
   }, [messages]);
 
-  // Load TTS preferences
-  React.useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedTts = localStorage.getItem("ttsEnabled");
-      if (savedTts !== null) {
-        setTtsEnabled(savedTts === "true");
-      }
-
-      const savedVoice = localStorage.getItem("ttsVoice");
-      if (savedVoice) {
-        setSelectedVoice(savedVoice);
-      }
-    }
-  }, []);
-
-  // Save TTS preferences
-  React.useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("ttsEnabled", String(ttsEnabled));
-    }
-  }, [ttsEnabled]);
-
-  React.useEffect(() => {
-    if (typeof window !== "undefined" && selectedVoice) {
-      localStorage.setItem("ttsVoice", selectedVoice);
-    }
-  }, [selectedVoice]);
 
   // TTS queue processor
   const processTtsQueue = React.useCallback(() => {
     if (
       isSpeakingRef.current ||
       ttsQueueRef.current.length === 0 ||
-      !ttsEnabled
+      !settings.ttsEnabled
     ) {
       return;
     }
@@ -514,9 +487,9 @@ export function ChatInterface({
     utterance.volume = 0.9;
 
     // Set selected voice if available
-    if (selectedVoice) {
+    if (settings.selectedVoice) {
       const voices = window.speechSynthesis.getVoices();
-      const voice = voices.find((v) => v.voiceURI === selectedVoice);
+      const voice = voices.find((v) => v.voiceURI === settings.selectedVoice);
       if (voice) {
         utterance.voice = voice;
       }
@@ -538,7 +511,7 @@ export function ChatInterface({
 
     speechSynthesisRef.current = utterance;
     window.speechSynthesis.speak(utterance);
-  }, [ttsEnabled, selectedVoice]);
+  }, [settings.ttsEnabled, settings.selectedVoice]);
 
   // TTS buffer processor - flushes buffer and queues for speech
   const flushTtsBuffer = React.useCallback(() => {
@@ -598,9 +571,9 @@ export function ChatInterface({
       utterance.volume = 0.9;
 
       // Set selected voice if available
-      if (selectedVoice) {
+      if (settings.selectedVoice) {
         const voices = window.speechSynthesis.getVoices();
-        const voice = voices.find((v) => v.voiceURI === selectedVoice);
+        const voice = voices.find((v) => v.voiceURI === settings.selectedVoice);
         if (voice) {
           utterance.voice = voice;
         }
@@ -616,7 +589,7 @@ export function ChatInterface({
 
       window.speechSynthesis.speak(utterance);
     },
-    [messages, selectedVoice],
+    [messages, settings.selectedVoice],
   );
 
   // Toggle speak for a message
@@ -644,7 +617,7 @@ export function ChatInterface({
   }, []);
 
   React.useEffect(() => {
-    if (!ttsEnabled && window.speechSynthesis) {
+    if (!settings.ttsEnabled && window.speechSynthesis) {
       window.speechSynthesis.cancel();
       ttsQueueRef.current = [];
       ttsBufferRef.current = "";
@@ -654,7 +627,7 @@ export function ChatInterface({
         ttsBufferTimeoutRef.current = null;
       }
     }
-  }, [ttsEnabled]);
+  }, [settings.ttsEnabled]);
 
   const wsStream = React.useCallback(
     (data: any) => {
@@ -683,7 +656,7 @@ export function ChatInterface({
               setMessages,
               assistantMessage: assistantMessage.current,
               onNewContent: (content) => {
-                if (ttsEnabled && content) {
+                if (settings.ttsEnabled && content) {
                   // Add to buffer
                   ttsBufferRef.current += content;
 
@@ -730,7 +703,7 @@ export function ChatInterface({
             assistantMessage.current = null;
 
             // Flush any remaining TTS buffer
-            if (ttsEnabled) {
+            if (settings.ttsEnabled) {
               flushTtsBuffer();
             }
 
@@ -808,7 +781,7 @@ export function ChatInterface({
         streamingRef.current = null;
       }
     },
-    [ttsEnabled, processTtsQueue, flushTtsBuffer],
+    [settings.ttsEnabled, processTtsQueue, flushTtsBuffer],
   );
 
   React.useEffect(() => {
@@ -1522,10 +1495,10 @@ export function ChatInterface({
         modelsLoading={modelsLoading}
         modelsError={modelsError}
         apiKeyInfo={apiKeyInfo?.data}
-        ttsEnabled={ttsEnabled}
-        onTtsToggle={setTtsEnabled}
-        selectedVoice={selectedVoice}
-        onVoiceChange={setSelectedVoice}
+        ttsEnabled={settings.ttsEnabled}
+        onTtsToggle={updateTtsEnabled}
+        selectedVoice={settings.selectedVoice}
+        onVoiceChange={updateSelectedVoice}
       />
     </div>
   );

@@ -26,6 +26,7 @@ import { useRef, useState, useEffect } from "react";
 import { useSidebar } from "./ui/sidebar";
 import { ModelSelector } from "./model-selector";
 import type { ModelsResponse } from "./chat-interface";
+import { useChatSettings } from "~/stores/chat-settings";
 
 interface ApiKeyInfo {
   label: string;
@@ -77,10 +78,7 @@ export function ChatInput({
   const [speechSupported, setSpeechSupported] = useState(false);
   const [pendingSubmit, setPendingSubmit] = useState(false);
   const [showVoiceHint, setShowVoiceHint] = useState(false);
-  const [enterToSend, setEnterToSend] = useState(true);
-  const [availableVoices, setAvailableVoices] = useState<
-    SpeechSynthesisVoice[]
-  >([]);
+  const { settings, updateEnterToSend } = useChatSettings();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const textareaScrollHeightRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -115,51 +113,15 @@ export function ChatInput({
 
   const usageStatus = getUsageStatus();
 
-  // Check for speech recognition support and load preferences
+  // Check for speech recognition support
   useEffect(() => {
     if (typeof window !== "undefined") {
       const SpeechRecognition =
         (window as any).SpeechRecognition ||
         (window as any).webkitSpeechRecognition;
       setSpeechSupported(!!SpeechRecognition);
-
-      // Load enter key preference
-      const savedPref = localStorage.getItem("enterToSend");
-      if (savedPref !== null) {
-        setEnterToSend(savedPref === "true");
-      }
-
-      // Load available voices
-      const loadVoices = () => {
-        const allVoices = window.speechSynthesis.getVoices();
-        // Get user's locale
-        const userLocale = navigator.language || "en-US";
-        const userLang = userLocale.split("-")[0]; // e.g., 'en' from 'en-US'
-
-        // Filter for local voices that match user's language
-        const localVoices = allVoices.filter((voice) => {
-          const voiceLang = voice.lang.split("-")[0];
-          return (
-            voice.localService &&
-            (voice.lang.startsWith(userLocale) || // Exact locale match
-              voiceLang === userLang)
-          ); // Language match
-        });
-
-        setAvailableVoices(localVoices);
-      };
-
-      loadVoices();
-      window.speechSynthesis.onvoiceschanged = loadVoices;
     }
   }, []);
-
-  // Save enter key preference
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("enterToSend", String(enterToSend));
-    }
-  }, [enterToSend]);
 
   // Initialize speech recognition
   useEffect(() => {
@@ -299,10 +261,10 @@ export function ChatInput({
     }
 
     if (e.key === "Enter") {
-      if (enterToSend && !e.shiftKey) {
+      if (settings.enterToSend && !e.shiftKey) {
         e.preventDefault();
         handleSubmit();
-      } else if (!enterToSend && e.shiftKey) {
+      } else if (!settings.enterToSend && e.shiftKey) {
         e.preventDefault();
         handleSubmit();
       }
@@ -538,15 +500,15 @@ export function ChatInput({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => setEnterToSend(!enterToSend)}
+                  onClick={() => updateEnterToSend(!settings.enterToSend)}
                   className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
                   title={
-                    enterToSend
+                    settings.enterToSend
                       ? "Enter sends message"
                       : "Shift+Enter sends message"
                   }
                 >
-                  {enterToSend ? (
+                  {settings.enterToSend ? (
                     <>
                       <CornerDownLeft className="h-3 w-3" />
                       <span className="@max-[600px]:hidden">to send</span>
@@ -603,13 +565,13 @@ export function ChatInput({
                         align="end"
                         className="w-56 max-h-80 overflow-y-auto"
                       >
-                        {availableVoices.length === 0 ? (
+                        {settings.availableVoices.length === 0 ? (
                           <DropdownMenuItem disabled>
                             No voices available
                           </DropdownMenuItem>
                         ) : (
                           <>
-                            {availableVoices.map((voice) => (
+                            {settings.availableVoices.map((voice) => (
                               <DropdownMenuItem
                                 key={voice.voiceURI}
                                 onClick={() =>
