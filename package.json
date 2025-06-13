@@ -1,8 +1,30 @@
 {
-  "name": "zwc-chat",
-  "version": "1.0.0",
+  "name": "z3chat",
+  "version": "0.1.0",
+  "description": "AI-powered chat application with real-time streaming and multi-model support",
   "private": true,
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zachlankton/z3chat.git"
+  },
+  "keywords": [
+    "chat",
+    "ai",
+    "openai",
+    "anthropic",
+    "websocket",
+    "real-time",
+    "bun",
+    "react",
+    "typescript"
+  ],
+  "author": "Zachary Lankton",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/zachlankton/z3chat/issues"
+  },
+  "homepage": "https://github.com/zachlankton/z3chat#readme",
   "workspaces": [
     "apps/*",
     "packages/*"

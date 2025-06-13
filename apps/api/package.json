@@ -1,8 +1,26 @@
 {
-	"name": "zwc-chat-api",
+	"name": "@z3chat/api",
 	"module": "index.ts",
 	"type": "module",
-	"version": "0.1.30",
+	"version": "0.1.0",
+	"description": "Backend API for z3chat - WebSocket-based chat streaming with AI integration",
+	"private": true,
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/zachlankton/z3chat.git",
+		"directory": "apps/api"
+	},
+	"keywords": [
+		"api",
+		"websocket",
+		"bun",
+		"mongodb",
+		"openai",
+		"anthropic",
+		"workos"
+	],
+	"author": "Zachary Lankton",
+	"license": "MIT",
 	"devDependencies": {
 		"@types/bun": "latest",
 		"@types/luxon": "^3.6.2",
