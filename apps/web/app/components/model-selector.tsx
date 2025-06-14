@@ -9,7 +9,7 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { Skeleton } from "~/components/ui/skeleton";
 import { ChevronDown, Sparkles, Zap } from "lucide-react";
-import { useEffect, useState, useRef } from "react";
+import { useState, useRef } from "react";
 import type { ModelsResponse } from "./chat-interface";
 
 interface ModelSelectorProps {
@@ -90,7 +90,7 @@ export function ModelSelector({
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
-          className="justify-between max-w-full"
+          className="justify-between w-full max-w-full"
           size="sm"
         >
           <div className="flex items-center gap-2 truncate">

@@ -8,12 +8,12 @@ import {
   CheckCircle,
   XCircle,
   CornerDownLeft,
-  Keyboard,
   Volume2,
   VolumeX,
-  ChevronDown,
   Check,
   FileText,
+  ArrowBigUp,
+  AudioLines,
 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
@@ -22,6 +22,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 import { cn } from "~/lib/utils";
 import { useRef, useState, useEffect } from "react";
 import { useSidebar } from "./ui/sidebar";
@@ -62,22 +68,25 @@ interface ChatInputProps {
 export const ChatInput = React.forwardRef<
   { focus: () => void },
   ChatInputProps
->(function ChatInput({
-  onSubmit,
-  isLoading = false,
-  placeholder = "Message AI assistant...",
-  selectedModel,
-  onModelChange,
-  modelsData,
-  modelsLoading,
-  modelsError,
-  apiKeyInfo,
-  ttsEnabled = false,
-  onTtsToggle,
-  selectedVoice,
-  onVoiceChange,
-  onSystemPromptEdit,
-}: ChatInputProps, ref) {
+>(function ChatInput(
+  {
+    onSubmit,
+    isLoading = false,
+    placeholder = "Message AI assistant...",
+    selectedModel,
+    onModelChange,
+    modelsData,
+    modelsLoading,
+    modelsError,
+    apiKeyInfo,
+    ttsEnabled = false,
+    onTtsToggle,
+    selectedVoice,
+    onVoiceChange,
+    onSystemPromptEdit,
+  }: ChatInputProps,
+  ref,
+) {
   const [isFocused, setIsFocused] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [isListening, setIsListening] = useState(false);
@@ -507,73 +516,77 @@ export const ChatInput = React.forwardRef<
           {/* Helper Text and Model Selector */}
           <div className="mt-2 w-full flex flex-1 gap-2 @max-[570px]:flex-col-reverse items-center justify-between px-2">
             <div className="@max-[570px]:hidden">
-              {/* Enter key toggle */}
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => updateEnterToSend(!settings.enterToSend)}
-                  className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
-                  title={
-                    settings.enterToSend
-                      ? "Enter sends message"
-                      : "Shift+Enter sends message"
-                  }
-                >
-                  {settings.enterToSend ? (
-                    <>
-                      <CornerDownLeft className="h-3 w-3" />
-                      <span className="@max-[600px]:hidden">to send</span>
-                    </>
-                  ) : (
-                    <>
-                      <Keyboard className="h-3 w-3" />
-                      <span className="@max-[600px]:hidden">⇧+↵ to send</span>
-                    </>
-                  )}
-                </Button>
+              {/* Icon-only controls */}
+              <div className="flex items-center gap-1">
+                <TooltipProvider>
+                  {/* Enter key toggle */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => updateEnterToSend(!settings.enterToSend)}
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                      >
+                        {settings.enterToSend ? (
+                          <CornerDownLeft className="h-3.5 w-3.5" />
+                        ) : (
+                          <ArrowBigUp className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {settings.enterToSend
+                        ? "Enter sends message"
+                        : "Shift+Enter sends message"}
+                    </TooltipContent>
+                  </Tooltip>
 
-                {/* TTS Toggle */}
-                {onTtsToggle && (
-                  <div className="flex items-center">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onTtsToggle(!ttsEnabled)}
-                      className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-foreground rounded-r-none"
-                      title={
-                        ttsEnabled
-                          ? "Disable text-to-speech"
-                          : "Enable text-to-speech"
-                      }
-                    >
-                      {ttsEnabled ? (
-                        <>
-                          <Volume2 className="h-3 w-3" />
-                          <span className="@max-[700px]:hidden">TTS</span>
-                        </>
-                      ) : (
-                        <>
-                          <VolumeX className="h-3 w-3" />
-                          <span className="@max-[700px]:hidden">TTS</span>
-                        </>
-                      )}
-                    </Button>
-
-                    <DropdownMenu>
-                      <DropdownMenuTrigger disabled={!onVoiceChange} asChild>
+                  {/* TTS Toggle */}
+                  {onTtsToggle && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
                         <Button
                           type="button"
                           variant="ghost"
-                          size="sm"
-                          className="h-7 px-1.5 text-xs text-muted-foreground hover:text-foreground rounded-l-none border-l"
-                          title="Select voice"
+                          size="icon"
+                          onClick={() => onTtsToggle(!ttsEnabled)}
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
                         >
-                          <ChevronDown className="h-3 w-3 rotate-180" />
+                          {ttsEnabled ? (
+                            <Volume2 className="h-3.5 w-3.5" />
+                          ) : (
+                            <VolumeX className="h-3.5 w-3.5" />
+                          )}
                         </Button>
-                      </DropdownMenuTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {ttsEnabled
+                          ? "Disable text-to-speech"
+                          : "Enable text-to-speech"}
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+
+                  {/* Voice Selection */}
+                  {onVoiceChange && (
+                    <DropdownMenu>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            >
+                              <AudioLines className="h-3.5 w-3.5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent>Select voice</TooltipContent>
+                      </Tooltip>
                       <DropdownMenuContent
                         align="end"
                         className="w-56 max-h-80 overflow-y-auto"
@@ -602,30 +615,35 @@ export const ChatInput = React.forwardRef<
                         )}
                       </DropdownMenuContent>
                     </DropdownMenu>
-                  </div>
-                )}
+                  )}
 
-                {/* System Prompt Button */}
-                {onSystemPromptEdit && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={onSystemPromptEdit}
-                    className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
-                    title="Edit system prompt for this chat"
-                  >
-                    <FileText className="h-3 w-3" />
-                    <span className="@max-[800px]:hidden">System Prompt</span>
-                  </Button>
-                )}
+                  {/* System Prompt Button */}
+                  {onSystemPromptEdit && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={onSystemPromptEdit}
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                        >
+                          <FileText className="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Edit system prompt for this chat
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </TooltipProvider>
               </div>
             </div>
 
             {/* API Key Usage Indicator */}
             {usageStatus && (
               <div className="flex flex-1 flex-col min-w-[150px] justify-center @max-[570px]:w-full @max-[570px]:flex-row @max-[600px]:text-center items-center gap-2">
-                <div className="flex flex-1 items-center justify-center gap-1.5 max-w-[150px]">
+                <div className="flex flex-1 items-center justify-center gap-1.5 max-w-[180px]">
                   {usageStatus.status === "critical" ? (
                     <XCircle className="h-3.5 w-3.5 text-destructive" />
                   ) : usageStatus.status === "warning" ? (
@@ -642,33 +660,14 @@ export const ChatInput = React.forwardRef<
                     )}
                   >
                     {usageStatus.remaining > 0
-                      ? `${usageStatus.percentage.toFixed(1)}% credits remain`
+                      ? `$ ${usageStatus.remaining.toFixed(3)} credits remain`
                       : "No credits remaining"}
                   </span>
-                </div>
-                {/* Progress bar */}
-                <div
-                  className={cn(
-                    "relative flex-1 w-full min-h-1.5 max-w-[100px] h-1.5 bg-muted rounded-full overflow-hidden outline ",
-                    usageStatus.status === "critical" && "outline-destructive",
-                    usageStatus.status === "warning" && "outline-yellow-500",
-                    usageStatus.status === "good" && "outline-green-500",
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "absolute left-0 top-0 h-full  transition-all duration-300",
-                      usageStatus.status === "critical" && "bg-destructive",
-                      usageStatus.status === "warning" && "bg-yellow-500",
-                      usageStatus.status === "good" && "bg-green-500",
-                    )}
-                    style={{ width: `${usageStatus.percentage}%` }}
-                  />
                 </div>
               </div>
             )}
             {selectedModel && onModelChange && (
-              <div className="flex-1 min-w-[200px]">
+              <div className="flex-1 min-w-[200px] max-w-[250px]">
                 <ModelSelector
                   selectedModel={selectedModel}
                   onModelChange={onModelChange}
