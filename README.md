@@ -13,6 +13,7 @@ A modern, real-time chat application with AI integration, built with Bun, React,
 - 🚀 **High Performance** - Built on Bun runtime for blazing-fast performance
 - 🎙️ **Speech Recognition** - Talk to the LLM instead of typing, say 'send message' to send it
 - 🗣️ **Text To Speech** - Listen to the LLM talk as the text streams in
+- 🎯 **System Prompts** - Customize AI behavior with default and per-chat system prompts
 
 ## Tech Stack
 

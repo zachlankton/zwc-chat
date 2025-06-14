@@ -6,47 +6,58 @@ export interface ChatSettings {
   ttsEnabled: boolean;
   selectedVoice: string;
   availableVoices: SpeechSynthesisVoice[];
+  systemPrompt: string;
 }
 
 const CHAT_SETTINGS_KEY = "CHAT_SETTINGS";
 
 // Initialize default settings
+export const defaultSystemPrompt =
+  "Your name is ZWC Chat. You are a helpful AI assistant. Be concise, accurate, and friendly. When providing code, ensure it is well-documented and follows best practices.";
+
 const defaultSettings: ChatSettings = {
   enterToSend: true,
   ttsEnabled: false,
   selectedVoice: "",
   availableVoices: [],
+  systemPrompt: defaultSystemPrompt,
 };
 
 // Load settings from localStorage
 function loadSettings(): ChatSettings {
   if (typeof window === "undefined") return defaultSettings;
-  
+
   const settings = { ...defaultSettings };
-  
+
   // Load enter key preference
   const savedEnter = localStorage.getItem("enterToSend");
   if (savedEnter !== null) {
     settings.enterToSend = savedEnter === "true";
   }
-  
+
   // Load TTS preference
   const savedTts = localStorage.getItem("ttsEnabled");
   if (savedTts !== null) {
     settings.ttsEnabled = savedTts === "true";
   }
-  
+
   // Load voice preference
   const savedVoice = localStorage.getItem("ttsVoice");
   if (savedVoice) {
     settings.selectedVoice = savedVoice;
   }
-  
+
+  // Load system prompt
+  const savedSystemPrompt = localStorage.getItem("systemPrompt");
+  if (savedSystemPrompt) {
+    settings.systemPrompt = savedSystemPrompt;
+  }
+
   // Load available voices
   const allVoices = window.speechSynthesis.getVoices();
   const userLocale = navigator.language || "en-US";
   const userLang = userLocale.split("-")[0];
-  
+
   settings.availableVoices = allVoices.filter((voice) => {
     const voiceLang = voice.lang.split("-")[0];
     return (
@@ -54,7 +65,7 @@ function loadSettings(): ChatSettings {
       (voice.lang.startsWith(userLocale) || voiceLang === userLang)
     );
   });
-  
+
   return settings;
 }
 
@@ -62,14 +73,17 @@ function loadSettings(): ChatSettings {
 const SETTINGS_Q_FUN = async (): Promise<ChatSettings> => {
   return new Promise((resolve) => {
     const settings = loadSettings();
-    
+
     // If voices aren't loaded yet, wait for them
-    if (settings.availableVoices.length === 0 && typeof window !== "undefined") {
+    if (
+      settings.availableVoices.length === 0 &&
+      typeof window !== "undefined"
+    ) {
       const handleVoicesChanged = () => {
         const updatedSettings = loadSettings();
         resolve(updatedSettings);
       };
-      
+
       // Check if voices are already available
       const voices = window.speechSynthesis.getVoices();
       if (voices.length > 0) {
@@ -97,11 +111,11 @@ export function getChatSettings(): ChatSettings | undefined {
 // Update a specific setting
 export function updateChatSetting<K extends keyof ChatSettings>(
   key: K,
-  value: ChatSettings[K]
+  value: ChatSettings[K],
 ): void {
   const currentSettings = getChatSettings() || defaultSettings;
   const newSettings = { ...currentSettings, [key]: value };
-  
+
   // Save to localStorage
   if (typeof window !== "undefined") {
     if (key === "enterToSend") {
@@ -110,12 +124,14 @@ export function updateChatSetting<K extends keyof ChatSettings>(
       localStorage.setItem("ttsEnabled", String(value));
     } else if (key === "selectedVoice") {
       localStorage.setItem("ttsVoice", value as string);
+    } else if (key === "systemPrompt") {
+      localStorage.setItem("systemPrompt", value as string);
     }
   }
-  
+
   // Update cache
   queryClient.setQueryData([CHAT_SETTINGS_KEY], newSettings);
-  
+
   // Invalidate to trigger re-renders
   queryClient.invalidateQueries({ queryKey: [CHAT_SETTINGS_KEY] });
 }
@@ -123,11 +139,17 @@ export function updateChatSetting<K extends keyof ChatSettings>(
 // Hook to use chat settings
 export function useChatSettings() {
   const { data } = useQuery(chatSettingsQuery);
-  
+
   return {
     settings: data || defaultSettings,
-    updateEnterToSend: (value: boolean) => updateChatSetting("enterToSend", value),
-    updateTtsEnabled: (value: boolean) => updateChatSetting("ttsEnabled", value),
-    updateSelectedVoice: (value: string) => updateChatSetting("selectedVoice", value),
+    updateEnterToSend: (value: boolean) =>
+      updateChatSetting("enterToSend", value),
+    updateTtsEnabled: (value: boolean) =>
+      updateChatSetting("ttsEnabled", value),
+    updateSelectedVoice: (value: string) =>
+      updateChatSetting("selectedVoice", value),
+    updateSystemPrompt: (value: string) =>
+      updateChatSetting("systemPrompt", value),
   };
 }
+

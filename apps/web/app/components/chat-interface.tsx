@@ -22,11 +22,7 @@ import { AsyncAlert, AsyncConfirm, AsyncModal } from "./async-modals";
 import { getHeaderAndText, type StreamResponse } from "~/lib/webSocketClient";
 import { queryClient } from "~/providers/queryClient";
 import { ChatInput } from "./chat-input";
-import {
-  DialogTitle,
-  DialogDescription,
-  DialogClose,
-} from "~/components/ui/dialog";
+import { DialogClose } from "~/components/ui/dialog";
 import { Textarea } from "~/components/ui/textarea";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Label } from "~/components/ui/label";
@@ -57,6 +53,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useApiKeyInfo } from "~/stores/session";
 import { useChatSettings } from "~/stores/chat-settings";
 import { parseSSEEvents } from "~/lib/llm-tools";
+import {
+  DialogDescription,
+  DialogTitle as DialogTitleComponent,
+} from "~/components/ui/dialog";
 
 interface Message {
   id: string;
@@ -86,8 +86,6 @@ interface ChatInterfaceProps {
 
 function MessageSpeakButton({
   messageId,
-  content,
-  reasoning,
   isPlaying,
   onToggleSpeak,
 }: {
@@ -280,9 +278,9 @@ function MessageEditButton({
 
     const result = await AsyncModal(
       <>
-        <DialogTitle className="mb-4 text-xl font-bold">
+        <DialogTitleComponent className="mb-4 text-xl font-bold">
           Edit Message
-        </DialogTitle>
+        </DialogTitleComponent>
         <DialogDescription className="mb-4">
           Edit the message content below:
         </DialogDescription>
@@ -461,6 +459,7 @@ export function ChatInterface({
   );
   const ttsBufferRef = React.useRef<string>("");
   const ttsBufferTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const chatInputRef = React.useRef<{ focus: () => void } | null>(null);
 
   // Keep messagesRef in sync with messages state
   React.useEffect(() => {
@@ -706,6 +705,11 @@ export function ChatInterface({
               flushTtsBuffer();
             }
 
+            // Refocus the textarea after streaming completes
+            setTimeout(() => {
+              chatInputRef.current?.focus();
+            }, 100);
+
             // Generate title for new chats after first response
             if (isNewChat) {
               // Fire and forget - don't wait for title generation
@@ -939,6 +943,18 @@ export function ChatInterface({
     };
 
     let msgsRef = [...messages, userMessage];
+
+    // Add system prompt if this is the first message in a new chat
+    if (isNewChat && settings.systemPrompt) {
+      const systemMessage: Message = {
+        id: crypto.randomUUID(),
+        content: settings.systemPrompt,
+        role: "system",
+        timestamp: Date.now(),
+      };
+      msgsRef = [systemMessage, ...msgsRef];
+    }
+
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
 
@@ -1011,10 +1027,26 @@ export function ChatInterface({
       ),
     );
 
+    // Check if we need to include system prompt for retry
+    let messagesToSend = messagesUpToRetry;
+    if (
+      messagesUpToRetry.length > 0 &&
+      messagesUpToRetry[0].role !== "system" &&
+      settings.systemPrompt
+    ) {
+      const systemMessage: Message = {
+        id: crypto.randomUUID(),
+        content: settings.systemPrompt,
+        role: "system",
+        timestamp: Date.now(),
+      };
+      messagesToSend = [systemMessage, ...messagesUpToRetry];
+    }
+
     post<StreamResponse | Response>(
       `/chat/${chatId}`,
       {
-        messages: messagesUpToRetry,
+        messages: messagesToSend,
         model: modelToUse,
         messageIdToReplace: assistantMessage.current.id,
       },
@@ -1084,13 +1116,15 @@ export function ChatInterface({
     newContent: string,
     regenerateNext: boolean,
   ) => {
+    // Find the message to edit
+    const messageIndex = messages.findIndex((msg) => msg.id === messageId);
+    if (messageIndex === -1) return;
+
+    const originalMessage = messages[messageIndex];
+    const isSystem = originalMessage.role === "system";
+    const isFirst = messages.length === 1;
+
     try {
-      // Find the message to edit
-      const messageIndex = messages.findIndex((msg) => msg.id === messageId);
-      if (messageIndex === -1) return;
-
-      const originalMessage = messages[messageIndex];
-
       // Optimistically update the message
       setMessages((prev) =>
         prev.map((msg) =>
@@ -1127,6 +1161,8 @@ export function ChatInterface({
         }
       }
     } catch (error) {
+      // editing the system prompt in a new chat would cause this, and its ok because it will get saved with the first message
+      if (isSystem && isFirst) return;
       console.error("Failed to edit message:", error);
 
       // Revert the optimistic update on error
@@ -1139,207 +1175,341 @@ export function ChatInterface({
     }
   };
 
-  return (
-    <div className="flex flex-col h-full">
-      {/* Messages Area */}
-      <div className="@container flex-1 overflow-y-auto pb-32">
-        <div className="max-w-[1000px] mx-auto px-4 @max-[560px]:px-1 mb-[70vh]">
-          {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full min-h-[60vh] text-center">
-              <div className="rounded-full bg-primary/10 p-6 mb-6">
-                <svg
-                  className="h-12 w-12 text-primary"
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                </svg>
-              </div>
+  const handleSystemPromptEdit = async () => {
+    const systemMessage = messages.find((m) => m.role === "system");
 
-              <h2 className="text-2xl font-semibold mb-2">
-                Start a conversation
-              </h2>
-              <p className="text-muted-foreground max-w-md">
-                Ask me anything! I'm here to help with coding, analysis,
-                creative writing, and more.
-              </p>
-              <div className="grid grid-cols-2 gap-3 mt-8 w-full max-w-2xl">
-                <button
-                  onClick={() => handleSubmit("What can you help me with?", [])}
-                  className="text-left p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors"
-                >
-                  <h3 className="font-medium mb-1">Capabilities</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Learn what I can do
-                  </p>
-                </button>
-                <button
-                  onClick={() => handleSubmit("Help me write code", [])}
-                  className="text-left p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors"
-                >
-                  <h3 className="font-medium mb-1">Code Assistant</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Write and debug code
-                  </p>
-                </button>
-                <button
-                  onClick={() => handleSubmit("Help me analyze data", [])}
-                  className="text-left p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors"
-                >
-                  <h3 className="font-medium mb-1">Data Analysis</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Analyze and visualize data
-                  </p>
-                </button>
-                <button
-                  onClick={() => handleSubmit("Help me brainstorm ideas", [])}
-                  className="text-left p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors"
-                >
-                  <h3 className="font-medium mb-1">Creative Writing</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Brainstorm and create content
-                  </p>
-                </button>
+    if (systemMessage) {
+      // Create a temporary visible message for editing
+      const result = await AsyncModal(
+        <>
+          <DialogTitleComponent className="mb-4 text-xl font-bold">
+            Edit System Prompt
+          </DialogTitleComponent>
+          <DialogDescription className="mb-4">
+            Customize the system prompt for this chat:
+          </DialogDescription>
+          <div className="mb-4">
+            <Textarea
+              name="content"
+              defaultValue={systemMessage.content as string}
+              className="min-h-[200px] w-full resize-y"
+              placeholder="Enter system prompt..."
+              autoFocus
+            />
+          </div>
+          <div className="grid grid-flow-row-dense grid-cols-2 gap-3">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button type="submit" variant="default">
+              Save
+            </Button>
+          </div>
+        </>,
+        {
+          style: { maxWidth: "80vw" },
+          initialData: {
+            content: systemMessage.content as string,
+          },
+        },
+      );
+
+      if (result.ok && result.data.content?.trim()) {
+        handleEdit(systemMessage.id, result.data.content.trim(), false);
+      }
+    } else {
+      // Add new system message
+      const result = await AsyncModal(
+        <>
+          <DialogTitleComponent className="mb-4 text-xl font-bold">
+            Add System Prompt
+          </DialogTitleComponent>
+          <DialogDescription className="mb-4">
+            Add a system prompt to guide the AI's behavior in this chat:
+          </DialogDescription>
+          <div className="mb-4">
+            <Textarea
+              name="content"
+              defaultValue={settings.systemPrompt}
+              className="min-h-[200px] w-full resize-y"
+              placeholder="Enter system prompt..."
+              autoFocus
+            />
+          </div>
+          <div className="grid grid-flow-row-dense grid-cols-2 gap-3">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button type="submit" variant="default">
+              Save
+            </Button>
+          </div>
+        </>,
+        {
+          style: { maxWidth: "80vw" },
+          initialData: {
+            content: settings.systemPrompt,
+          },
+        },
+      );
+
+      if (result.ok && result.data.content?.trim()) {
+        const newSystemMessage: Message = {
+          id: crypto.randomUUID(),
+          content: result.data.content.trim(),
+          role: "system",
+          timestamp: Date.now(),
+        };
+        setMessages((prev) => [newSystemMessage, ...prev]);
+      }
+    }
+  };
+
+  return (
+    <>
+      <div className="flex flex-col h-full">
+        {/* Messages Area */}
+        <div className="@container flex-1 overflow-y-auto pb-32">
+          <div className="max-w-[1000px] mx-auto px-4 @max-[560px]:px-1 mt-10 mb-[70vh]">
+            {messages.length === 0 && (
+              <div className="flex flex-col items-center justify-center h-full min-h-[60vh] text-center">
+                <div className="rounded-full bg-primary/10 p-6 mb-6">
+                  <svg
+                    className="h-12 w-12 text-primary"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                  </svg>
+                </div>
+
+                <h2 className="text-2xl font-semibold mb-2">
+                  Start a conversation
+                </h2>
+                <p className="text-muted-foreground max-w-md">
+                  Ask me anything! I'm here to help with coding, analysis,
+                  creative writing, and more.
+                </p>
+                <div className="grid grid-cols-2 gap-3 mt-8 w-full max-w-2xl">
+                  <button
+                    onClick={() =>
+                      handleSubmit("What can you help me with?", [])
+                    }
+                    className="text-left p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors"
+                  >
+                    <h3 className="font-medium mb-1">Capabilities</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Learn what I can do
+                    </p>
+                  </button>
+                  <button
+                    onClick={() => handleSubmit("Help me write code", [])}
+                    className="text-left p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors"
+                  >
+                    <h3 className="font-medium mb-1">Code Assistant</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Write and debug code
+                    </p>
+                  </button>
+                  <button
+                    onClick={() => handleSubmit("Help me analyze data", [])}
+                    className="text-left p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors"
+                  >
+                    <h3 className="font-medium mb-1">Data Analysis</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Analyze and visualize data
+                    </p>
+                  </button>
+                  <button
+                    onClick={() => handleSubmit("Help me brainstorm ideas", [])}
+                    className="text-left p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors"
+                  >
+                    <h3 className="font-medium mb-1">Creative Writing</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Brainstorm and create content
+                    </p>
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
-          {messages &&
-            messages.map((message, index) => (
-              <div
-                key={message.id}
-                className={cn(
-                  "flex gap-3 py-6 border-b border-border/50 last:border-0",
-                  message.role === "user" ? "flex-row-reverse" : "",
-                )}
-              >
-                <Avatar className="h-8 w-8 @max-[560px]:hidden">
-                  {message.role === "assistant" ? (
-                    <>
-                      <AvatarFallback>AI</AvatarFallback>
-                    </>
-                  ) : (
-                    <>
-                      <AvatarFallback>U</AvatarFallback>
-                    </>
-                  )}
-                </Avatar>
-                <div
-                  className={cn(
-                    "flex-1 space-y-2 max-w-[88%] @max-[560px]:max-w-full",
-                    message.role === "user" ? "flex flex-col items-end" : "",
-                  )}
-                >
+            )}
+            {messages &&
+              messages.map((message, index) => {
+                if (message.role === "system") return null;
+                return (
                   <div
+                    key={message.id}
                     className={cn(
-                      "rounded-2xl px-5 py-3 max-w-full shadow-sm",
-                      message.role === "user"
-                        ? "bg-muted/100 text-foreground"
-                        : "bg-muted/50 border border-border/50",
+                      "flex gap-3 py-6 border-b border-border/50 last:border-0",
+                      message.role === "user" ? "flex-row-reverse" : "",
                     )}
                   >
-                    {message.role === "user" ? (
-                      <div className="prose prose-sm text-sm user-message max-w-full max-h-[40vh] overflow-y-auto">
-                        {typeof message.content === "string" ? (
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            rehypePlugins={[rehypeHighlight]}
-                            components={{
-                              code: ({ children, className }) => {
-                                const childrenStr =
-                                  typeof children === "string";
-                                const multiLine = childrenStr
-                                  ? children.includes("\n")
-                                  : false;
-                                const isInline =
-                                  !className?.includes("language-") &&
-                                  !multiLine;
-
-                                if (isInline) {
-                                  return (
-                                    <code className="px-1 py-0.5 bg-primary text-primary-foreground rounded text-sm">
-                                      {children}
-                                    </code>
-                                  );
-                                }
-
-                                return <CodeBlock>{children}</CodeBlock>;
-                              },
-                            }}
-                          >
-                            {message.content}
-                          </ReactMarkdown>
-                        ) : (
-                          <div className="space-y-2">
-                            {message.content.map((item, index) => {
-                              if (item.type === "text") {
-                                return (
-                                  <ReactMarkdown
-                                    key={index}
-                                    remarkPlugins={[remarkGfm]}
-                                    rehypePlugins={[rehypeHighlight]}
-                                    components={{
-                                      code: ({ children, className }) => {
-                                        const childrenStr =
-                                          typeof children === "string";
-                                        const multiLine = childrenStr
-                                          ? children.includes("\n")
-                                          : false;
-                                        const isInline =
-                                          !className?.includes("language-") &&
-                                          !multiLine;
-
-                                        if (isInline) {
-                                          return (
-                                            <code className="px-1 py-0.5 bg-primary text-primary-foreground rounded text-sm">
-                                              {children}
-                                            </code>
-                                          );
-                                        }
-
-                                        return (
-                                          <CodeBlock>{children}</CodeBlock>
-                                        );
-                                      },
-                                    }}
-                                  >
-                                    {item.text || ""}
-                                  </ReactMarkdown>
-                                );
-                              } else if (item.type === "image_url") {
-                                return (
-                                  <img
-                                    key={index}
-                                    src={item.image_url?.url}
-                                    alt="Uploaded image"
-                                    className="max-w-full rounded-lg"
-                                  />
-                                );
-                              } else if (item.type === "file") {
-                                return (
-                                  <div
-                                    key={index}
-                                    className="flex items-center gap-2 bg-primary/10 rounded-lg p-2"
-                                  >
-                                    <span className="text-sm">
-                                      📎 {item.file?.filename}
-                                    </span>
-                                  </div>
-                                );
-                              }
-                              return null;
-                            })}
-                          </div>
+                    <Avatar className="h-8 w-8 @max-[560px]:hidden">
+                      {message.role === "assistant" ? (
+                        <>
+                          <AvatarFallback>AI</AvatarFallback>
+                        </>
+                      ) : (
+                        <>
+                          <AvatarFallback>U</AvatarFallback>
+                        </>
+                      )}
+                    </Avatar>
+                    <div
+                      className={cn(
+                        "flex-1 space-y-2 max-w-[88%] @max-[560px]:max-w-full",
+                        message.role === "user"
+                          ? "flex flex-col items-end"
+                          : "",
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "rounded-2xl px-5 py-3 max-w-full shadow-sm",
+                          message.role === "user"
+                            ? "bg-muted/100 text-foreground"
+                            : "bg-muted/50 border border-border/50",
                         )}
-                      </div>
-                    ) : (
-                      <div className="prose prose-sm">
-                        {message.reasoning ? (
-                          <>
-                            <h1>Reasoning</h1>
+                      >
+                        {message.role === "user" ? (
+                          <div className="prose prose-sm text-sm user-message max-w-full max-h-[40vh] overflow-y-auto">
+                            {typeof message.content === "string" ? (
+                              <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                rehypePlugins={[rehypeHighlight]}
+                                components={{
+                                  code: ({ children, className }) => {
+                                    const childrenStr =
+                                      typeof children === "string";
+                                    const multiLine = childrenStr
+                                      ? children.includes("\n")
+                                      : false;
+                                    const isInline =
+                                      !className?.includes("language-") &&
+                                      !multiLine;
+
+                                    if (isInline) {
+                                      return (
+                                        <code className="px-1 py-0.5 bg-primary text-primary-foreground rounded text-sm">
+                                          {children}
+                                        </code>
+                                      );
+                                    }
+
+                                    return <CodeBlock>{children}</CodeBlock>;
+                                  },
+                                }}
+                              >
+                                {message.content}
+                              </ReactMarkdown>
+                            ) : (
+                              <div className="space-y-2">
+                                {message.content.map((item, index) => {
+                                  if (item.type === "text") {
+                                    return (
+                                      <ReactMarkdown
+                                        key={index}
+                                        remarkPlugins={[remarkGfm]}
+                                        rehypePlugins={[rehypeHighlight]}
+                                        components={{
+                                          code: ({ children, className }) => {
+                                            const childrenStr =
+                                              typeof children === "string";
+                                            const multiLine = childrenStr
+                                              ? children.includes("\n")
+                                              : false;
+                                            const isInline =
+                                              !className?.includes(
+                                                "language-",
+                                              ) && !multiLine;
+
+                                            if (isInline) {
+                                              return (
+                                                <code className="px-1 py-0.5 bg-primary text-primary-foreground rounded text-sm">
+                                                  {children}
+                                                </code>
+                                              );
+                                            }
+
+                                            return (
+                                              <CodeBlock>{children}</CodeBlock>
+                                            );
+                                          },
+                                        }}
+                                      >
+                                        {item.text || ""}
+                                      </ReactMarkdown>
+                                    );
+                                  } else if (item.type === "image_url") {
+                                    return (
+                                      <img
+                                        key={index}
+                                        src={item.image_url?.url}
+                                        alt="Uploaded image"
+                                        className="max-w-full rounded-lg"
+                                      />
+                                    );
+                                  } else if (item.type === "file") {
+                                    return (
+                                      <div
+                                        key={index}
+                                        className="flex items-center gap-2 bg-primary/10 rounded-lg p-2"
+                                      >
+                                        <span className="text-sm">
+                                          📎 {item.file?.filename}
+                                        </span>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="prose prose-sm">
+                            {message.reasoning ? (
+                              <>
+                                <h1>Reasoning</h1>
+                                <ReactMarkdown
+                                  remarkPlugins={[remarkGfm]}
+                                  rehypePlugins={[rehypeHighlight]}
+                                  components={{
+                                    code: ({ children, className }) => {
+                                      const childrenStr =
+                                        typeof children === "string";
+                                      const multiLine = childrenStr
+                                        ? children.includes("\n")
+                                        : false;
+                                      const isInline =
+                                        !className?.includes("language-") &&
+                                        !multiLine;
+
+                                      if (isInline) {
+                                        return (
+                                          <code className="px-1 py-0.5 bg-primary text-primary-foreground rounded text-sm">
+                                            {children}
+                                          </code>
+                                        );
+                                      }
+
+                                      return <CodeBlock>{children}</CodeBlock>;
+                                    },
+                                  }}
+                                >
+                                  {message.reasoning}
+                                </ReactMarkdown>
+                                <hr />
+                              </>
+                            ) : null}
+
                             <ReactMarkdown
                               remarkPlugins={[remarkGfm]}
                               rehypePlugins={[rehypeHighlight]}
@@ -1366,140 +1536,117 @@ export function ChatInterface({
                                 },
                               }}
                             >
-                              {message.reasoning}
+                              {typeof message.content === "string"
+                                ? message.content
+                                : "Assistant response"}
                             </ReactMarkdown>
-                            <hr />
-                          </>
-                        ) : null}
-
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          rehypePlugins={[rehypeHighlight]}
-                          components={{
-                            code: ({ children, className }) => {
-                              const childrenStr = typeof children === "string";
-                              const multiLine = childrenStr
-                                ? children.includes("\n")
-                                : false;
-                              const isInline =
-                                !className?.includes("language-") && !multiLine;
-
-                              if (isInline) {
-                                return (
-                                  <code className="px-1 py-0.5 bg-primary text-primary-foreground rounded text-sm">
-                                    {children}
-                                  </code>
-                                );
-                              }
-
-                              return <CodeBlock>{children}</CodeBlock>;
-                            },
-                          }}
-                        >
-                          {typeof message.content === "string"
-                            ? message.content
-                            : "Assistant response"}
-                        </ReactMarkdown>
-                        {isLoading &&
-                          streamingMessageId === message.id &&
-                          !message.content && (
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <div className="flex space-x-1">
-                                <div className="w-2 h-2 bg-primary/60 rounded-full animate-pulse" />
-                                <div className="w-2 h-2 bg-primary/60 rounded-full animate-pulse [animation-delay:0.2s]" />
-                                <div className="w-2 h-2 bg-primary/60 rounded-full animate-pulse [animation-delay:0.4s]" />
-                              </div>
-                              <span className="text-sm">Thinking...</span>
-                            </div>
-                          )}
+                            {isLoading &&
+                              streamingMessageId === message.id &&
+                              !message.content && (
+                                <div className="flex items-center gap-2 text-muted-foreground">
+                                  <div className="flex space-x-1">
+                                    <div className="w-2 h-2 bg-primary/60 rounded-full animate-pulse" />
+                                    <div className="w-2 h-2 bg-primary/60 rounded-full animate-pulse [animation-delay:0.2s]" />
+                                    <div className="w-2 h-2 bg-primary/60 rounded-full animate-pulse [animation-delay:0.4s]" />
+                                  </div>
+                                  <span className="text-sm">Thinking...</span>
+                                </div>
+                              )}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <div className="flex @max-[560px]:px-10 max-w-4xl items-center justify-between text-xs text-muted-foreground">
-                    <div className="flex @max-[560px]:hidden items-center gap-2">
-                      {message.model && message.role === "assistant" && (
-                        <>
-                          <span className="flex items-center gap-1">
-                            <Sparkles className="h-3 w-3" />
-                            {message.model.split("/")[1] || message.model}
-                          </span>
-                        </>
-                      )}
-                      {message.totalTokens && (
-                        <>
-                          <span>•</span>
-                          <span>{message.totalTokens} tokens</span>
-                        </>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {message.role === "assistant" && (
-                        <>
-                          <MessageRetryButton
-                            messageIndex={index}
-                            messageModel={message.model ?? ""}
-                            currentModel={selectedModel}
-                            onRetry={handleRetry}
-                          />
-                          <MessageBranchButton
-                            messageId={message.id}
-                            messageIndex={index}
-                            onBranch={handleBranch}
-                          />
-                          <MessageSpeakButton
+                      <div className="flex @max-[560px]:px-10 max-w-4xl items-center justify-between text-xs text-muted-foreground">
+                        <div className="flex @max-[560px]:hidden items-center gap-2">
+                          {message.model && message.role === "assistant" && (
+                            <>
+                              <span className="flex items-center gap-1">
+                                <Sparkles className="h-3 w-3" />
+                                {message.model.split("/")[1] || message.model}
+                              </span>
+                            </>
+                          )}
+                          {message.totalTokens && (
+                            <>
+                              <span>•</span>
+                              <span>{message.totalTokens} tokens</span>
+                            </>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {message.role === "assistant" && (
+                            <>
+                              <MessageRetryButton
+                                messageIndex={index}
+                                messageModel={message.model ?? ""}
+                                currentModel={selectedModel}
+                                onRetry={handleRetry}
+                              />
+                              <MessageBranchButton
+                                messageId={message.id}
+                                messageIndex={index}
+                                onBranch={handleBranch}
+                              />
+                              <MessageSpeakButton
+                                messageId={message.id}
+                                content={message.content}
+                                reasoning={message.reasoning}
+                                isPlaying={speakingMessageId === message.id}
+                                onToggleSpeak={toggleSpeakMessage}
+                              />
+                              <MessageCopyButton
+                                content={message.content}
+                                reasoning={message.reasoning}
+                              />
+                            </>
+                          )}
+                          <MessageEditButton
                             messageId={message.id}
                             content={message.content}
-                            reasoning={message.reasoning}
-                            isPlaying={speakingMessageId === message.id}
-                            onToggleSpeak={toggleSpeakMessage}
+                            onEdit={handleEdit}
+                            isUserMessage={message.role === "user"}
+                            hasNextAssistantMessage={
+                              message.role === "user" &&
+                              messages.findIndex(
+                                (m, i) =>
+                                  i > messages.indexOf(message) &&
+                                  m.role === "assistant",
+                              ) !== -1
+                            }
                           />
-                          <MessageCopyButton
-                            content={message.content}
-                            reasoning={message.reasoning}
+                          <MessageDeleteButton
+                            messageId={message.id}
+                            onDelete={handleDelete}
                           />
-                        </>
-                      )}
-                      <MessageEditButton
-                        messageId={message.id}
-                        content={message.content}
-                        onEdit={handleEdit}
-                        isUserMessage={message.role === "user"}
-                        hasNextAssistantMessage={
-                          message.role === "user" &&
-                          index < messages.length - 1 &&
-                          messages[index + 1].role === "assistant"
-                        }
-                      />
-                      <MessageDeleteButton
-                        messageId={message.id}
-                        onDelete={handleDelete}
-                      />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            ))}
+                );
+              })}
 
-          <div ref={messagesEndRef} className="mt-24" />
+            <div ref={messagesEndRef} className="mt-24" />
+          </div>
         </div>
-      </div>
 
-      {/* Modern Chat Input */}
-      <ChatInput
-        onSubmit={handleSubmit}
-        isLoading={isLoading}
-        selectedModel={selectedModel}
-        onModelChange={setSelectedModel}
-        modelsData={modelsData}
-        modelsLoading={modelsLoading}
-        modelsError={modelsError}
-        apiKeyInfo={apiKeyInfo?.data}
-        ttsEnabled={settings.ttsEnabled}
-        onTtsToggle={updateTtsEnabled}
-        selectedVoice={settings.selectedVoice}
-        onVoiceChange={updateSelectedVoice}
-      />
-    </div>
+        {/* Modern Chat Input */}
+        <ChatInput
+          ref={chatInputRef}
+          onSubmit={handleSubmit}
+          isLoading={isLoading}
+          selectedModel={selectedModel}
+          onModelChange={setSelectedModel}
+          modelsData={modelsData}
+          modelsLoading={modelsLoading}
+          modelsError={modelsError}
+          apiKeyInfo={apiKeyInfo?.data}
+          ttsEnabled={settings.ttsEnabled}
+          onTtsToggle={updateTtsEnabled}
+          selectedVoice={settings.selectedVoice}
+          onVoiceChange={updateSelectedVoice}
+          onSystemPromptEdit={handleSystemPromptEdit}
+        />
+      </div>
+    </>
   );
 }
 

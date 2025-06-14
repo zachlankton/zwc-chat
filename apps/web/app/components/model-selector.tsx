@@ -90,7 +90,7 @@ export function ModelSelector({
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
-          className="w-full justify-between max-w-xs"
+          className="justify-between max-w-full"
           size="sm"
         >
           <div className="flex items-center gap-2 truncate">

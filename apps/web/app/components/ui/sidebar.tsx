@@ -263,13 +263,13 @@ function SidebarTrigger({
   const { isMobile, toggleSidebar } = useSidebar();
 
   return (
-    <Button
+    <button
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
       variant="default"
       size="lg"
       className={cn(
-        "button-85 size-12 px-12 shadow-lg shadow-foreground",
+        "button-87 px-6 h-12 shadow-lg shadow-foreground",
         className,
       )}
       onClick={(event) => {
@@ -280,7 +280,7 @@ function SidebarTrigger({
     >
       {isMobile ? "Menu" : <Menu className="size-8 p-1" />}
       <span className="sr-only">Toggle Sidebar</span>
-    </Button>
+    </button>
   );
 }
 

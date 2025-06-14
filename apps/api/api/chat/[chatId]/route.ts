@@ -53,10 +53,42 @@ export const POST = apiHandler(
 			throw badRequest("Invalid chat ID format");
 		}
 
-		// Save user message before processing (only if not retrying)
+		// Save messages before processing (only if not retrying)
 		try {
 			const messages = body.messages;
 			if (messages && messages.length > 0 && !messageIdToReplace) {
+				// Check if there's a system message at the beginning
+				const firstMessage = messages[0];
+				const hasSystemPrompt = firstMessage.role === "system";
+				
+				// Save system prompt if it exists and is not already saved
+				if (hasSystemPrompt) {
+					const messagesCollection = await getMessagesCollection();
+					// Check if system message already exists for this chat
+					const existingSystemMessage = await messagesCollection.findOne({
+						chatId: userChatId,
+						userEmail: req.session.email,
+						role: "system"
+					});
+					
+					if (!existingSystemMessage) {
+						const systemMessageId = validateUUID(firstMessage.id) 
+							? firstMessage.id 
+							: crypto.randomUUID();
+						const systemMessage: OpenRouterMessage = {
+							id: systemMessageId,
+							chatId: userChatId,
+							userEmail: req.session.email,
+							content: firstMessage.content,
+							role: "system",
+							timestamp: Date.now() - 1, // Slightly before user message
+						};
+						await messagesCollection.insertOne(systemMessage);
+						console.log(`System message saved to database for chat ${userChatId}`);
+					}
+				}
+				
+				// Save user message
 				const lastMessage = messages[messages.length - 1];
 				if (lastMessage.role === "user") {
 					const chatId = userChatId;
@@ -114,19 +146,19 @@ export const POST = apiHandler(
 								title: chatTitle,
 								createdAt: now,
 							},
-							$inc: { messageCount: 1 },
+							$inc: { messageCount: hasSystemPrompt ? 2 : 1 }, // Count system message if present
 						},
 						{ upsert: true }
 					);
 				}
 			}
 		} catch (error) {
-			console.error("Failed to save user message:", error);
+			console.error("Failed to save messages:", error);
 			const errorMessage =
 				error instanceof Error ? error.message : "Unknown error occurred";
 			return Response.json(
 				{
-					error: "Failed to save message. Please try again.",
+					error: "Failed to save messages. Please try again.",
 					details:
 						process.env.NODE_ENV === "development" ? errorMessage : undefined,
 				},

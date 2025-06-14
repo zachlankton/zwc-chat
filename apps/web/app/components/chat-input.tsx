@@ -13,6 +13,7 @@ import {
   VolumeX,
   ChevronDown,
   Check,
+  FileText,
 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
@@ -55,9 +56,13 @@ interface ChatInputProps {
   onTtsToggle?: (enabled: boolean) => void;
   selectedVoice?: string;
   onVoiceChange?: (voice: string) => void;
+  onSystemPromptEdit?: () => void;
 }
 
-export function ChatInput({
+export const ChatInput = React.forwardRef<
+  { focus: () => void },
+  ChatInputProps
+>(function ChatInput({
   onSubmit,
   isLoading = false,
   placeholder = "Message AI assistant...",
@@ -71,7 +76,8 @@ export function ChatInput({
   onTtsToggle,
   selectedVoice,
   onVoiceChange,
-}: ChatInputProps) {
+  onSystemPromptEdit,
+}: ChatInputProps, ref) {
   const [isFocused, setIsFocused] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [isListening, setIsListening] = useState(false);
@@ -87,6 +93,13 @@ export function ChatInput({
   const sidebar = useSidebar();
   const sidebarCollapsed = sidebar.state === "collapsed";
   const isMobile = sidebar.isMobile;
+
+  // Expose focus method through ref
+  React.useImperativeHandle(ref, () => ({
+    focus: () => {
+      textareaRef.current?.focus();
+    },
+  }));
 
   // Calculate usage percentage and determine status
   const getUsageStatus = () => {
@@ -492,7 +505,7 @@ export function ChatInput({
           </div>
 
           {/* Helper Text and Model Selector */}
-          <div className="mt-2 flex gap-2 @max-[570px]:flex-col-reverse items-center justify-between px-2">
+          <div className="mt-2 w-full flex flex-1 gap-2 @max-[570px]:flex-col-reverse items-center justify-between px-2">
             <div className="@max-[570px]:hidden">
               {/* Enter key toggle */}
               <div className="flex items-center gap-2">
@@ -591,13 +604,28 @@ export function ChatInput({
                     </DropdownMenu>
                   </div>
                 )}
+
+                {/* System Prompt Button */}
+                {onSystemPromptEdit && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={onSystemPromptEdit}
+                    className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+                    title="Edit system prompt for this chat"
+                  >
+                    <FileText className="h-3 w-3" />
+                    <span className="@max-[800px]:hidden">System Prompt</span>
+                  </Button>
+                )}
               </div>
             </div>
 
             {/* API Key Usage Indicator */}
             {usageStatus && (
-              <div className="flex min-w-[225px] @max-[600px]:text-center items-center gap-2">
-                <div className="flex items-center gap-1.5">
+              <div className="flex flex-1 flex-col min-w-[150px] justify-center @max-[570px]:w-full @max-[570px]:flex-row @max-[600px]:text-center items-center gap-2">
+                <div className="flex flex-1 items-center justify-center gap-1.5 max-w-[150px]">
                   {usageStatus.status === "critical" ? (
                     <XCircle className="h-3.5 w-3.5 text-destructive" />
                   ) : usageStatus.status === "warning" ? (
@@ -619,10 +647,17 @@ export function ChatInput({
                   </span>
                 </div>
                 {/* Progress bar */}
-                <div className="relative w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                <div
+                  className={cn(
+                    "relative flex-1 w-full min-h-1.5 max-w-[100px] h-1.5 bg-muted rounded-full overflow-hidden outline ",
+                    usageStatus.status === "critical" && "outline-destructive",
+                    usageStatus.status === "warning" && "outline-yellow-500",
+                    usageStatus.status === "good" && "outline-green-500",
+                  )}
+                >
                   <div
                     className={cn(
-                      "absolute left-0 top-0 h-full transition-all duration-300",
+                      "absolute left-0 top-0 h-full  transition-all duration-300",
                       usageStatus.status === "critical" && "bg-destructive",
                       usageStatus.status === "warning" && "bg-yellow-500",
                       usageStatus.status === "good" && "bg-green-500",
@@ -633,17 +668,19 @@ export function ChatInput({
               </div>
             )}
             {selectedModel && onModelChange && (
-              <ModelSelector
-                selectedModel={selectedModel}
-                onModelChange={onModelChange}
-                data={modelsData}
-                isLoading={modelsLoading}
-                error={modelsError}
-              />
+              <div className="flex-1 min-w-[200px]">
+                <ModelSelector
+                  selectedModel={selectedModel}
+                  onModelChange={onModelChange}
+                  data={modelsData}
+                  isLoading={modelsLoading}
+                  error={modelsError}
+                />
+              </div>
             )}
           </div>
         </div>
       </div>
     </div>
   );
-}
+});
