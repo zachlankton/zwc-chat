@@ -2,10 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, put } from "../lib/fetchWrapper";
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
-import { Trash2, Pencil, Check, X, MoreVertical } from "lucide-react";
+import { Trash2, Pencil, MoreVertical } from "lucide-react";
 import { useNavigate } from "react-router";
-import { AsyncConfirm } from "./async-modals";
-import { useState } from "react";
+import { AsyncConfirm, AsyncPrompt } from "./async-modals";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,8 +37,6 @@ interface ChatListProps {
 export function ChatList({ currentChatId, onChatSelect }: ChatListProps) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [editingChatId, setEditingChatId] = useState<string | null>(null);
-  const [editTitle, setEditTitle] = useState("");
 
   // Fetch user's chats
   const { data, isLoading, error } = useQuery({
@@ -76,26 +73,21 @@ export function ChatList({ currentChatId, onChatSelect }: ChatListProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["chats"] });
-      setEditingChatId(null);
     },
   });
 
-  const handleEditStart = (chatId: string, currentTitle: string) => {
-    setEditingChatId(chatId);
-    setEditTitle(currentTitle);
-  };
+  const handleRenameChat = async (chatId: string, currentTitle: string) => {
+    const result = await AsyncPrompt({
+      title: "Rename Chat",
+      message: "Enter a new name for this chat:",
+      defaultValue: currentTitle,
+      confirmBtnText: "Save",
+      cancelBtnText: "Cancel",
+    });
 
-  const handleEditSave = (chatId: string) => {
-    if (editTitle.trim() && editTitle.trim() !== "") {
-      updateChatMutation.mutate({ chatId, title: editTitle.trim() });
-    } else {
-      setEditingChatId(null);
+    if (result.ok && result.data.results.trim()) {
+      updateChatMutation.mutate({ chatId, title: result.data.results.trim() });
     }
-  };
-
-  const handleEditCancel = () => {
-    setEditingChatId(null);
-    setEditTitle("");
   };
 
   if (error) {
@@ -128,97 +120,51 @@ export function ChatList({ currentChatId, onChatSelect }: ChatListProps) {
               >
                 <div className="flex items-center gap-3">
                   <div className="flex-1 min-w-0">
-                    {editingChatId === chat.id ? (
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={editTitle}
-                          onChange={(e) => setEditTitle(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              handleEditSave(chat.id);
-                            } else if (e.key === "Escape") {
-                              handleEditCancel();
-                            }
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex-1 px-2 py-1 text-sm bg-background border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                          autoFocus
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditSave(chat.id);
-                          }}
-                          className="h-6 w-6 p-0"
-                        >
-                          <Check className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditCancel();
-                          }}
-                          className="h-6 w-6 p-0"
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <>
-                        <h4 className="text-sm font-medium truncate">
-                          {chat.title}
-                        </h4>
-                      </>
-                    )}
+                    <h4 className="text-sm font-medium truncate">
+                      {chat.title}
+                    </h4>
                   </div>
-                  {editingChatId !== chat.id && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-40">
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditStart(chat.id, chat.title);
-                          }}
-                        >
-                          <Pencil className="h-4 w-4 mr-2" />
-                          Rename
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            const { ok } = await AsyncConfirm({
-                              destructive: true,
-                              title: "Delete Chat",
-                              message:
-                                "Are you sure you want to delete this chat?",
-                            });
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40">
+                      <DropdownMenuItem
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          await handleRenameChat(chat.id, chat.title);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Rename
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const { ok } = await AsyncConfirm({
+                            destructive: true,
+                            title: "Delete Chat",
+                            message:
+                              "Are you sure you want to delete this chat?",
+                          });
 
-                            if (ok) deleteChatMutation.mutate(chat.id);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
+                          if (ok) deleteChatMutation.mutate(chat.id);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             ))}
