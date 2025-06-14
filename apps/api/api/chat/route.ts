@@ -26,10 +26,10 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 			userEmail: req.session.email,
 		});
 
-		// Get paginated chats
+		// Get paginated chats - pinned chats first, then by updated date
 		const chats = await chatsCollection
 			.find({ userEmail: req.session.email })
-			.sort({ updatedAt: -1 })
+			.sort({ pinnedAt: -1, updatedAt: -1 })
 			.skip(offset)
 			.limit(limit)
 			.toArray();
@@ -41,6 +41,7 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 			lastMessage: chat.lastMessage,
 			updatedAt: chat.updatedAt.toISOString(),
 			messageCount: chat.messageCount,
+			pinnedAt: chat.pinnedAt?.toISOString() || null,
 		}));
 
 		return Response.json({

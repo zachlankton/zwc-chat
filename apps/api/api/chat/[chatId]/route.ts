@@ -22,6 +22,7 @@ interface ChatUpdateData {
 	updatedAt: Date;
 	title?: string;
 	lastMessage?: string;
+	pinnedAt?: Date | null;
 }
 
 const openRouterApiKey = process.env.OPENROUTER_KEY;
@@ -381,6 +382,10 @@ export const PUT = apiHandler(
 
 			if (body.title !== undefined) {
 				updateData.title = body.title;
+			}
+
+			if (body.pinned !== undefined) {
+				updateData.pinnedAt = body.pinned ? new Date() : null;
 			}
 
 			await chatsCollection.updateOne(

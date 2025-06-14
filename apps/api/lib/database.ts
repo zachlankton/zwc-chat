@@ -40,6 +40,7 @@ export interface Chat {
 	updatedAt: Date;
 	lastMessage?: string;
 	messageCount: number;
+	pinnedAt?: Date; // When the chat was pinned
 	branchedFrom?: {
 		chatId: string;
 		messageId: string;
@@ -173,8 +174,8 @@ async function createIndexes() {
 	}
 
 	if (chatsCollection) {
-		// Index for user's chat list
-		await chatsCollection.createIndex({ userEmail: 1, updatedAt: -1 });
+		// Index for user's chat list with pinned chats first
+		await chatsCollection.createIndex({ userEmail: 1, pinnedAt: -1, updatedAt: -1 });
 
 		// Unique index on chat id
 		await chatsCollection.createIndex({ id: 1 }, { unique: true });
