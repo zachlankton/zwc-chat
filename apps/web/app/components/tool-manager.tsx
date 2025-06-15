@@ -28,7 +28,7 @@ interface ToolManagerProps {
 }
 
 export function ToolManager({ open, onOpenChange }: ToolManagerProps) {
-  const { settings, updateTools, updateToolsEnabled } = useChatSettings();
+  const { settings, updateTools, updateToolsEnabled, updateHideToolCallMessages } = useChatSettings();
   const [editingTool, setEditingTool] = useState<Tool | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [createWithExample, setCreateWithExample] = useState(false);
@@ -138,18 +138,37 @@ export function ToolManager({ open, onOpenChange }: ToolManagerProps) {
           </DialogDescription>
         </DialogHeader>
 
-        {/* Tools Enabled Toggle */}
-        <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
-          <div>
-            <h3 className="font-medium">Enable Tools</h3>
-            <p className="text-sm text-muted-foreground">
-              Allow the AI to call your custom tools during conversations
-            </p>
+        {/* Tools Settings */}
+        <div className="space-y-3">
+          {/* Tools Enabled Toggle */}
+          <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
+            <div>
+              <h3 className="font-medium">Enable Tools</h3>
+              <p className="text-sm text-muted-foreground">
+                Allow the AI to call your custom tools during conversations
+              </p>
+            </div>
+            <Switch
+              checked={settings.toolsEnabled}
+              onCheckedChange={updateToolsEnabled}
+            />
           </div>
-          <Switch
-            checked={settings.toolsEnabled}
-            onCheckedChange={updateToolsEnabled}
-          />
+
+          {/* Hide Tool Call Messages Toggle */}
+          {settings.toolsEnabled && (
+            <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
+              <div>
+                <h3 className="font-medium">Hide Tool Call Messages</h3>
+                <p className="text-sm text-muted-foreground">
+                  Hide the tool calls and responses from the chat interface
+                </p>
+              </div>
+              <Switch
+                checked={settings.hideToolCallMessages}
+                onCheckedChange={updateHideToolCallMessages}
+              />
+            </div>
+          )}
         </div>
 
         {/* Tools List */}

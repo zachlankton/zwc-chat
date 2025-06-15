@@ -1478,6 +1478,11 @@ export function ChatInterface({
               messages.map((message, index) => {
                 if (message.role === "system") return null;
 
+                // Hide tool messages if setting is enabled
+                if (message.role === "tool" && settings.hideToolCallMessages) {
+                  return null;
+                }
+
                 // Handle tool messages
                 if (message.role === "tool") {
                   return (
@@ -1506,6 +1511,11 @@ export function ChatInterface({
                       </div>
                     </div>
                   );
+                }
+                
+                // Hide assistant messages with tool calls if setting is enabled
+                if (message.role === "assistant" && message.tool_calls && message.tool_calls.length > 0 && settings.hideToolCallMessages) {
+                  return null;
                 }
 
                 return (

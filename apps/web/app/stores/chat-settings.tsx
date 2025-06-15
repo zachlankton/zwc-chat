@@ -10,6 +10,7 @@ export interface ChatSettings {
   systemPrompt: string;
   tools: Tool[];
   toolsEnabled: boolean;
+  hideToolCallMessages: boolean;
 }
 
 const CHAT_SETTINGS_KEY = "CHAT_SETTINGS";
@@ -26,6 +27,7 @@ const defaultSettings: ChatSettings = {
   systemPrompt: defaultSystemPrompt,
   tools: [],
   toolsEnabled: false,
+  hideToolCallMessages: false,
 };
 
 // Load settings from localStorage
@@ -84,6 +86,12 @@ function loadSettings(): ChatSettings {
   const savedToolsEnabled = localStorage.getItem("toolsEnabled");
   if (savedToolsEnabled !== null) {
     settings.toolsEnabled = savedToolsEnabled === "true";
+  }
+
+  // Load hide tool call messages preference
+  const savedHideToolCallMessages = localStorage.getItem("hideToolCallMessages");
+  if (savedHideToolCallMessages !== null) {
+    settings.hideToolCallMessages = savedHideToolCallMessages === "true";
   }
 
   // Load available voices
@@ -163,6 +171,8 @@ export function updateChatSetting<K extends keyof ChatSettings>(
       localStorage.setItem("chat-tools", JSON.stringify(value));
     } else if (key === "toolsEnabled") {
       localStorage.setItem("toolsEnabled", String(value));
+    } else if (key === "hideToolCallMessages") {
+      localStorage.setItem("hideToolCallMessages", String(value));
     }
   }
 
@@ -190,5 +200,7 @@ export function useChatSettings() {
     updateTools: (value: Tool[]) => updateChatSetting("tools", value),
     updateToolsEnabled: (value: boolean) =>
       updateChatSetting("toolsEnabled", value),
+    updateHideToolCallMessages: (value: boolean) =>
+      updateChatSetting("hideToolCallMessages", value),
   };
 }
