@@ -452,6 +452,7 @@ export function ChatInterface({
   const apiKeyInfo = useApiKeyInfo();
 
   const streamingRef = React.useRef<NodeJS.Timeout | null>(null);
+  const isNewChat = React.useRef<boolean>(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [streamingMessageId, setStreamingMessageId] = React.useState<
     string | null
@@ -676,8 +677,6 @@ export function ChatInterface({
         assistantMessage.current.id = messageId;
 
         const stashMessageLength = messagesRef.current.length;
-        const isNewChat =
-          initialMessages.length === 0 && stashMessageLength === 0;
 
         for (const chunk of parseSSEEvents(text, buffer)) {
           if (chunk.type === "data" && assistantMessage.current) {
@@ -690,7 +689,6 @@ export function ChatInterface({
                 pendingToolCallsRef.current = toolCalls;
               },
               onNewContent: (content) => {
-                console.log(settings.ttsEnabled, content);
                 if (settings.ttsEnabled && content) {
                   // Add to buffer
                   ttsBufferRef.current += content;
@@ -759,7 +757,7 @@ export function ChatInterface({
             }, 100);
 
             // Generate title for new chats after first response
-            if (isNewChat) {
+            if (isNewChat.current) {
               // Fire and forget - don't wait for title generation
               post(`/chat/${chatId}/generate-title`, {})
                 .then(() => {
@@ -832,6 +830,7 @@ export function ChatInterface({
         setIsLoading(false);
         updateStreamingMessageId(null);
         streamingRef.current = null;
+        isNewChat.current = false;
       }
     },
     [settings.ttsEnabled, processTtsQueue, flushTtsBuffer],
@@ -921,7 +920,7 @@ export function ChatInterface({
 
         // Send a new request with the tool results
         const requestBody: any = {
-          messages: messagesRef.current,
+          messages: [...messagesRef.current],
           model: selectedModel,
         };
 
@@ -947,17 +946,21 @@ export function ChatInterface({
         });
       } catch (error) {
         console.error("Error executing tools:", error);
-        
+
         // Show error to user
-        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred while executing tools";
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "An unknown error occurred while executing tools";
         AsyncAlert({
           title: "Tool Execution Error",
           message: errorMessage,
         });
 
-        // Reset assistant message state
+        // Reset assistant message state and pending tool calls
         assistantMessage.current = null;
         updateStreamingMessageId(null);
+        pendingToolCallsRef.current = null;
       } finally {
         // Always reset loading state, but only if no streaming is happening
         if (!streamingMessageIdRef.current) {
@@ -1002,7 +1005,8 @@ export function ChatInterface({
   const handleSubmit = async (input: string, attachments: File[]) => {
     if (!input.trim() || isLoading) return;
     const stashMessageLength = messages.length;
-    const isNewChat = initialMessages.length === 0 && stashMessageLength === 0;
+    isNewChat.current =
+      initialMessages.length === 0 && stashMessageLength === 0;
 
     // Convert files to base64
     const fileToBase64 = async (file: File): Promise<string> => {
@@ -1041,7 +1045,7 @@ export function ChatInterface({
     }
 
     // If this is a new chat, immediately add a placeholder to the chat list
-    if (isNewChat) {
+    if (isNewChat.current) {
       queryClient.setQueryData(["chats"], (oldData: any) => {
         if (!oldData) return oldData;
 
@@ -1071,21 +1075,28 @@ export function ChatInterface({
       timestamp: Date.now(),
     };
 
-    let msgsRef = [...messages, userMessage];
-
-    // Add system prompt if this is the first message in a new chat
-    if (isNewChat && settings.systemPrompt) {
+    // For new chats, add system prompt as the first message if it exists
+    if (isNewChat.current && settings.systemPrompt) {
       const systemMessage: Message = {
         id: crypto.randomUUID(),
         content: settings.systemPrompt,
         role: "system",
         timestamp: Date.now(),
       };
-      msgsRef = [systemMessage, ...msgsRef];
+      setMessages([systemMessage, userMessage]);
+    } else {
+      setMessages((prev) => [...prev, userMessage]);
     }
-
-    setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
+
+    // Include tools if enabled
+    const requestBody: any = {
+      messages: [...messagesRef.current],
+      model: selectedModel,
+    };
+    if (settings.toolsEnabled && settings.tools.length > 0) {
+      requestBody.tools = formatToolsForAPI(settings.tools);
+    }
 
     // Create empty assistant message to start streaming
     assistantMessage.current = {
@@ -1100,12 +1111,6 @@ export function ChatInterface({
     setMessages((prev) => [...prev, assistantMessage.current as Message]);
     updateStreamingMessageId(assistantMessage.current.id);
     setTimeout(scrollNewMessage, 100);
-
-    // Include tools if enabled
-    const requestBody: any = { messages: msgsRef, model: selectedModel };
-    if (settings.toolsEnabled && settings.tools.length > 0) {
-      requestBody.tools = formatToolsForAPI(settings.tools);
-    }
 
     post<StreamResponse | Response>(`/chat/${chatId}`, requestBody, {
       resolveImmediately: true,
@@ -1158,25 +1163,9 @@ export function ChatInterface({
       ),
     );
 
-    // Check if we need to include system prompt for retry
-    let messagesToSend = messagesUpToRetry;
-    if (
-      messagesUpToRetry.length > 0 &&
-      messagesUpToRetry[0].role !== "system" &&
-      settings.systemPrompt
-    ) {
-      const systemMessage: Message = {
-        id: crypto.randomUUID(),
-        content: settings.systemPrompt,
-        role: "system",
-        timestamp: Date.now(),
-      };
-      messagesToSend = [systemMessage, ...messagesUpToRetry];
-    }
-
     // Include tools if enabled
     const retryRequestBody: any = {
-      messages: messagesToSend,
+      messages: messagesUpToRetry,
       model: modelToUse,
       messageIdToReplace: assistantMessage.current.id,
     };
