@@ -456,6 +456,7 @@ export function ChatInterface({
   const [streamingMessageId, setStreamingMessageId] = React.useState<
     string | null
   >(null);
+  const streamingMessageIdRef = React.useRef<string | null>(null);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
   const [messages, _setMessages] = React.useState<Message[]>(initialMessages);
@@ -474,6 +475,12 @@ export function ChatInterface({
       }
       _setMessages(messagesRef.current);
     }, []);
+
+  // Helper to update both streamingMessageId state and ref
+  const updateStreamingMessageId = React.useCallback((id: string | null) => {
+    streamingMessageIdRef.current = id;
+    setStreamingMessageId(id);
+  }, []);
 
   // TTS state
   const { settings, updateTtsEnabled, updateSelectedVoice } = useChatSettings();
@@ -725,7 +732,7 @@ export function ChatInterface({
             });
           } else if (chunk.type === "done") {
             setIsLoading(false);
-            setStreamingMessageId(null);
+            updateStreamingMessageId(null);
             streamingRef.current = null;
 
             // Check if we have pending tool calls to execute
@@ -823,7 +830,7 @@ export function ChatInterface({
         }
 
         setIsLoading(false);
-        setStreamingMessageId(null);
+        updateStreamingMessageId(null);
         streamingRef.current = null;
       }
     },
@@ -933,7 +940,7 @@ export function ChatInterface({
         };
 
         setMessages((prev) => [...prev, assistantMessage.current as Message]);
-        setStreamingMessageId(assistantMessage.current.id);
+        updateStreamingMessageId(assistantMessage.current.id);
 
         post<StreamResponse | Response>(`/chat/${chatId}`, requestBody, {
           resolveImmediately: true,
@@ -950,10 +957,10 @@ export function ChatInterface({
 
         // Reset assistant message state
         assistantMessage.current = null;
-        setStreamingMessageId(null);
+        updateStreamingMessageId(null);
       } finally {
         // Always reset loading state, but only if no streaming is happening
-        if (!streamingMessageId) {
+        if (!streamingMessageIdRef.current) {
           setIsLoading(false);
         }
       }
@@ -1091,7 +1098,7 @@ export function ChatInterface({
     };
 
     setMessages((prev) => [...prev, assistantMessage.current as Message]);
-    setStreamingMessageId(assistantMessage.current.id);
+    updateStreamingMessageId(assistantMessage.current.id);
     setTimeout(scrollNewMessage, 100);
 
     // Include tools if enabled
@@ -1140,7 +1147,7 @@ export function ChatInterface({
     setIsLoading(true);
 
     // Mark this specific message as being regenerated
-    setStreamingMessageId(assistantMessage.current.id);
+    updateStreamingMessageId(assistantMessage.current.id);
 
     // Clear the content of the message being retried
     setMessages((prev) =>
