@@ -889,53 +889,74 @@ export function ChatInterface({
         return;
       }
 
-      // Execute tools
-      const toolResults = await executeToolCalls(toolCalls, settings.tools);
-
-      // Create tool result messages
-      const toolMessages: Message[] = toolResults.map((result) => ({
-        id: crypto.randomUUID(),
-        role: "tool",
-        tool_call_id: result.tool_call_id,
-        name: result.name,
-        content: result.content,
-        timestamp: Date.now(),
-      }));
-
-      // Add tool messages to the conversation
-      setMessages((prev) => [...prev, ...toolMessages]);
-
-      if (assistantMessage.current?.tool_calls?.length === 0) {
-        delete assistantMessage.current.tool_calls;
-      }
-
-      // Send a new request with the tool results
-      const requestBody: any = {
-        messages: messagesRef.current,
-        model: selectedModel,
-      };
-
-      if (settings.toolsEnabled && settings.tools.length > 0) {
-        requestBody.tools = formatToolsForAPI(settings.tools);
-      }
-
-      // Create a new assistant message for the final response
-      assistantMessage.current = {
-        id: crypto.randomUUID(),
-        content: "",
-        role: "assistant",
-        model: selectedModel,
-        timestamp: Date.now(),
-        timeToFinish: 0,
-      };
-
-      setMessages((prev) => [...prev, assistantMessage.current as Message]);
-      setStreamingMessageId(assistantMessage.current.id);
       setIsLoading(true);
 
-      post<StreamResponse | Response>(`/chat/${chatId}`, requestBody, {
-        resolveImmediately: true,
-      });
+      try {
+        // Execute tools
+        const toolResults = await executeToolCalls(toolCalls, settings.tools);
+
+        // Create tool result messages
+        const toolMessages: Message[] = toolResults.map((result) => ({
+          id: crypto.randomUUID(),
+          role: "tool",
+          tool_call_id: result.tool_call_id,
+          name: result.name,
+          content: result.content,
+          timestamp: Date.now(),
+        }));
+
+        // Add tool messages to the conversation
+        setMessages((prev) => [...prev, ...toolMessages]);
+
+        if (assistantMessage.current?.tool_calls?.length === 0) {
+          delete assistantMessage.current.tool_calls;
+        }
+
+        // Send a new request with the tool results
+        const requestBody: any = {
+          messages: messagesRef.current,
+          model: selectedModel,
+        };
+
+        if (settings.toolsEnabled && settings.tools.length > 0) {
+          requestBody.tools = formatToolsForAPI(settings.tools);
+        }
+
+        // Create a new assistant message for the final response
+        assistantMessage.current = {
+          id: crypto.randomUUID(),
+          content: "",
+          role: "assistant",
+          model: selectedModel,
+          timestamp: Date.now(),
+          timeToFinish: 0,
+        };
+
+        setMessages((prev) => [...prev, assistantMessage.current as Message]);
+        setStreamingMessageId(assistantMessage.current.id);
+
+        post<StreamResponse | Response>(`/chat/${chatId}`, requestBody, {
+          resolveImmediately: true,
+        });
+      } catch (error) {
+        console.error("Error executing tools:", error);
+        
+        // Show error to user
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred while executing tools";
+        AsyncAlert({
+          title: "Tool Execution Error",
+          message: errorMessage,
+        });
+
+        // Reset assistant message state
+        assistantMessage.current = null;
+        setStreamingMessageId(null);
+      } finally {
+        // Always reset loading state, but only if no streaming is happening
+        if (!streamingMessageId) {
+          setIsLoading(false);
+        }
+      }
     },
     [chatId, selectedModel, settings.toolsEnabled, settings.tools],
   );
