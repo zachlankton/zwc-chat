@@ -645,6 +645,7 @@ export const ChatInput = React.forwardRef<
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
+                          aria-label="Manage tools"
                           type="button"
                           variant="ghost"
                           size="icon"
@@ -654,9 +655,7 @@ export const ChatInput = React.forwardRef<
                           <Hammer className="h-3.5 w-3.5" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>
-                        Manage tools
-                      </TooltipContent>
+                      <TooltipContent>Manage tools</TooltipContent>
                     </Tooltip>
                   )}
                 </TooltipProvider>

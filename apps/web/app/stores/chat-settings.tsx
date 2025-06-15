@@ -62,9 +62,21 @@ function loadSettings(): ChatSettings {
   const savedTools = localStorage.getItem("chat-tools");
   if (savedTools) {
     try {
-      settings.tools = JSON.parse(savedTools);
+      const parsedTools = JSON.parse(savedTools);
+      // Ensure the parsed value is an array
+      if (Array.isArray(parsedTools)) {
+        settings.tools = parsedTools;
+      } else {
+        console.error("Saved tools is not an array, resetting to empty array");
+        settings.tools = [];
+        // Clean up the corrupted data
+        localStorage.removeItem("chat-tools");
+      }
     } catch (e) {
       console.error("Failed to parse saved tools:", e);
+      settings.tools = [];
+      // Clean up the corrupted data
+      localStorage.removeItem("chat-tools");
     }
   }
 

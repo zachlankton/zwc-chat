@@ -937,7 +937,7 @@ export function ChatInterface({
         resolveImmediately: true,
       });
     },
-    [],
+    [chatId, selectedModel, settings.toolsEnabled, settings.tools],
   );
 
   // Add cleanup effect
