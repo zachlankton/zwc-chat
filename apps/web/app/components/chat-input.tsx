@@ -14,6 +14,7 @@ import {
   FileText,
   ArrowBigUp,
   AudioLines,
+  Hammer,
 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
@@ -63,6 +64,7 @@ interface ChatInputProps {
   selectedVoice?: string;
   onVoiceChange?: (voice: string) => void;
   onSystemPromptEdit?: () => void;
+  onToolsClick?: () => void;
 }
 
 export const ChatInput = React.forwardRef<
@@ -84,6 +86,7 @@ export const ChatInput = React.forwardRef<
     selectedVoice,
     onVoiceChange,
     onSystemPromptEdit,
+    onToolsClick,
   }: ChatInputProps,
   ref,
 ) {
@@ -633,6 +636,26 @@ export const ChatInput = React.forwardRef<
                       </TooltipTrigger>
                       <TooltipContent>
                         Edit system prompt for this chat
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+
+                  {/* Tools Button */}
+                  {onToolsClick && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={onToolsClick}
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                        >
+                          <Hammer className="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Manage tools
                       </TooltipContent>
                     </Tooltip>
                   )}

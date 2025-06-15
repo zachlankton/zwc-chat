@@ -9,6 +9,7 @@ import {
   Pencil,
   Volume2,
   VolumeX,
+  Hammer,
 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
@@ -26,6 +27,14 @@ import { DialogClose } from "~/components/ui/dialog";
 import { Textarea } from "~/components/ui/textarea";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Label } from "~/components/ui/label";
+
+export function tryParseJson(txt: string) {
+  try {
+    return JSON.parse(txt);
+  } catch (error) {
+    return txt;
+  }
+}
 
 export interface Model {
   id: string;
@@ -57,6 +66,9 @@ import {
   DialogDescription,
   DialogTitle as DialogTitleComponent,
 } from "~/components/ui/dialog";
+import { ToolManager } from "./tool-manager";
+import { formatToolsForAPI, executeToolCalls } from "~/lib/tool-executor";
+import type { ToolCall } from "~/types/tools";
 
 interface Message {
   id: string;
@@ -77,6 +89,10 @@ interface Message {
   totalTokens?: number;
   timeToFirstToken?: number;
   timeToFinish?: number;
+  // Tool-related fields
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
+  name?: string; // Tool name for tool messages
 }
 
 interface ChatInterfaceProps {
@@ -394,7 +410,7 @@ function CodeBlock({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="relative group">
-      <div className="absolute right-2 top-2 text-white opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute -right-2 -top-2 text-white opacity-0 group-hover:opacity-100 transition-opacity">
         <Button
           variant="ghost"
           size="icon"
@@ -442,10 +458,22 @@ export function ChatInterface({
   >(null);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
-  const [messages, setMessages] = React.useState<Message[]>(initialMessages);
+  const [messages, _setMessages] = React.useState<Message[]>(initialMessages);
   const buffer = React.useRef("");
   const assistantMessage = React.useRef<null | Message>(null);
   const messagesRef = React.useRef<Message[]>(messages);
+
+  const setMessages: React.Dispatch<React.SetStateAction<Message[]>> =
+    React.useCallback((args) => {
+      if (typeof args === "function") {
+        // args is a function that takes the previous state and returns new state
+        messagesRef.current = args(messagesRef.current);
+      } else {
+        // args is the new state value directly
+        messagesRef.current = args;
+      }
+      _setMessages(messagesRef.current);
+    }, []);
 
   // TTS state
   const { settings, updateTtsEnabled, updateSelectedVoice } = useChatSettings();
@@ -460,11 +488,8 @@ export function ChatInterface({
   const ttsBufferRef = React.useRef<string>("");
   const ttsBufferTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   const chatInputRef = React.useRef<{ focus: () => void } | null>(null);
-
-  // Keep messagesRef in sync with messages state
-  React.useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
+  const [showToolManager, setShowToolManager] = React.useState(false);
+  const pendingToolCallsRef = React.useRef<ToolCall[] | null>(null);
 
   // TTS queue processor
   const processTtsQueue = React.useCallback(() => {
@@ -653,7 +678,12 @@ export function ChatInterface({
               value: chunk.parsed,
               setMessages,
               assistantMessage: assistantMessage.current,
+              onToolCalls: (toolCalls) => {
+                // Store tool calls to execute after streaming completes
+                pendingToolCallsRef.current = toolCalls;
+              },
               onNewContent: (content) => {
+                console.log(settings.ttsEnabled, content);
                 if (settings.ttsEnabled && content) {
                   // Add to buffer
                   ttsBufferRef.current += content;
@@ -697,6 +727,17 @@ export function ChatInterface({
             setIsLoading(false);
             setStreamingMessageId(null);
             streamingRef.current = null;
+
+            // Check if we have pending tool calls to execute
+            if (pendingToolCallsRef.current && assistantMessage.current) {
+              const toolCalls = pendingToolCallsRef.current;
+              pendingToolCallsRef.current = null;
+
+              // Execute tools and continue conversation
+              executeToolsAndContinue(toolCalls);
+
+              return; // Don't do the normal completion stuff
+            }
 
             assistantMessage.current = null;
 
@@ -753,8 +794,10 @@ export function ChatInterface({
             data?.body?.error?.message ?? "An unknown error occurred";
           AsyncAlert({
             message: (
-              <div className="flex flex-col gap-2 mb-4">
-                <h1 className="text-xl strong">Error</h1>
+              <>
+                <DialogTitleComponent className="mb-4 text-xl font-bold">
+                  Error
+                </DialogTitleComponent>
                 <p>{message}</p>
                 <p>
                   Could be upstream, check{" "}
@@ -762,7 +805,7 @@ export function ChatInterface({
                     https://status.openrouter.ai/
                   </a>
                 </p>
-              </div>
+              </>
             ),
           });
         }
@@ -838,6 +881,64 @@ export function ChatInterface({
   React.useEffect(() => {
     localStorage.setItem("selectedModel", selectedModel);
   }, [selectedModel]);
+
+  // Handle tool execution
+  const executeToolsAndContinue = React.useCallback(
+    async (toolCalls: ToolCall[]) => {
+      if (!settings.toolsEnabled || !toolCalls || toolCalls.length === 0) {
+        return;
+      }
+
+      // Execute tools
+      const toolResults = await executeToolCalls(toolCalls, settings.tools);
+
+      // Create tool result messages
+      const toolMessages: Message[] = toolResults.map((result) => ({
+        id: crypto.randomUUID(),
+        role: "tool",
+        tool_call_id: result.tool_call_id,
+        name: result.name,
+        content: result.content,
+        timestamp: Date.now(),
+      }));
+
+      // Add tool messages to the conversation
+      setMessages((prev) => [...prev, ...toolMessages]);
+
+      if (assistantMessage.current?.tool_calls?.length === 0) {
+        delete assistantMessage.current.tool_calls;
+      }
+
+      // Send a new request with the tool results
+      const requestBody: any = {
+        messages: messagesRef.current,
+        model: selectedModel,
+      };
+
+      if (settings.toolsEnabled && settings.tools.length > 0) {
+        requestBody.tools = formatToolsForAPI(settings.tools);
+      }
+
+      // Create a new assistant message for the final response
+      assistantMessage.current = {
+        id: crypto.randomUUID(),
+        content: "",
+        role: "assistant",
+        model: selectedModel,
+        timestamp: Date.now(),
+        timeToFinish: 0,
+      };
+
+      setMessages((prev) => [...prev, assistantMessage.current as Message]);
+      setStreamingMessageId(assistantMessage.current.id);
+      setIsLoading(true);
+
+      post<StreamResponse | Response>(`/chat/${chatId}`, requestBody, {
+        resolveImmediately: true,
+      });
+    },
+    [],
+  );
 
   // Add cleanup effect
   React.useEffect(() => {
@@ -972,13 +1073,15 @@ export function ChatInterface({
     setStreamingMessageId(assistantMessage.current.id);
     setTimeout(scrollNewMessage, 100);
 
-    post<StreamResponse | Response>(
-      `/chat/${chatId}`,
-      { messages: msgsRef, model: selectedModel },
-      {
-        resolveImmediately: true,
-      },
-    );
+    // Include tools if enabled
+    const requestBody: any = { messages: msgsRef, model: selectedModel };
+    if (settings.toolsEnabled && settings.tools.length > 0) {
+      requestBody.tools = formatToolsForAPI(settings.tools);
+    }
+
+    post<StreamResponse | Response>(`/chat/${chatId}`, requestBody, {
+      resolveImmediately: true,
+    });
   };
 
   const handleRetry = async (
@@ -1043,17 +1146,20 @@ export function ChatInterface({
       messagesToSend = [systemMessage, ...messagesUpToRetry];
     }
 
-    post<StreamResponse | Response>(
-      `/chat/${chatId}`,
-      {
-        messages: messagesToSend,
-        model: modelToUse,
-        messageIdToReplace: assistantMessage.current.id,
-      },
-      {
-        resolveImmediately: true,
-      },
-    );
+    // Include tools if enabled
+    const retryRequestBody: any = {
+      messages: messagesToSend,
+      model: modelToUse,
+      messageIdToReplace: assistantMessage.current.id,
+    };
+
+    if (settings.toolsEnabled && settings.tools.length > 0) {
+      retryRequestBody.tools = formatToolsForAPI(settings.tools);
+    }
+
+    post<StreamResponse | Response>(`/chat/${chatId}`, retryRequestBody, {
+      resolveImmediately: true,
+    });
   };
 
   const handleBranch = async (messageId: string, messageIndex: number) => {
@@ -1083,15 +1189,19 @@ export function ChatInterface({
     }
   };
 
-  const handleDelete = async (messageId: string) => {
-    const { ok } = await AsyncConfirm({
-      destructive: true,
-      title: "Delete Message",
-      message:
-        "Are you sure you want to delete this message? This action cannot be undone.",
-    });
+  const handleDelete = async (messageId: string, force?: boolean) => {
+    let ok;
+    if (!force) {
+      const { ok: _ok } = await AsyncConfirm({
+        destructive: true,
+        title: "Delete Message",
+        message:
+          "Are you sure you want to delete this message? This action cannot be undone.",
+      });
 
-    if (!ok) return;
+      if (!_ok) return;
+      ok = _ok;
+    }
 
     try {
       // Call API to delete message
@@ -1140,10 +1250,17 @@ export function ChatInterface({
         ),
       );
 
-      // Call API to update message
-      await put<Response>(`/chat/${chatId}/message/${messageId}`, {
-        content: newContent,
-      });
+      const isLastMessage = messageIndex === messages.length - 1;
+      if (isLastMessage) {
+        await handleDelete(messageId, true);
+        await handleSubmit(newContent, []);
+        return;
+      } else {
+        // Call API to update message
+        await put(`/chat/${chatId}/message/${messageId}`, {
+          content: newContent,
+        });
+      }
 
       // If this was a user message and we should regenerate the next assistant message
       if (regenerateNext && originalMessage.role === "user") {
@@ -1343,6 +1460,37 @@ export function ChatInterface({
             {messages &&
               messages.map((message, index) => {
                 if (message.role === "system") return null;
+
+                // Handle tool messages
+                if (message.role === "tool") {
+                  return (
+                    <div
+                      key={message.id}
+                      className="flex prose gap-3 py-3 px-6 bg-muted/30 border-l-4 border-primary/50"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Hammer className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-medium">
+                            Tool Result: {message.name}
+                          </span>
+                        </div>
+                        <pre>
+                          <CodeBlock>
+                            {typeof message.content === "string"
+                              ? JSON.stringify(
+                                  tryParseJson(message.content),
+                                  null,
+                                  2,
+                                )
+                              : JSON.stringify(message.content, null, 2)}
+                          </CodeBlock>
+                        </pre>
+                      </div>
+                    </div>
+                  );
+                }
+
                 return (
                   <div
                     key={message.id}
@@ -1540,6 +1688,39 @@ export function ChatInterface({
                                 ? message.content
                                 : "Assistant response"}
                             </ReactMarkdown>
+
+                            {/* Display tool calls if present */}
+                            {message.tool_calls &&
+                              message.tool_calls.length > 0 && (
+                                <div className="mt-4 space-y-2">
+                                  <div className="flex items-center gap-2 text-sm font-medium">
+                                    <Hammer className="h-4 w-4" />
+                                    <span>Using tools:</span>
+                                  </div>
+                                  {message.tool_calls.map((toolCall) => (
+                                    <div
+                                      key={toolCall.id}
+                                      className="bg-muted/50 rounded-lg p-3 text-sm"
+                                    >
+                                      <div className="font-medium mb-1">
+                                        {toolCall.function.name}
+                                      </div>
+                                      <pre>
+                                        <CodeBlock>
+                                          {JSON.stringify(
+                                            tryParseJson(
+                                              toolCall.function.arguments,
+                                            ),
+                                            null,
+                                            2,
+                                          )}
+                                        </CodeBlock>
+                                      </pre>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
                             {isLoading &&
                               streamingMessageId === message.id &&
                               !message.content && (
@@ -1644,7 +1825,11 @@ export function ChatInterface({
           selectedVoice={settings.selectedVoice}
           onVoiceChange={updateSelectedVoice}
           onSystemPromptEdit={handleSystemPromptEdit}
+          onToolsClick={() => setShowToolManager(true)}
         />
+
+        {/* Tool Manager Dialog */}
+        <ToolManager open={showToolManager} onOpenChange={setShowToolManager} />
       </div>
     </>
   );
@@ -1655,11 +1840,13 @@ function handleChunk({
   setMessages,
   assistantMessage,
   onNewContent,
+  onToolCalls,
 }: {
   value: any;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   assistantMessage: Message;
   onNewContent?: (content: string) => void;
+  onToolCalls?: (toolCalls: ToolCall[]) => void;
 }) {
   const usage = value?.usage;
 
@@ -1678,37 +1865,91 @@ function handleChunk({
     );
   }
 
-  const delta = value?.choices?.[0]?.delta;
-  const role = delta.role;
-  if (role !== "assistant") {
-    console.error(
-      "obviously we forgot to plan for message roles that aren't assistant",
-      value,
-    );
-    return;
-  }
+  const choice = value?.choices?.[0];
+  const delta = choice?.delta;
 
   if (!delta) {
     console.error("delta is not defined", value);
     return;
   }
-  const msgKey = delta.reasoning ? "reasoning" : "content";
-  const newContent = delta[msgKey] || "";
 
-  setMessages((prev) =>
-    prev.map((msg) =>
-      msg.id === assistantMessage.id
-        ? {
-            ...msg,
-            [msgKey]: (msg[msgKey] ?? "") + newContent,
-          }
-        : msg,
-    ),
-  );
+  // Handle regular content
+  if (delta.content || delta.reasoning) {
+    const msgKey = delta.reasoning ? "reasoning" : "content";
+    const newContent = delta[msgKey] || "";
 
-  // Notify about new content for TTS
-  if (newContent && onNewContent) {
-    onNewContent(newContent);
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === assistantMessage.id
+          ? {
+              ...msg,
+              [msgKey]: (msg[msgKey] ?? "") + newContent,
+            }
+          : msg,
+      ),
+    );
+
+    // Notify about new content for TTS
+    if (newContent && onNewContent) {
+      onNewContent(newContent);
+    }
+  }
+
+  // Handle tool calls streaming
+  if (delta.tool_calls) {
+    // Initialize tool_calls array if needed
+    assistantMessage.tool_calls = assistantMessage.tool_calls ?? [];
+
+    // Process each tool call delta
+    for (const toolCallDelta of delta.tool_calls) {
+      const index = toolCallDelta.index;
+
+      // Initialize tool call if it's the first chunk for this index
+      if (!assistantMessage.tool_calls[index]) {
+        assistantMessage.tool_calls[index] = {
+          id: toolCallDelta.id || "",
+          type: toolCallDelta.type || "function",
+          function: {
+            name: toolCallDelta.function?.name || "",
+            arguments: "",
+          },
+        };
+      }
+
+      // Update tool call data
+      if (toolCallDelta.id) {
+        assistantMessage.tool_calls[index].id = toolCallDelta.id;
+      }
+      if (toolCallDelta.function?.name) {
+        assistantMessage.tool_calls[index].function.name =
+          toolCallDelta.function.name;
+      }
+      if (toolCallDelta.function?.arguments) {
+        assistantMessage.tool_calls[index].function.arguments +=
+          toolCallDelta.function.arguments;
+      }
+    }
+
+    setMessages((prev) =>
+      prev.map((msg) => {
+        if (msg.id !== assistantMessage.id) return msg;
+
+        // Update the assistantMessage reference with the tool calls
+        return { ...msg, tool_calls: assistantMessage.tool_calls };
+      }),
+    );
+  }
+
+  // Check for finish reason
+  if (choice?.finish_reason === "tool_calls") {
+    // Tool calls are complete - notify the callback
+    if (
+      assistantMessage.tool_calls &&
+      assistantMessage.tool_calls.length > 0 &&
+      onToolCalls
+    ) {
+      onToolCalls(assistantMessage.tool_calls);
+    }
   }
 
   setMessages((prev) =>

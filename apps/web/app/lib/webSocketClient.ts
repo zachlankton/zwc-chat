@@ -427,6 +427,7 @@ class WebSocketClient {
     if (this._isSocketReady()) {
       const messageStr = JSON.stringify(message);
       this.socket!.send(messageStr);
+      message.body = tryParseJson(message.body) ?? message.body;
       this._log("Message sent:", message);
       return true;
     } else {
@@ -642,6 +643,7 @@ export {
 };
 
 export function tryParseJson(txt: string) {
+  if (!txt) return null;
   try {
     return JSON.parse(txt);
   } catch (error) {

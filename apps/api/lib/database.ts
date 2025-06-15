@@ -25,6 +25,17 @@ export interface OpenRouterMessage {
 	timeToFirstToken?: number;
 	timeToFinish?: number;
 	annotations?: any; // For storing PDF annotations
+	// Tool-related fields
+	tool_calls?: Array<{
+		id: string;
+		type: "function";
+		function: {
+			name: string;
+			arguments: string;
+		};
+	}>;
+	tool_call_id?: string; // For tool response messages
+	name?: string; // Tool name for tool messages
 }
 
 export type OpenRouterContent =
@@ -40,7 +51,7 @@ export interface Chat {
 	updatedAt: Date;
 	lastMessage?: string;
 	messageCount: number;
-	pinnedAt?: Date; // When the chat was pinned
+	pinnedAt?: Date | null; // When the chat was pinned
 	branchedFrom?: {
 		chatId: string;
 		messageId: string;
@@ -175,7 +186,11 @@ async function createIndexes() {
 
 	if (chatsCollection) {
 		// Index for user's chat list with pinned chats first
-		await chatsCollection.createIndex({ userEmail: 1, pinnedAt: -1, updatedAt: -1 });
+		await chatsCollection.createIndex({
+			userEmail: 1,
+			pinnedAt: -1,
+			updatedAt: -1,
+		});
 
 		// Unique index on chat id
 		await chatsCollection.createIndex({ id: 1 }, { unique: true });
