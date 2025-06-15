@@ -61,7 +61,7 @@ export const POST = apiHandler(
 				// Check if there's a system message at the beginning
 				const firstMessage = messages[0];
 				const hasSystemPrompt = firstMessage.role === "system";
-				
+
 				// Save system prompt if it exists and is not already saved
 				if (hasSystemPrompt) {
 					const messagesCollection = await getMessagesCollection();
@@ -69,12 +69,12 @@ export const POST = apiHandler(
 					const existingSystemMessage = await messagesCollection.findOne({
 						chatId: userChatId,
 						userEmail: req.session.email,
-						role: "system"
+						role: "system",
 					});
-					
+
 					if (!existingSystemMessage) {
-						const systemMessageId = validateUUID(firstMessage.id) 
-							? firstMessage.id 
+						const systemMessageId = validateUUID(firstMessage.id)
+							? firstMessage.id
 							: crypto.randomUUID();
 						const systemMessage: OpenRouterMessage = {
 							id: systemMessageId,
@@ -85,13 +85,33 @@ export const POST = apiHandler(
 							timestamp: Date.now() - 1, // Slightly before user message
 						};
 						await messagesCollection.insertOne(systemMessage);
-						console.log(`System message saved to database for chat ${userChatId}`);
+						console.log(
+							`System message saved to database for chat ${userChatId}`
+						);
 					}
 				}
-				
+
 				// Save user message
-				const lastMessage = messages[messages.length - 1];
-				if (lastMessage.role === "user") {
+				let currentMessageIndex = messages.length - 1;
+				let lastMessage: OpenRouterMessage = messages[currentMessageIndex];
+				const lastRole = lastMessage.role;
+				const save = ["user", "tool"].includes(lastRole);
+
+				if (lastRole === "tool") {
+					// get first tool call in this latest round
+					while (lastMessage.role === "tool") {
+						currentMessageIndex--;
+						lastMessage = messages[currentMessageIndex];
+					}
+					currentMessageIndex++;
+					lastMessage = messages[currentMessageIndex];
+				}
+
+				if (lastRole === "user") {
+					lastMessage = messages[currentMessageIndex];
+				}
+
+				while (save && currentMessageIndex < messages.length) {
 					const chatId = userChatId;
 					const validMessageId = validateUUID(lastMessage.id);
 					const userMessageId = validMessageId
@@ -102,7 +122,9 @@ export const POST = apiHandler(
 						chatId,
 						userEmail: req.session.email,
 						content: lastMessage.content,
-						role: "user",
+						tool_call_id: lastMessage.tool_call_id,
+						name: lastMessage.name,
+						role: lastMessage.role,
 						model: model, // Store which model the user requested
 						timestamp: Date.now(),
 					};
@@ -151,6 +173,9 @@ export const POST = apiHandler(
 						},
 						{ upsert: true }
 					);
+
+					currentMessageIndex++;
+					lastMessage = messages[currentMessageIndex];
 				}
 			}
 		} catch (error) {
@@ -194,6 +219,8 @@ export const POST = apiHandler(
 					// Optional: Default is false. All models support this.
 					exclude: false, // Set to true to exclude reasoning tokens from response
 				},
+				// Include tools if provided
+				...(body.tools && { tools: body.tools }),
 			}),
 		}).then((r) => {
 			r.headers.set("x-zwc-chat-id", userChatId);
@@ -276,6 +303,10 @@ export const GET = apiHandler(
 				timeToFirstToken: msg.timeToFirstToken,
 				timeToFinish: msg.timeToFinish,
 				annotations: msg.annotations,
+				// Include tool-related fields
+				tool_calls: msg.tool_calls?.length === 0 ? undefined : msg.tool_calls,
+				tool_call_id: msg.tool_call_id,
+				name: msg.name,
 			}));
 
 			return Response.json({

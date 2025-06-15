@@ -1,5 +1,6 @@
 import { useQuery, type FetchQueryOptions } from "@tanstack/react-query";
 import { queryClient } from "~/providers/queryClient";
+import type { Tool } from "~/types/tools";
 
 export interface ChatSettings {
   enterToSend: boolean;
@@ -7,6 +8,8 @@ export interface ChatSettings {
   selectedVoice: string;
   availableVoices: SpeechSynthesisVoice[];
   systemPrompt: string;
+  tools: Tool[];
+  toolsEnabled: boolean;
 }
 
 const CHAT_SETTINGS_KEY = "CHAT_SETTINGS";
@@ -21,6 +24,8 @@ const defaultSettings: ChatSettings = {
   selectedVoice: "",
   availableVoices: [],
   systemPrompt: defaultSystemPrompt,
+  tools: [],
+  toolsEnabled: false,
 };
 
 // Load settings from localStorage
@@ -51,6 +56,34 @@ function loadSettings(): ChatSettings {
   const savedSystemPrompt = localStorage.getItem("systemPrompt");
   if (savedSystemPrompt) {
     settings.systemPrompt = savedSystemPrompt;
+  }
+
+  // Load tools
+  const savedTools = localStorage.getItem("chat-tools");
+  if (savedTools) {
+    try {
+      const parsedTools = JSON.parse(savedTools);
+      // Ensure the parsed value is an array
+      if (Array.isArray(parsedTools)) {
+        settings.tools = parsedTools;
+      } else {
+        console.error("Saved tools is not an array, resetting to empty array");
+        settings.tools = [];
+        // Clean up the corrupted data
+        localStorage.removeItem("chat-tools");
+      }
+    } catch (e) {
+      console.error("Failed to parse saved tools:", e);
+      settings.tools = [];
+      // Clean up the corrupted data
+      localStorage.removeItem("chat-tools");
+    }
+  }
+
+  // Load tools enabled preference
+  const savedToolsEnabled = localStorage.getItem("toolsEnabled");
+  if (savedToolsEnabled !== null) {
+    settings.toolsEnabled = savedToolsEnabled === "true";
   }
 
   // Load available voices
@@ -126,6 +159,10 @@ export function updateChatSetting<K extends keyof ChatSettings>(
       localStorage.setItem("ttsVoice", value as string);
     } else if (key === "systemPrompt") {
       localStorage.setItem("systemPrompt", value as string);
+    } else if (key === "tools") {
+      localStorage.setItem("chat-tools", JSON.stringify(value));
+    } else if (key === "toolsEnabled") {
+      localStorage.setItem("toolsEnabled", String(value));
     }
   }
 
@@ -150,6 +187,8 @@ export function useChatSettings() {
       updateChatSetting("selectedVoice", value),
     updateSystemPrompt: (value: string) =>
       updateChatSetting("systemPrompt", value),
+    updateTools: (value: Tool[]) => updateChatSetting("tools", value),
+    updateToolsEnabled: (value: boolean) =>
+      updateChatSetting("toolsEnabled", value),
   };
 }
-

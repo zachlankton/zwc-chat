@@ -13,15 +13,15 @@ export function sanitizeHeaders(req: Request | undefined) {
 		);
 
 	const headersCopy = { ...req.headers.toJSON() };
-	delete headersCopy.cookie;
-	delete headersCopy["x-api-secret"];
+	headersCopy.cookie = undefined;
+	headersCopy["x-api-secret"] = undefined;
 	if (headersCopy.authorization) headersCopy.authorization = "********";
 	return headersCopy;
 }
 
 function sanitizeResponseHeaders(res: Response) {
 	const headersCopy = { ...res.headers.toJSON() };
-	delete headersCopy["set-cookie"];
+	headersCopy["set-cookie"] = undefined;
 	if (headersCopy.authorization) headersCopy.authorization = "********";
 	return headersCopy;
 }

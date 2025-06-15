@@ -283,6 +283,15 @@ interface EventType {
 				content: string;
 				reasoning: string | null;
 				annotations: any;
+				tool_calls: {
+					id: string;
+					index: number;
+					type: "function";
+					function: {
+						name: string;
+						arguments: string; // JSON string
+					};
+				}[];
 			};
 			finish_reason: string | null;
 			native_finish_reason: string | null;
@@ -306,9 +315,12 @@ async function parseStreamingChunks(
 	const chunks = text.split("\n\n");
 	if (chunks[0] === "") chunks.shift();
 
-	for (const chunk of chunks) {
-		//await appendFile("debug-chunks.txt", chunk);
+	// Initialize tool calls array if needed
+	if (!newMessage.tool_calls) {
+		newMessage.tool_calls = [];
+	}
 
+	for (const chunk of chunks) {
 		// Extract data from SSE event
 		const dataMatch = chunk.match(/^data: (.+)$/m);
 		if (dataMatch) {
@@ -318,6 +330,11 @@ async function parseStreamingChunks(
 				console.log("Received message:", { data });
 			} else {
 				const value = tryParseJson(data) as EventType;
+				//await appendFile(
+				//	"debug-chunks.txt",
+				//	JSON.stringify(value, null, 2) + "\n\n"
+				//);
+
 				if (!value) continue;
 
 				// Extract model information
@@ -346,7 +363,7 @@ async function parseStreamingChunks(
 					newMessage.annotations = delta.annotations;
 				}
 
-				if (role !== "assistant") {
+				if (role && role !== "assistant") {
 					console.error(
 						"obviously we forgot to plan for message roles that aren't assistant",
 						value
@@ -354,11 +371,51 @@ async function parseStreamingChunks(
 					continue;
 				}
 
-				if (delta) {
+				// Handle regular content
+				if (delta.content || delta.reasoning) {
 					const msgKey = delta.reasoning ? "reasoning" : "content";
 					if (delta[msgKey]) {
 						newMessage[msgKey] = (newMessage[msgKey] ?? "") + delta[msgKey];
 					}
+				}
+
+				// Handle tool calls streaming
+				if (delta.tool_calls) {
+					for (const toolCallDelta of delta.tool_calls) {
+						const index = toolCallDelta.index;
+
+						// Initialize tool call if it's the first chunk for this index
+						if (!newMessage.tool_calls[index]) {
+							newMessage.tool_calls[index] = {
+								id: toolCallDelta.id || "",
+								type: toolCallDelta.type || "function",
+								function: {
+									name: toolCallDelta.function?.name || "",
+									arguments: "",
+								},
+							};
+						}
+
+						// Update tool call data
+						if (toolCallDelta.id) {
+							newMessage.tool_calls[index].id = toolCallDelta.id;
+						}
+						if (toolCallDelta.function?.name) {
+							newMessage.tool_calls[index].function.name =
+								toolCallDelta.function.name;
+						}
+						if (toolCallDelta.function?.arguments) {
+							newMessage.tool_calls[index].function.arguments +=
+								toolCallDelta.function.arguments;
+						}
+					}
+				}
+
+				// Check for finish reason
+				const finishReason = value?.choices?.[0]?.finish_reason;
+				if (finishReason === "tool_calls") {
+					// Tool calls are complete - they've been built incrementally
+					console.log("Tool calls complete:", newMessage.tool_calls);
 				}
 			}
 		}
@@ -386,6 +443,10 @@ async function saveMessageAndUpdateChat(
 		if (originalMessage) {
 			// Preserve the original timestamp
 			newMessage.timestamp = originalMessage.timestamp;
+		}
+
+		if (newMessage.tool_calls?.length === 0) {
+			newMessage.tool_calls = undefined;
 		}
 
 		// Update existing message

@@ -31,7 +31,7 @@ export async function getSession(token: string): Promise<SessionData | null> {
 				} catch (error) {
 					console.error("Failed to decrypt API key for session:", error);
 					// Remove the encrypted key if decryption fails
-					delete dbSession.openRouterApiKey;
+					dbSession.openRouterApiKey = undefined;
 				}
 			}
 
