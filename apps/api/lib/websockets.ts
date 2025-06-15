@@ -446,7 +446,7 @@ async function saveMessageAndUpdateChat(
 		}
 
 		if (newMessage.tool_calls?.length === 0) {
-			delete newMessage.tool_calls;
+			newMessage.tool_calls = undefined;
 		}
 
 		// Update existing message

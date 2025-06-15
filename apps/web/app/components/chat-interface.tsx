@@ -909,7 +909,7 @@ export function ChatInterface({
         setMessages((prev) => [...prev, ...toolMessages]);
 
         if (assistantMessage.current?.tool_calls?.length === 0) {
-          delete assistantMessage.current.tool_calls;
+          assistantMessage.current.tool_calls = undefined;
         }
 
         // Send a new request with the tool results
