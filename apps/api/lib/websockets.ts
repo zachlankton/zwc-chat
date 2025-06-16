@@ -575,7 +575,6 @@ async function streamedChunks(
 		const subs = chatSubs.get(ctx.params.chatId);
 		for (const sub of subs!) {
 			const subSocket = socketSubs.get(sub);
-			console.log("SUB", sub, subSocket === undefined);
 
 			if (!subSocket) continue;
 			let valueToSend = value;

@@ -439,16 +439,6 @@ export function ChatInterface({
   chatId,
   initialMessages = [],
 }: ChatInterfaceProps) {
-  const {
-    data: modelsData,
-    isLoading: modelsLoading,
-    error: modelsError,
-  } = useQuery<ModelsResponse>({
-    queryKey: ["models"],
-    queryFn: () => get("/api/models"),
-    staleTime: 60 * 60 * 1000, // 1 hour
-  });
-
   const apiKeyInfo = useApiKeyInfo();
 
   const streamingRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -1456,6 +1446,16 @@ export function ChatInterface({
       }
     }
   };
+
+  const {
+    data: modelsData,
+    isLoading: modelsLoading,
+    error: modelsError,
+  } = useQuery<ModelsResponse>({
+    queryKey: ["models"],
+    queryFn: () => get("/api/models"),
+    staleTime: 60 * 60 * 1000, // 1 hour
+  });
 
   return (
     <>
