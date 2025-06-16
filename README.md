@@ -1,4 +1,4 @@
-# Z3Chat
+# ZWC Chat
 
 A modern, real-time chat application with AI integration, built with Bun, React, and WebSockets.
 
