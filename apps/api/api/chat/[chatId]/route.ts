@@ -8,7 +8,7 @@ import {
 } from "lib/database";
 import { DEFAULT_MODEL } from "lib/modelConfig";
 import type { ExtendedRequest } from "lib/server-types";
-import { chatSubs, socketSubs } from "lib/websockets";
+import { chatSubs, sendMessageToChatSubs, socketSubs } from "lib/websockets";
 
 // UUID v4 validation regex
 const UUID_V4_REGEX =
@@ -39,6 +39,7 @@ export const POST = apiHandler(
 		await getCurrentSession(req);
 		if (!req.session) throw notAuthorized();
 		if (!req.session.email) throw notAuthorized();
+		const wsId = (req as ExtendedRequest).wsId;
 
 		const body = await req.json().catch(() => null);
 		if (body === null) throw badRequest("Could not parse the body");
@@ -59,6 +60,12 @@ export const POST = apiHandler(
 		// Save messages before processing (only if not retrying)
 		try {
 			const messages = body.messages;
+			sendMessageToChatSubs(wsId, userChatId, {
+				subType: "msg-post",
+				lastMessage: messages.at(-1),
+				messageIdToReplace,
+			});
+
 			if (messages && messages.length > 0 && !messageIdToReplace) {
 				// Check if there's a system message at the beginning
 				const firstMessage = messages[0];
@@ -194,10 +201,26 @@ export const POST = apiHandler(
 			);
 		}
 
+		const messagesCollection = await getMessagesCollection();
+
 		// Store messageIdToReplace in the request for websocket handler
 		if (messageIdToReplace) {
 			// The request becomes ExtendedRequest in the websocket handler
 			(req as ExtendedRequest).messageIdToReplace = messageIdToReplace;
+			await messagesCollection.updateOne(
+				{
+					id: messageIdToReplace,
+					chatId: userChatId,
+					userEmail: req.session.email,
+				},
+				{
+					$set: {
+						content: "",
+						reasoning: undefined,
+						tool_calls: undefined,
+					},
+				}
+			);
 		}
 
 		if (overrideAssistantTimestamp) {
@@ -364,6 +387,7 @@ export const DELETE = apiHandler(
 		await getCurrentSession(req);
 		if (!req.session) throw notAuthorized();
 		if (!req.session.email) throw notAuthorized();
+		const wsId = (req as ExtendedRequest).wsId;
 
 		const chatId = params.chatId;
 		if (!validateUUID(chatId)) {
@@ -398,6 +422,10 @@ export const DELETE = apiHandler(
 				userEmail: req.session.email,
 			});
 
+			sendMessageToChatSubs(wsId, chatId, {
+				subType: "chat-delete",
+				chatId,
+			});
 			return Response.json({ success: true });
 		} catch (error) {
 			console.error("Failed to delete chat:", error);
@@ -414,6 +442,7 @@ export const PUT = apiHandler(
 		await getCurrentSession(req);
 		if (!req.session) throw notAuthorized();
 		if (!req.session.email) throw notAuthorized();
+		const wsId = (req as ExtendedRequest).wsId;
 
 		const chatId = params.chatId;
 		if (!validateUUID(chatId)) {
@@ -456,6 +485,11 @@ export const PUT = apiHandler(
 				{ $set: updateData }
 			);
 
+			sendMessageToChatSubs(wsId, chatId, {
+				subType: "chat-update",
+				chatId,
+				body,
+			});
 			return Response.json({ success: true });
 		} catch (error) {
 			console.error("Failed to update chat:", error);

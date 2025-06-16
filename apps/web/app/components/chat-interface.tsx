@@ -69,6 +69,7 @@ import {
 import { ToolManager } from "./tool-manager";
 import { formatToolsForAPI, executeToolCalls } from "~/lib/tool-executor";
 import type { ToolCall } from "~/types/tools";
+import { useNavigate } from "react-router";
 
 interface Message {
   id: string;
@@ -440,9 +441,10 @@ export function ChatInterface({
   initialMessages = [],
 }: ChatInterfaceProps) {
   const apiKeyInfo = useApiKeyInfo();
+  const navigate = useNavigate();
 
-  const streamingRef = React.useRef<NodeJS.Timeout | null>(null);
   const isNewChat = React.useRef<boolean>(false);
+  const resettingOffset = React.useRef<boolean>(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [streamingMessageId, setStreamingMessageId] = React.useState<
     string | null
@@ -650,6 +652,91 @@ export function ChatInterface({
     }
   }, [settings.ttsEnabled]);
 
+  const handleChatSubMessage = React.useCallback((data: any) => {
+    function msgUpdate(data: any = {}) {
+      //find message
+      const msg = messagesRef.current.find((m) => m.id === data.messageId);
+      if (!msg) return;
+      msg.content = data.content;
+      setMessages((prev) => [...prev]);
+    }
+
+    function msgDelete(data: any = {}) {
+      const msgIndex = messagesRef.current.findIndex(
+        (m) => m.id === data.messageId,
+      );
+      if (!msgIndex) return;
+      messagesRef.current.splice(msgIndex, 1);
+      setMessages((prev) => [...prev]);
+    }
+
+    function msgPost(data: any = {}) {
+      const lastMessageId = data.lastMessage.id;
+      const userMsg = messagesRef.current.find((m) => m.id === lastMessageId);
+      if (!userMsg) {
+        const newUserMessage = {
+          id: lastMessageId,
+          content: data.lastMessage.content,
+          role: data.lastMessage.role,
+          timestamp: data.lastMessage.timestamp,
+        };
+        setMessages((prev) => [...prev, newUserMessage]);
+        setTimeout(scrollNewMessage, 100);
+      }
+
+      if (assistantMessage.current === null) {
+        const newMessageId = data.messageIdToReplace;
+        const existingMessage = messagesRef.current.find(
+          (m) => m.id === newMessageId,
+        );
+        if (existingMessage) {
+          existingMessage.content = "";
+          existingMessage.reasoning = undefined;
+          existingMessage.tool_calls = undefined;
+          assistantMessage.current = existingMessage;
+          setMessages((prev) => [...prev]);
+        } else {
+          assistantMessage.current = {
+            id: newMessageId,
+            content: "",
+            role: "assistant",
+            model: selectedModel,
+            timestamp: Date.now(),
+            timeToFinish: 0,
+          };
+          setMessages((prev) => [...prev, assistantMessage.current as Message]);
+        }
+        setIsLoading(true);
+        updateStreamingMessageId(assistantMessage.current.id);
+      }
+    }
+
+    async function chatDelete() {
+      await AsyncAlert({
+        title: "Deleted",
+        message: "This chat has been deleted",
+      });
+      const newChatId = crypto.randomUUID();
+      navigate(`/chat/${newChatId}`, { replace: true });
+    }
+
+    const handlers = {
+      "msg-update": msgUpdate,
+      "msg-delete": msgDelete,
+      "msg-post": msgPost,
+      "chat-delete": chatDelete,
+    };
+
+    const msgData = data.data;
+    if (!msgData) return;
+
+    const subType: keyof typeof handlers | undefined = msgData.subType;
+    if (!subType) return;
+    if (!handlers[subType]) return;
+
+    handlers[subType](msgData);
+  }, []);
+
   const wsStream = React.useCallback(
     (data: any) => {
       const messageHasThisChatId =
@@ -663,14 +750,25 @@ export function ChatInterface({
         if (!header.chatId) return;
         if (header.chatId !== chatId) return;
         const messageId = header.newMessageId;
+        const thisMessageIsFromTheOriginSocket =
+          header.thisMessageIsFromTheOriginSocket;
+
         if (assistantMessage.current === null) {
+          if (header.offset > 0) {
+            if (resettingOffset.current) return;
+            resettingOffset.current = true;
+            get(`/api/chat/${chatId}`);
+            return;
+          }
+
+          resettingOffset.current = false;
           const newMessageId = header.newMessageId;
           const existingMessage = messagesRef.current.find(
             (m) => m.id === newMessageId,
           );
           if (existingMessage) {
             existingMessage.content = "";
-            existingMessage.reasoning = "";
+            existingMessage.reasoning = undefined;
             existingMessage.tool_calls = undefined;
             assistantMessage.current = existingMessage;
           } else {
@@ -688,7 +786,9 @@ export function ChatInterface({
             ]);
           }
         }
+
         assistantMessage.current.id = messageId;
+        assistantMessage.current.timestamp = header.newMessageTimestamp;
 
         for (const chunk of parseSSEEvents(text, buffer)) {
           if (chunk.type === "data" && assistantMessage.current) {
@@ -743,7 +843,6 @@ export function ChatInterface({
           } else if (chunk.type === "done") {
             setIsLoading(false);
             updateStreamingMessageId(null);
-            streamingRef.current = null;
 
             // Check if we have pending tool calls to execute
             if (pendingToolCallsRef.current && assistantMessage.current) {
@@ -751,7 +850,9 @@ export function ChatInterface({
               pendingToolCallsRef.current = null;
 
               // Execute tools and continue conversation
-              executeToolsAndContinue(toolCalls);
+              if (thisMessageIsFromTheOriginSocket) {
+                executeToolsAndContinue(toolCalls);
+              }
 
               return; // Don't do the normal completion stuff
             }
@@ -795,6 +896,10 @@ export function ChatInterface({
       } else {
         if (!messageHasThisChatId) return;
 
+        if (data.type === "chat-sub-message") {
+          return handleChatSubMessage(data);
+        }
+
         if (
           data.status === 403 &&
           data.body &&
@@ -835,7 +940,6 @@ export function ChatInterface({
 
         setIsLoading(false);
         updateStreamingMessageId(null);
-        streamingRef.current = null;
         isNewChat.current = false;
       }
     },
@@ -876,6 +980,7 @@ export function ChatInterface({
 
   // Update messages when initialMessages changes (e.g., when switching chats)
   React.useEffect(() => {
+    if (assistantMessage.current !== null) return;
     setMessages(initialMessages);
 
     // Also update the selected model based on the new chat's messages
@@ -995,18 +1100,20 @@ export function ChatInterface({
     [chatId, selectedModel, settings.toolsEnabled, settings.tools],
   );
 
-  // Add cleanup effect
-  React.useEffect(() => {
-    return () => {
-      if (streamingRef.current) {
-        clearInterval(streamingRef.current);
-      }
-    };
-  }, []);
-
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({
       behavior: "auto",
+      block: "end",
+    });
+  };
+
+  const scrollActiveAssistantMessage = () => {
+    // Get all elements with the class and take the last one
+    if (assistantMessage.current === null) return;
+    const element = document.getElementById(assistantMessage.current.id);
+    if (!element) return;
+    element.scrollIntoView({
+      behavior: "smooth",
       block: "end",
     });
   };
@@ -1023,7 +1130,13 @@ export function ChatInterface({
   };
 
   React.useEffect(() => {
-    setTimeout(scrollToBottom, 100);
+    setTimeout(() => {
+      if (assistantMessage.current === null) {
+        scrollToBottom();
+      } else {
+        scrollActiveAssistantMessage();
+      }
+    }, 100);
   }, [chatId]);
 
   const handleSubmit = async (input: string, attachments: File[]) => {
@@ -1312,7 +1425,8 @@ export function ChatInterface({
       );
 
       const isLastMessage = messageIndex === messages.length - 1;
-      if (isLastMessage) {
+      const isUserMessage = originalMessage.role === "user";
+      if (isLastMessage && isUserMessage) {
         await handleDelete(messageId, true);
         await handleSubmit(newContent, []);
         return;
@@ -1580,6 +1694,7 @@ export function ChatInterface({
                 return (
                   <div
                     key={message.id}
+                    id={message.id}
                     className={cn(
                       "flex gap-3 py-6 border-b border-border/50 last:border-0",
                       message.role === "user" ? "flex-row-reverse" : "",

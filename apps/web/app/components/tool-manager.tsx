@@ -11,7 +11,15 @@ import { ScrollArea } from "~/components/ui/scroll-area";
 import { Switch } from "~/components/ui/switch";
 import { useChatSettings } from "~/stores/chat-settings";
 import type { Tool } from "~/types/tools";
-import { Plus, Trash2, Download, Upload, Edit2, Sparkles, ChevronDown } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Download,
+  Upload,
+  Edit2,
+  Sparkles,
+  ChevronDown,
+} from "lucide-react";
 import { ToolEditor } from "./tool-editor";
 import { cn } from "~/lib/utils";
 import { exampleTools } from "~/lib/example-tools";
@@ -28,7 +36,12 @@ interface ToolManagerProps {
 }
 
 export function ToolManager({ open, onOpenChange }: ToolManagerProps) {
-  const { settings, updateTools, updateToolsEnabled, updateHideToolCallMessages } = useChatSettings();
+  const {
+    settings,
+    updateTools,
+    updateToolsEnabled,
+    updateHideToolCallMessages,
+  } = useChatSettings();
   const [editingTool, setEditingTool] = useState<Tool | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [createWithExample, setCreateWithExample] = useState(false);
@@ -128,7 +141,7 @@ export function ToolManager({ open, onOpenChange }: ToolManagerProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="min-w-[80dvw] h-[60dvw] flex flex-col">
+      <DialogContent className="min-w-[80dvw] h-[80dvh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Manage Tools</DialogTitle>
           <DialogDescription>
@@ -309,4 +322,3 @@ export function ToolManager({ open, onOpenChange }: ToolManagerProps) {
     </Dialog>
   );
 }
-

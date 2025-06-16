@@ -2,6 +2,8 @@ import type { RequestWithSession } from "api/auth/session/sessionCache";
 import { getCurrentSession } from "api/auth/session/utils";
 import { apiHandler, badRequest, notAuthorized } from "lib/utils";
 import { getMessagesCollection, getChatsCollection } from "lib/database";
+import type { ExtendedRequest } from "lib/server-types";
+import { sendMessageToChatSubs } from "lib/websockets";
 
 // UUID v4 validation regex
 const UUID_V4_REGEX =
@@ -19,6 +21,7 @@ export const PUT = apiHandler(
 		await getCurrentSession(req);
 		if (!req.session) throw notAuthorized();
 		if (!req.session.email) throw notAuthorized();
+		const wsId = (req as ExtendedRequest).wsId;
 
 		const { chatId, messageId } = params;
 
@@ -94,6 +97,11 @@ export const PUT = apiHandler(
 				);
 			}
 
+			sendMessageToChatSubs(wsId, chatId, {
+				subType: "msg-update",
+				messageId,
+				content: body.content,
+			});
 			return Response.json({ success: true });
 		} catch (error) {
 			console.error("Error updating message:", error);
@@ -113,6 +121,7 @@ export const DELETE = apiHandler(
 		await getCurrentSession(req);
 		if (!req.session) throw notAuthorized();
 		if (!req.session.email) throw notAuthorized();
+		const wsId = (req as ExtendedRequest).wsId;
 
 		const { chatId, messageId } = params;
 
@@ -201,6 +210,10 @@ export const DELETE = apiHandler(
 				);
 			}
 
+			sendMessageToChatSubs(wsId, chatId, {
+				subType: "msg-delete",
+				messageId,
+			});
 			return Response.json({ success: true });
 		} catch (error) {
 			console.error("Error deleting message:", error);

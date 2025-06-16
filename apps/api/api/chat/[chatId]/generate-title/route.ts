@@ -2,6 +2,8 @@ import type { RequestWithSession } from "api/auth/session/sessionCache";
 import { getCurrentSession } from "api/auth/session/utils";
 import { apiHandler, badRequest, notAuthorized } from "lib/utils";
 import { getMessagesCollection, getChatsCollection } from "lib/database";
+import type { ExtendedRequest } from "lib/server-types";
+import { sendMessageToChatSubs } from "lib/websockets";
 
 // UUID v4 validation regex
 const UUID_V4_REGEX =
@@ -19,6 +21,7 @@ export const POST = apiHandler(
 		await getCurrentSession(req);
 		if (!req.session) throw notAuthorized();
 		if (!req.session.email) throw notAuthorized();
+		const wsId = (req as ExtendedRequest).wsId;
 
 		const chatId = params.chatId;
 		if (!validateUUID(chatId)) {
@@ -127,6 +130,11 @@ export const POST = apiHandler(
 					},
 				}
 			);
+
+			sendMessageToChatSubs(wsId, chatId, {
+				subType: "chat-title-generated",
+				generatedTitle,
+			});
 
 			return Response.json({
 				success: true,
