@@ -1,13 +1,13 @@
 {
-	"name": "@z3chat/api",
+	"name": "@zwc-chat/api",
 	"module": "index.ts",
 	"type": "module",
 	"version": "0.1.0",
-	"description": "Backend API for z3chat - WebSocket-based chat streaming with AI integration",
+	"description": "Backend API for zwc-chat - WebSocket-based chat streaming with AI integration",
 	"private": true,
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/zachlankton/z3chat.git",
+		"url": "https://github.com/zachlankton/zwc-chat.git",
 		"directory": "apps/api"
 	},
 	"keywords": [

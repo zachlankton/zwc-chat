@@ -39,5 +39,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Authentication system with WorkOS integration
 - Project documentation (README, LICENSE, CONTRIBUTING)
 
-[Unreleased]: https://github.com/zachlankton/z3chat/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/zachlankton/z3chat/releases/tag/v0.1.0
+[Unreleased]: https://github.com/zachlankton/zwc-chat/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/zachlankton/zwc-chat/releases/tag/v0.1.0

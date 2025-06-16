@@ -13,7 +13,9 @@ export function sanitizeHeaders(req: Request | undefined) {
 		);
 
 	const headersCopy = { ...req.headers.toJSON() };
+	//@ts-ignore
 	headersCopy.cookie = undefined;
+	//@ts-ignore
 	headersCopy["x-api-secret"] = undefined;
 	if (headersCopy.authorization) headersCopy.authorization = "********";
 	return headersCopy;

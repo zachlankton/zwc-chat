@@ -8,6 +8,7 @@ import {
 } from "lib/database";
 import { DEFAULT_MODEL } from "lib/modelConfig";
 import type { ExtendedRequest } from "lib/server-types";
+import { chatSubs, socketSubs } from "lib/websockets";
 
 // UUID v4 validation regex
 const UUID_V4_REGEX =
@@ -252,6 +253,7 @@ export const GET = apiHandler(
 		await getCurrentSession(req);
 		if (!req.session) throw notAuthorized();
 		if (!req.session.email) throw notAuthorized();
+		const wsId = (req as ExtendedRequest).wsId;
 
 		const chatId = params.chatId;
 		if (!validateUUID(chatId)) {
@@ -272,6 +274,23 @@ export const GET = apiHandler(
 		const offset = !isNaN(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
 
 		try {
+			// a  little sub unsub dance for the current socket
+			const prevSubChatId = socketSubs.get(wsId);
+			if (prevSubChatId) {
+				let prevChatSubSocketIds = chatSubs.get(prevSubChatId.chatId);
+				if (prevChatSubSocketIds) {
+					prevChatSubSocketIds.delete(wsId);
+				}
+			}
+
+			let newChatSubSocketIds = chatSubs.get(chatId);
+			if (!newChatSubSocketIds) {
+				newChatSubSocketIds = new Set();
+				chatSubs.set(chatId, newChatSubSocketIds);
+			}
+			newChatSubSocketIds.add(wsId);
+			socketSubs.set(wsId, { chatId, offset: 0 });
+
 			// First verify the user owns this chat
 			const chatsCollection = await getChatsCollection();
 			const chat = await chatsCollection.findOne({

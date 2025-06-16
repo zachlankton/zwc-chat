@@ -1,12 +1,12 @@
 {
-  "name": "@z3chat/web",
+  "name": "@zwc-chat/web",
   "version": "0.1.0",
-  "description": "Frontend React application for z3chat - Modern AI chat interface",
+  "description": "Frontend React application for zwc-chat - Modern AI chat interface",
   "private": true,
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/zachlankton/z3chat.git",
+    "url": "https://github.com/zachlankton/zwc-chat.git",
     "directory": "apps/web"
   },
   "keywords": [

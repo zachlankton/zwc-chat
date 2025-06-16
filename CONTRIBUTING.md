@@ -1,10 +1,10 @@
-# Contributing to Z3Chat
+# Contributing to ZWCChat
 
-First off, thank you for considering contributing to Z3Chat! It's people like you that make Z3Chat such a great tool.
+First off, thank you for considering contributing to ZWCChat! It's people like you that make ZWCChat such a great tool.
 
 ## Code of Conduct
 
-This project and everyone participating in it is governed by the [Z3Chat Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
+This project and everyone participating in it is governed by the [ZWCChat Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
 
 ## How Can I Contribute?
 
@@ -104,7 +104,7 @@ Use descriptive branch names:
 Please maintain the existing project structure:
 
 ```
-z3chat/
+zwc-chat/
 ├── apps/
 │   ├── api/        # Backend code
 │   └── web/        # Frontend code

@@ -51,8 +51,8 @@ A modern, real-time chat application with AI integration, built with Bun, React,
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/z3chat.git
-cd z3chat
+git clone https://github.com/zachlankton/zwc-chat.git
+cd zwc-chat
 ```
 
 2. Install dependencies:
@@ -69,7 +69,7 @@ Create `.env.development` files in both `apps/api` and `apps/web` directories:
 
 ```env
 PORT=3000
-MONGODB_URI=mongodb://localhost:27017/z3chat
+MONGODB_URI=mongodb://localhost:27017/zwcchat
 WORKOS_API_KEY=your_workos_api_key
 WORKOS_CLIENT_ID=your_workos_client_id
 WORKOS_REDIRECT_URI=https://localhost:3000/api/auth/callback
@@ -121,17 +121,17 @@ Both applications include Dockerfiles for containerized deployment:
 ```bash
 # Build API container
 cd apps/api
-docker build -t z3chat-api .
+docker build -t zwc-chat-api .
 
 # Build web container
 cd apps/web
-docker build -t z3chat-web .
+docker build -t zwc-chat-web .
 ```
 
 ## Project Structure
 
 ```
-z3chat/
+zwc-chat/
 ├── apps/
 │   ├── api/              # Backend API server
 │   │   ├── src/          # Source code
@@ -177,4 +177,4 @@ For security concerns, please review our [Security Policy](SECURITY.md).
 
 ---
 
-Made with ❤️ by the Z3Chat team
+Made with ❤️ by the ZWCChat team

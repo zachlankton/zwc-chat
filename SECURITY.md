@@ -8,7 +8,7 @@
 
 ## Reporting a Vulnerability
 
-We take the security of z3chat seriously. If you have discovered a security vulnerability in our project, please report it to us as described below.
+We take the security of zwc chat seriously. If you have discovered a security vulnerability in our project, please report it to us as described below.
 
 ### How to Report a Security Vulnerability
 
@@ -16,7 +16,7 @@ We take the security of z3chat seriously. If you have discovered a security vuln
 
 Instead, please report them via email to:
 
-- **Email**: security@z3chat.com (replace with your actual security email)
+- **Email**: TBD (replace with your actual security email)
 
 Please include the following information in your report:
 
@@ -44,7 +44,7 @@ When you report a vulnerability to us, here's what will happen:
 
 ### Security Best Practices for Contributors
 
-When contributing to z3chat, please keep these security considerations in mind:
+When contributing to zwc-chat, please keep these security considerations in mind:
 
 1. **Never commit secrets**: Don't commit API keys, passwords, or other sensitive data
 2. **Validate inputs**: Always validate and sanitize user inputs
@@ -54,7 +54,7 @@ When contributing to z3chat, please keep these security considerations in mind:
 
 ## Security Features
 
-z3chat implements several security measures:
+zwc chat implements several security measures:
 
 - **Authentication**: Session-based authentication with WorkOS
 - **HTTPS**: All traffic is encrypted using TLS
@@ -70,4 +70,4 @@ We believe in responsible disclosure. If you discover a vulnerability:
 - Make a good faith effort to avoid privacy violations, data destruction, and service disruption
 - We will acknowledge your contribution in our security advisories (unless you prefer to remain anonymous)
 
-Thank you for helping keep z3chat and our users safe!
+Thank you for helping keep zwc chat and our users safe!

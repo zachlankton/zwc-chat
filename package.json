@@ -1,5 +1,5 @@
 {
-  "name": "z3chat",
+  "name": "zwc-chat",
   "version": "0.1.0",
   "description": "AI-powered chat application with real-time streaming and multi-model support",
   "private": true,
@@ -22,9 +22,9 @@
   "author": "Zachary Lankton",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/zachlankton/z3chat/issues"
+    "url": "https://github.com/zachlankton/zwc-chat/issues"
   },
-  "homepage": "https://github.com/zachlankton/z3chat#readme",
+  "homepage": "https://github.com/zachlankton/zwc-chat#readme",
   "workspaces": [
     "apps/*",
     "packages/*"

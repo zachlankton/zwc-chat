@@ -23,6 +23,7 @@ export interface ExtendedRequest extends RequestWithSession {
 	timestamp: number;
 	messageIdToReplace?: string; // For message retry functionality
 	overrideAssistantTimestamp?: number;
+	wsId: string;
 }
 
 export type RouteHandler = (

@@ -12,6 +12,31 @@ import type { OpenRouterMessage } from "./database";
 import { getMessagesCollection, getChatsCollection } from "./database";
 //import { appendFile } from "node:fs/promises";
 
+type WebSocketData = {
+	id: string;
+	session: SessionData;
+	url: string;
+	token: string;
+	server_id: string;
+	ip: string;
+	server: Server;
+	request_id: string;
+};
+
+type ZwcChatWebSocketServer = ServerWebSocket<WebSocketData>;
+
+//													email				ws.id
+const userSockets = new Map<string, Map<string, ZwcChatWebSocketServer>>();
+
+//										ws.id
+const skts = new Map<string, ZwcChatWebSocketServer>();
+
+//															ws.id		chatId
+export const socketSubs = new Map<string, { chatId: string; offset: number }>();
+
+//															chatId			ws.id
+export const chatSubs = new Map<string, Set<string>>();
+
 const txtDecoder = new TextDecoder();
 
 export async function handleWebsocketUpgrade(
@@ -41,23 +66,6 @@ export async function handleWebsocketUpgrade(
 	// about the presence of websockets on our server
 	return Response.json({ error: "Not Found" }, { status: 404 });
 }
-
-type WebSocketData = {
-	session: SessionData;
-	url: string;
-	token: string;
-	server_id: string;
-	ip: string;
-	server: Server;
-	request_id: string;
-};
-
-type ZwcChatWebSocketServer = ServerWebSocket<WebSocketData>;
-
-export const websocketEventSubscriptions = new Map<
-	string, // account id
-	Map<any, Map<string, ZwcChatWebSocketServer>>
->();
 
 interface websocketHandlers {
 	message: (
@@ -108,6 +116,7 @@ export const bunWebsocketHandlers: websocketHandlers = {
 			req.ip = "WS:" + ws.data?.ip;
 			req.performance_start = performance.now();
 			req.timestamp = Date.now();
+			req.wsId = ws.data.id;
 
 			asyncLocalStorage.run(req, async () => {
 				const response: Response = await handleRequest(
@@ -148,11 +157,27 @@ export const bunWebsocketHandlers: websocketHandlers = {
 
 	open(ws) {
 		// a socket is opened
+		if (!ws.data?.session?.email) return;
+
+		ws.data.id = crypto.randomUUID();
+
 		console.log(
 			"WS_OPEN",
 			"Sending Welcome Message to",
-			ws.data?.session?.email
+			ws.data.session.email,
+			ws.data.id
 		);
+
+		skts.set(ws.data.id, ws);
+
+		if (userSockets.has(ws.data.session.email)) {
+			const userSocket = userSockets.get(ws.data.session.email);
+			userSocket!.set(ws.data.id, ws);
+		} else {
+			const userConnections = new Map();
+			userConnections.set(ws.data.id, ws);
+			userSockets.set(ws.data.session.email, userConnections);
+		}
 
 		ws.send(
 			JSON.stringify({
@@ -170,6 +195,19 @@ export const bunWebsocketHandlers: websocketHandlers = {
 
 	close(ws, code, message) {
 		// a socket is closed
+		if (userSockets.has(ws.data.session.email)) {
+			const userSocket = userSockets.get(ws.data.session.email);
+			userSocket!.delete(ws.data.id);
+		}
+		skts.delete(ws.data.id);
+
+		const prevSubChatId = socketSubs.get(ws.data.id);
+		if (prevSubChatId) {
+			let prevChatSubSocketIds = chatSubs.get(prevSubChatId.chatId);
+			if (prevChatSubSocketIds) {
+				prevChatSubSocketIds.delete(ws.data.id);
+			}
+		}
 		console.log("WS_CLOSE", code, message, ws.data?.session?.email);
 	},
 
@@ -245,7 +283,8 @@ function createWebSocketMessage(
 	response: Response,
 	newMessageId: string,
 	chatId: string,
-	value: Uint8Array
+	value: Uint8Array,
+	offset: number
 ): Uint8Array {
 	const header = new TextEncoder().encode(
 		JSON.stringify({
@@ -255,6 +294,7 @@ function createWebSocketMessage(
 			newMessageId,
 			chatId,
 			length: value.length,
+			offset,
 		})
 	);
 	const headerLenBytes = new Uint8Array(4); // 32-bit LE
@@ -518,6 +558,7 @@ async function streamedChunks(
 
 	// Stream and collect data chunks
 	const dataChunks: number[] = [];
+
 	while (true) {
 		const { done, value } = await reader.read();
 		if (done) break;
@@ -527,17 +568,41 @@ async function streamedChunks(
 			newMessage.timeToFirstToken = Date.now() - newMessage.timestamp;
 		}
 
+		const offset = dataChunks.length;
+
 		dataChunks.push(...value);
 
-		// Create and send WebSocket message
-		const message = createWebSocketMessage(
-			msgObject,
-			response,
-			newMessageId,
-			ctx.params.chatId,
-			value
-		);
-		ws.send(message);
+		const subs = chatSubs.get(ctx.params.chatId);
+		for (const sub of subs!) {
+			const subSocket = socketSubs.get(sub);
+			console.log("SUB", sub, subSocket === undefined);
+
+			if (!subSocket) continue;
+			let valueToSend = value;
+			if (subSocket.offset === 0) {
+				valueToSend = dataChunks as any;
+			}
+
+			subSocket.offset = valueToSend.length;
+
+			// Create and send WebSocket message
+			const message = createWebSocketMessage(
+				msgObject,
+				response,
+				newMessageId,
+				ctx.params.chatId,
+				valueToSend,
+				offset
+			);
+
+			const socketToSendOn = skts.get(sub);
+			if (!socketToSendOn) {
+				console.error("socketToSendOn is not defined", sub);
+				continue;
+			}
+
+			socketToSendOn.send(message);
+		}
 	}
 
 	// Record completion time

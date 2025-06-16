@@ -662,7 +662,6 @@ export function ChatInterface({
 
   const wsStream = React.useCallback(
     (data: any) => {
-      if (assistantMessage.current === null) return;
       const messageHasThisChatId =
         data.type &&
         data.headers &&
@@ -674,6 +673,31 @@ export function ChatInterface({
         if (!header.chatId) return;
         if (header.chatId !== chatId) return;
         const messageId = header.newMessageId;
+        if (assistantMessage.current === null) {
+          const newMessageId = header.newMessageId;
+          const existingMessage = messagesRef.current.find(
+            (m) => m.id === newMessageId,
+          );
+          if (existingMessage) {
+            existingMessage.content = "";
+            existingMessage.reasoning = "";
+            existingMessage.tool_calls = undefined;
+            assistantMessage.current = existingMessage;
+          } else {
+            assistantMessage.current = {
+              id: newMessageId,
+              content: "",
+              role: "assistant",
+              model: selectedModel,
+              timestamp: Date.now(),
+              timeToFinish: 0,
+            };
+            setMessages((prev) => [
+              ...prev,
+              assistantMessage.current as Message,
+            ]);
+          }
+        }
         assistantMessage.current.id = messageId;
 
         for (const chunk of parseSSEEvents(text, buffer)) {
