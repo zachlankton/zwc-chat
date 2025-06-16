@@ -803,13 +803,7 @@ export function ChatInterface({
                 <DialogTitleComponent className="mb-4 text-xl font-bold">
                   Error
                 </DialogTitleComponent>
-                <p>{message}</p>
-                <p>
-                  Could be upstream, check{" "}
-                  <a href="https://status.openrouter.ai/" target="_blank">
-                    https://status.openrouter.ai/
-                  </a>
-                </p>
+                <p className="mb-2">{message}</p>
               </>
             ),
           });
@@ -1147,7 +1141,7 @@ export function ChatInterface({
 
     // Update the model if a new one was selected
     const modelToUse =
-      opts?.newModel || assistantMessage.current.model || selectedModel;
+      opts?.newModel || selectedModel || assistantMessage.current.model;
 
     setIsLoading(true);
 
@@ -1512,9 +1506,14 @@ export function ChatInterface({
                     </div>
                   );
                 }
-                
+
                 // Hide assistant messages with tool calls if setting is enabled
-                if (message.role === "assistant" && message.tool_calls && message.tool_calls.length > 0 && settings.hideToolCallMessages) {
+                if (
+                  message.role === "assistant" &&
+                  message.tool_calls &&
+                  message.tool_calls.length > 0 &&
+                  settings.hideToolCallMessages
+                ) {
                   return null;
                 }
 
