@@ -676,8 +676,6 @@ export function ChatInterface({
         const messageId = header.newMessageId;
         assistantMessage.current.id = messageId;
 
-        const stashMessageLength = messagesRef.current.length;
-
         for (const chunk of parseSSEEvents(text, buffer)) {
           if (chunk.type === "data" && assistantMessage.current) {
             handleChunk({
@@ -905,8 +903,19 @@ export function ChatInterface({
           timestamp: Date.now(),
         }));
 
-        // Add tool messages to the conversation
-        setMessages((prev) => [...prev, ...toolMessages]);
+        const currentMsgIdx = messagesRef.current.findIndex(
+          (x) => x.id === assistantMessage?.current?.id,
+        );
+
+        const messagesUpToRetry = messagesRef.current.slice(
+          0,
+          currentMsgIdx + 1,
+        );
+        const msgTime = assistantMessage?.current?.timestamp ?? Date.now();
+
+        toolMessages.forEach((t) => (t.timestamp = msgTime + 10));
+
+        const remainingMessages = messagesRef.current.slice(currentMsgIdx + 1);
 
         if (assistantMessage.current?.tool_calls?.length === 0) {
           assistantMessage.current.tool_calls = undefined;
@@ -914,8 +923,9 @@ export function ChatInterface({
 
         // Send a new request with the tool results
         const requestBody: any = {
-          messages: [...messagesRef.current],
+          messages: [...messagesUpToRetry, ...toolMessages],
           model: selectedModel,
+          overrideAssistantTimestamp: msgTime + 20,
         };
 
         if (settings.toolsEnabled && settings.tools.length > 0) {
@@ -928,11 +938,17 @@ export function ChatInterface({
           content: "",
           role: "assistant",
           model: selectedModel,
-          timestamp: Date.now(),
+          timestamp: msgTime + 20,
           timeToFinish: 0,
         };
 
-        setMessages((prev) => [...prev, assistantMessage.current as Message]);
+        setMessages([
+          ...messagesUpToRetry,
+          ...toolMessages,
+          assistantMessage.current,
+          ...remainingMessages,
+        ]);
+
         updateStreamingMessageId(assistantMessage.current.id);
 
         post<StreamResponse | Response>(`/chat/${chatId}`, requestBody, {
@@ -1132,9 +1148,29 @@ export function ChatInterface({
       return;
     }
 
+    assistantMessage.current.tool_calls = undefined;
+
     // Find all messages up to and including the user message before this assistant message
     const messagesUpToRetry = messages.slice(0, messageIndex);
     const prevUserMsg = messagesUpToRetry.at(-1);
+    let nextMsg = messagesRef.current[messageIndex + 1];
+
+    let lastToolIndex = messageIndex;
+    if (nextMsg && nextMsg.role === "tool") {
+      lastToolIndex++;
+      handleDelete(assistantMessage.current.id, true);
+      while (nextMsg.role === "tool") {
+        handleDelete(nextMsg.id, true);
+        lastToolIndex++;
+        nextMsg = messagesRef.current[lastToolIndex];
+      }
+      assistantMessage.current = nextMsg;
+    }
+
+    const remainingMessages = messagesRef.current.slice(lastToolIndex);
+
+    // Add tool messages to the conversation
+    setMessages([...messagesUpToRetry, ...remainingMessages]);
 
     if (opts?.newContentForPreviousMessage && prevUserMsg)
       prevUserMsg.content = opts?.newContentForPreviousMessage;

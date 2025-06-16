@@ -85,8 +85,6 @@ export async function fetchWrapper(
       });
     }
 
-    console.log(response);
-
     let data;
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.includes("application/json")) {

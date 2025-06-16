@@ -415,7 +415,6 @@ async function parseStreamingChunks(
 				const finishReason = value?.choices?.[0]?.finish_reason;
 				if (finishReason === "tool_calls") {
 					// Tool calls are complete - they've been built incrementally
-					console.log("Tool calls complete:", newMessage.tool_calls);
 				}
 			}
 		}
@@ -428,7 +427,6 @@ async function saveMessageAndUpdateChat(
 	messageIdToReplace?: string
 ): Promise<void> {
 	const messagesCollection = await getMessagesCollection();
-	console.log("messageIdToReplace", messageIdToReplace);
 
 	if (messageIdToReplace) {
 		// Get the original message to preserve its timestamp
@@ -437,8 +435,6 @@ async function saveMessageAndUpdateChat(
 			chatId: newMessage.chatId,
 			userEmail: newMessage.userEmail,
 		});
-
-		console.log("ORIGINAL MESSAGE", originalMessage);
 
 		if (originalMessage) {
 			// Preserve the original timestamp
@@ -458,8 +454,6 @@ async function saveMessageAndUpdateChat(
 			},
 			newMessage
 		);
-
-		console.log("newMessage", newMessage);
 	} else {
 		// Insert new message
 		await messagesCollection.insertOne(newMessage);
@@ -509,6 +503,7 @@ async function streamedChunks(
 
 	// Get messageIdToReplace from context if this is a retry
 	const messageIdToReplace = ctx.messageIdToReplace;
+	const overrideAssistantTimestamp = ctx.overrideAssistantTimestamp;
 
 	// Initialize new message
 	const newMessageId = messageIdToReplace || crypto.randomUUID();
@@ -518,7 +513,7 @@ async function streamedChunks(
 		userEmail: ctx.session.email,
 		content: "",
 		role: "assistant",
-		timestamp: Date.now(),
+		timestamp: overrideAssistantTimestamp || Date.now(),
 	};
 
 	// Stream and collect data chunks

@@ -48,6 +48,7 @@ export const POST = apiHandler(
 
 		// Extract messageIdToReplace if this is a retry
 		const messageIdToReplace = body.messageIdToReplace;
+		const overrideAssistantTimestamp = body.overrideAssistantTimestamp;
 
 		const userChatId = params.chatId;
 		if (!validateUUID(userChatId)) {
@@ -82,7 +83,7 @@ export const POST = apiHandler(
 							userEmail: req.session.email,
 							content: firstMessage.content,
 							role: "system",
-							timestamp: Date.now() - 1, // Slightly before user message
+							timestamp: Date.now() - 100000, // Slightly before user message
 						};
 						await messagesCollection.insertOne(systemMessage);
 						console.log(
@@ -126,7 +127,7 @@ export const POST = apiHandler(
 						name: lastMessage.name,
 						role: lastMessage.role,
 						model: model, // Store which model the user requested
-						timestamp: Date.now(),
+						timestamp: lastMessage.timestamp || Date.now(),
 					};
 
 					const messagesCollection = await getMessagesCollection();
@@ -198,6 +199,12 @@ export const POST = apiHandler(
 			(req as ExtendedRequest).messageIdToReplace = messageIdToReplace;
 		}
 
+		if (overrideAssistantTimestamp) {
+			// The request becomes ExtendedRequest in the websocket handler
+			(req as ExtendedRequest).overrideAssistantTimestamp =
+				overrideAssistantTimestamp;
+		}
+
 		return fetch("https://openrouter.ai/api/v1/chat/completions", {
 			method: "POST",
 			headers: {
@@ -226,6 +233,12 @@ export const POST = apiHandler(
 			r.headers.set("x-zwc-chat-id", userChatId);
 			if (messageIdToReplace)
 				r.headers.set("x-zwc-message-to-replace-id", messageIdToReplace);
+
+			if (overrideAssistantTimestamp)
+				r.headers.set(
+					"x-zwc-override-assistant-timestamp",
+					overrideAssistantTimestamp
+				);
 			return r;
 		});
 	}
