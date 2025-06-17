@@ -665,9 +665,11 @@ export function ChatInterface({
       const msgIndex = messagesRef.current.findIndex(
         (m) => m.id === data.messageId,
       );
-      if (!msgIndex) return;
+-     if (!msgIndex) return;
++     if (msgIndex === -1) return;
       messagesRef.current.splice(msgIndex, 1);
       setMessages((prev) => [...prev]);
+    }
     }
 
     function msgPost(data: any = {}) {
