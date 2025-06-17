@@ -541,7 +541,6 @@ export function ChatInterface({
       : null;
   }, [selectedModel, modelsData]);
 
-  const retryModel = React.useRef<string | null>(null);
   const isNewChat = React.useRef<boolean>(false);
   const resettingOffset = React.useRef<boolean>(false);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -854,6 +853,144 @@ export function ChatInterface({
     [selectedModel, navigate, updateStreamingMessageId, scrollNewMessage],
   );
 
+  // Handle tool execution
+  const executeToolsAndContinue = React.useCallback(
+    async (toolCalls: ToolCall[]) => {
+      if (!settings.toolsEnabled || !toolCalls || toolCalls.length === 0) {
+        return;
+      }
+
+      setIsLoading(true);
+
+      try {
+        const hasWebSearch = toolCalls.some(
+          (t) => t.function.name === "web_search",
+        );
+
+        if (hasWebSearch) {
+          if (assistantMessage.current === null) {
+            AsyncAlert({
+              title: "Error",
+              message:
+                "There was an issue trying to perform a web search tool call: assistantMessage is null",
+            });
+            return;
+          }
+
+          const messageIndex = messagesRef.current.findIndex(
+            (msg) => msg.id === assistantMessage?.current?.id,
+          );
+
+          if (messageIndex === -1) {
+            console.error({
+              hasWebSearch,
+              toolCalls,
+              messagesRef,
+            });
+            AsyncAlert({
+              title: "Error",
+              message:
+                "There was an issue trying to perform a web search tool call: Could not find message index",
+            });
+            return;
+          }
+
+          return handleRetry(messageIndex, {
+            newModel: assistantMessage.current.model,
+            includeWebSearch: true,
+          });
+        }
+        // Execute tools
+        const toolResults = await executeToolCalls(toolCalls, settings.tools);
+
+        // Create tool result messages
+        const toolMessages: Message[] = toolResults.map((result) => ({
+          id: crypto.randomUUID(),
+          role: "tool",
+          tool_call_id: result.tool_call_id,
+          name: result.name,
+          content: result.content,
+          timestamp: Date.now(),
+        }));
+
+        const currentMsgIdx = messagesRef.current.findIndex(
+          (x) => x.id === assistantMessage?.current?.id,
+        );
+
+        const messagesUpToRetry = messagesRef.current.slice(
+          0,
+          currentMsgIdx + 1,
+        );
+        const msgTime = assistantMessage?.current?.timestamp ?? Date.now();
+
+        toolMessages.forEach((t) => (t.timestamp = msgTime + 10));
+
+        const remainingMessages = messagesRef.current.slice(currentMsgIdx + 1);
+
+        if (assistantMessage.current?.tool_calls?.length === 0) {
+          assistantMessage.current.tool_calls = undefined;
+        }
+
+        // Send a new request with the tool results
+        const requestBody: any = {
+          messages: [...messagesUpToRetry, ...toolMessages],
+          model: selectedModel,
+          overrideAssistantTimestamp: msgTime + 20,
+        };
+
+        if (settings.toolsEnabled && settings.tools.length > 0) {
+          requestBody.tools = formatToolsForAPI(settings.tools);
+        }
+
+        // Create a new assistant message for the final response
+        assistantMessage.current = {
+          id: crypto.randomUUID(),
+          content: "",
+          role: "assistant",
+          model: selectedModel,
+          timestamp: msgTime + 20,
+          timeToFinish: 0,
+        };
+
+        setMessages([
+          ...messagesUpToRetry,
+          ...toolMessages,
+          assistantMessage.current,
+          ...remainingMessages,
+        ]);
+
+        updateStreamingMessageId(assistantMessage.current.id);
+
+        post<StreamResponse | Response>(`/chat/${chatId}`, requestBody, {
+          resolveImmediately: true,
+        });
+      } catch (error) {
+        console.error("Error executing tools:", error);
+
+        // Show error to user
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "An unknown error occurred while executing tools";
+        AsyncAlert({
+          title: "Tool Execution Error",
+          message: errorMessage,
+        });
+
+        // Reset assistant message state and pending tool calls
+        assistantMessage.current = null;
+        updateStreamingMessageId(null);
+        pendingToolCallsRef.current = null;
+      } finally {
+        // Always reset loading state, but only if no streaming is happening
+        if (!streamingMessageIdRef.current) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [chatId, selectedModel, settings.toolsEnabled, settings.tools, modelsData],
+  );
+
   const wsStream = React.useCallback(
     (data: any) => {
       const messageHasThisChatId =
@@ -1060,7 +1197,17 @@ export function ChatInterface({
         isNewChat.current = false;
       }
     },
-    [settings.ttsEnabled, processTtsQueue, flushTtsBuffer, modelsData],
+    [
+      chatId,
+      handleChatSubMessage,
+      selectedModel,
+      settings.ttsEnabled,
+      updateStreamingMessageId,
+      processTtsQueue,
+      flushTtsBuffer,
+      modelsData,
+      executeToolsAndContinue,
+    ],
   );
 
   React.useEffect(() => {
@@ -1090,144 +1237,6 @@ export function ChatInterface({
   React.useEffect(() => {
     localStorage.setItem("selectedModel", selectedModel);
   }, [selectedModel]);
-
-  // Handle tool execution
-  const executeToolsAndContinue = React.useCallback(
-    async (toolCalls: ToolCall[]) => {
-      if (!settings.toolsEnabled || !toolCalls || toolCalls.length === 0) {
-        return;
-      }
-
-      setIsLoading(true);
-
-      try {
-        const hasWebSearch = toolCalls.some(
-          (t) => t.function.name === "web_search",
-        );
-
-        if (hasWebSearch) {
-          if (assistantMessage.current === null) {
-            AsyncAlert({
-              title: "Error",
-              message:
-                "There was an issue trying to perform a web search tool call: assistantMessage is null",
-            });
-            return;
-          }
-
-          const messageIndex = messagesRef.current.findIndex(
-            (msg) => msg.id === assistantMessage?.current?.id,
-          );
-
-          if (messageIndex === -1) {
-            console.error({
-              hasWebSearch,
-              toolCalls,
-              messagesRef,
-            });
-            AsyncAlert({
-              title: "Error",
-              message:
-                "There was an issue trying to perform a web search tool call: Could not find message index",
-            });
-            return;
-          }
-
-          return handleRetry(messageIndex, {
-            newModel: assistantMessage.current.model,
-            includeWebSearch: true,
-          });
-        }
-        // Execute tools
-        const toolResults = await executeToolCalls(toolCalls, settings.tools);
-
-        // Create tool result messages
-        const toolMessages: Message[] = toolResults.map((result) => ({
-          id: crypto.randomUUID(),
-          role: "tool",
-          tool_call_id: result.tool_call_id,
-          name: result.name,
-          content: result.content,
-          timestamp: Date.now(),
-        }));
-
-        const currentMsgIdx = messagesRef.current.findIndex(
-          (x) => x.id === assistantMessage?.current?.id,
-        );
-
-        const messagesUpToRetry = messagesRef.current.slice(
-          0,
-          currentMsgIdx + 1,
-        );
-        const msgTime = assistantMessage?.current?.timestamp ?? Date.now();
-
-        toolMessages.forEach((t) => (t.timestamp = msgTime + 10));
-
-        const remainingMessages = messagesRef.current.slice(currentMsgIdx + 1);
-
-        if (assistantMessage.current?.tool_calls?.length === 0) {
-          assistantMessage.current.tool_calls = undefined;
-        }
-
-        // Send a new request with the tool results
-        const requestBody: any = {
-          messages: [...messagesUpToRetry, ...toolMessages],
-          model: selectedModel,
-          overrideAssistantTimestamp: msgTime + 20,
-        };
-
-        if (settings.toolsEnabled && settings.tools.length > 0) {
-          requestBody.tools = formatToolsForAPI(settings.tools);
-        }
-
-        // Create a new assistant message for the final response
-        assistantMessage.current = {
-          id: crypto.randomUUID(),
-          content: "",
-          role: "assistant",
-          model: selectedModel,
-          timestamp: msgTime + 20,
-          timeToFinish: 0,
-        };
-
-        setMessages([
-          ...messagesUpToRetry,
-          ...toolMessages,
-          assistantMessage.current,
-          ...remainingMessages,
-        ]);
-
-        updateStreamingMessageId(assistantMessage.current.id);
-
-        post<StreamResponse | Response>(`/chat/${chatId}`, requestBody, {
-          resolveImmediately: true,
-        });
-      } catch (error) {
-        console.error("Error executing tools:", error);
-
-        // Show error to user
-        const errorMessage =
-          error instanceof Error
-            ? error.message
-            : "An unknown error occurred while executing tools";
-        AsyncAlert({
-          title: "Tool Execution Error",
-          message: errorMessage,
-        });
-
-        // Reset assistant message state and pending tool calls
-        assistantMessage.current = null;
-        updateStreamingMessageId(null);
-        pendingToolCallsRef.current = null;
-      } finally {
-        // Always reset loading state, but only if no streaming is happening
-        if (!streamingMessageIdRef.current) {
-          setIsLoading(false);
-        }
-      }
-    },
-    [chatId, selectedModel, settings.toolsEnabled, settings.tools, modelsData],
-  );
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({
@@ -1417,7 +1426,7 @@ export function ChatInterface({
     assistantMessage.current.tool_calls = undefined;
 
     // Find all messages up to and including the user message before this assistant message
-    const messagesUpToRetry = messages.slice(0, messageIndex);
+    const messagesUpToRetry = messagesRef.current.slice(0, messageIndex);
     const prevUserMsg = messagesUpToRetry.at(-1);
     let nextMsg = messagesRef.current[messageIndex + 1];
 
