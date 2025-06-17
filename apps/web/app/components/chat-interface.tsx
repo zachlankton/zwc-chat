@@ -541,6 +541,7 @@ export function ChatInterface({
       : null;
   }, [selectedModel, modelsData]);
 
+  const retryModel = React.useRef<string | null>(null);
   const isNewChat = React.useRef<boolean>(false);
   const resettingOffset = React.useRef<boolean>(false);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -1457,6 +1458,7 @@ export function ChatInterface({
 
     // Mark this specific message as being regenerated
     updateStreamingMessageId(assistantMessage.current.id);
+    assistantMessage.current.model = _modelToUse;
 
     // Clear the content of the message being retried
     setMessages((prev) =>
@@ -1954,6 +1956,9 @@ export function ChatInterface({
 
                             {/* Display tool calls if present */}
                             {message.tool_calls &&
+                              !message.tool_calls.some((t) =>
+                                ["web_search"].includes(t.function.name),
+                              ) &&
                               !message.content &&
                               message.tool_calls.length > 0 && (
                                 <div className="mt-4 space-y-2">
@@ -1961,31 +1966,27 @@ export function ChatInterface({
                                     <Hammer className="h-4 w-4" />
                                     <span>Using tools:</span>
                                   </div>
-                                  {message.tool_calls
-                                    .filter((t) =>
-                                      ["web_search"].includes(t.function.name),
-                                    )
-                                    .map((toolCall) => (
-                                      <div
-                                        key={toolCall.id}
-                                        className="bg-muted/50 rounded-lg p-3 text-sm"
-                                      >
-                                        <div className="font-medium mb-1">
-                                          {toolCall.function.name}
-                                        </div>
-                                        <pre>
-                                          <CodeBlock>
-                                            {JSON.stringify(
-                                              tryParseJson(
-                                                toolCall.function.arguments,
-                                              ),
-                                              null,
-                                              2,
-                                            )}
-                                          </CodeBlock>
-                                        </pre>
+                                  {message.tool_calls.map((toolCall) => (
+                                    <div
+                                      key={toolCall.id}
+                                      className="bg-muted/50 rounded-lg p-3 text-sm"
+                                    >
+                                      <div className="font-medium mb-1">
+                                        {toolCall.function.name}
                                       </div>
-                                    ))}
+                                      <pre>
+                                        <CodeBlock>
+                                          {JSON.stringify(
+                                            tryParseJson(
+                                              toolCall.function.arguments,
+                                            ),
+                                            null,
+                                            2,
+                                          )}
+                                        </CodeBlock>
+                                      </pre>
+                                    </div>
+                                  ))}
                                 </div>
                               )}
 
