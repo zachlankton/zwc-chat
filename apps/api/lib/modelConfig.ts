@@ -1,5 +1,6 @@
 // Curated list of favorite model IDs
 export const FAVORITE_MODELS = [
+	"anthropic/claude-sonnet-4",
 	"anthropic/claude-3.5-haiku",
 	"openai/gpt-4o-mini",
 	"google/gemini-2.0-flash-exp",

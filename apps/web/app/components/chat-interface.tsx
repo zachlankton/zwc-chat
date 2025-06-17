@@ -46,6 +46,11 @@ export interface Model {
     prompt: string;
     completion: string;
   };
+  architecture?: {
+    input_modalities?: string[];
+    output_modalities?: string[];
+  };
+  supported_parameters?: string[];
 }
 
 export interface ModelsResponse {
@@ -1601,6 +1606,8 @@ export function ChatInterface({
     queryFn: () => get("/api/models"),
     staleTime: 60 * 60 * 1000, // 1 hour
   });
+
+  console.log(modelsData);
 
   return (
     <>

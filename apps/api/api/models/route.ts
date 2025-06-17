@@ -66,7 +66,13 @@ export async function GET(request: RequestWithSession) {
 		}
 
 		const data = await response.json();
-		const models: OpenRouterModel[] = data.data;
+		const models: OpenRouterModel[] = data.data.filter(
+			(m: any) =>
+				m.created > 1706763600 &&
+				!m.description?.toLowerCase().includes("mistral") &&
+				!m.id.toLowerCase().includes("mistral") &&
+				!m.name.toLowerCase().includes("mistral")
+		);
 
 		// Separate favorites and all models
 		const favoriteModels = models.filter((model) =>

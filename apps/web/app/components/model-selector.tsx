@@ -7,12 +7,14 @@ import {
   X,
   FileText,
   Diamond,
+  Gem,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import type { ModelsResponse } from "./chat-interface";
 import { ModelCard } from "./model-card";
 import { AsyncModal } from "./async-modals";
 import { useModalContext } from "./async-modals";
+import { cn } from "~/lib/utils";
 
 interface ModelSelectorProps {
   selectedModel: string;
@@ -34,6 +36,7 @@ export function ModelSelectorModal({
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(true);
+  const [showPremium, setShowPremium] = useState(true);
   const [hoveredModel, setHoveredModel] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { closeModal } = useModalContext();
@@ -57,21 +60,74 @@ export function ModelSelectorModal({
     ? data?.all.find((m) => m.id === hoveredModel)
     : selectedModelInfo;
 
-  // Filter models based on search
-  const filteredFavorites =
-    data?.favorites.filter(
-      (m) =>
-        m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.id.toLowerCase().includes(searchQuery.toLowerCase()),
-    ) || [];
+  // Filter models based on search - split query into words and match all
+  const searchWords = searchQuery
+    .toLowerCase()
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  const matchesAllWords = (model: (typeof data.all)[0]) => {
+    if (searchWords.length === 0) return true;
+    const modelText = `${model.name} ${model.id}`.toLowerCase();
+    return searchWords.every((word) => modelText.includes(word));
+  };
+
+  const isPremium = (model: (typeof data.all)[0]) => {
+    return parseFloat(model.pricing.prompt) > 0.000001; // Premium if > $1/M tokens
+  };
+
+  const applyFilters = (model: (typeof data.all)[0]) => {
+    if (!matchesAllWords(model)) return false;
+    if (!showPremium && isPremium(model)) return false;
+    return true;
+  };
+
+  const filteredFavorites = data?.favorites.filter(applyFilters) || [];
 
   const filteredAll =
     data?.all.filter(
-      (m) =>
-        !data.favorites.some((f) => f.id === m.id) &&
-        (m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          m.id.toLowerCase().includes(searchQuery.toLowerCase())),
+      (m) => !data.favorites.some((f) => f.id === m.id) && applyFilters(m),
     ) || [];
+
+  // Group models by provider
+  const majorProviders = [
+    "openai",
+    "anthropic",
+    "google",
+    "deepseek",
+    "x-ai",
+    "meta-llama",
+    "qwen",
+  ];
+
+  const groupedModels = filteredAll.reduce(
+    (groups, model) => {
+      const provider = model.id.split("/")[0].toLowerCase();
+
+      // Check if it's a major provider
+      const groupKey = majorProviders.includes(provider) ? provider : "other";
+
+      if (!groups[groupKey]) {
+        groups[groupKey] = [];
+      }
+      groups[groupKey].push(model);
+      return groups;
+    },
+    {} as Record<string, typeof filteredAll>,
+  );
+
+  // Provider display names
+  const providerNames: Record<string, string> = {
+    openai: "OpenAI",
+    anthropic: "Anthropic",
+    google: "Google",
+    deepseek: "DeepSeek",
+    "x-ai": "Grok",
+    "meta-llama": "Meta Llama",
+    qwen: "Qwen",
+    other: "Other Providers",
+  };
 
   const formatPrice = (price: string) => {
     const num = parseFloat(price);
@@ -134,21 +190,33 @@ export function ModelSelectorModal({
           </div>
         )}
 
-        {/* Others Section */}
+        {/* Provider Groups Section */}
         {!showFavoritesOnly && filteredAll.length > 0 && (
           <div>
-            <h3 className="text-sm font-medium mb-3">Others</h3>
-            <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 gap-3">
-              {filteredAll.map((model) => (
-                <ModelCard
-                  key={model.id}
-                  model={model}
-                  isSelected={model.id === selectedModel}
-                  onSelect={() => handleModelSelect(model.id)}
-                  onHover={setHoveredModel}
-                />
-              ))}
-            </div>
+            {/* Major providers first, then "other" last */}
+            {[...majorProviders, "other"].map((provider) => {
+              const models = groupedModels[provider];
+              if (!models || models.length === 0) return null;
+
+              return (
+                <div key={provider} className="mb-6">
+                  <h3 className="text-sm font-medium mb-3">
+                    {providerNames[provider]}
+                  </h3>
+                  <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 gap-3">
+                    {models.map((model) => (
+                      <ModelCard
+                        key={model.id}
+                        model={model}
+                        isSelected={model.id === selectedModel}
+                        onSelect={() => handleModelSelect(model.id)}
+                        onHover={setHoveredModel}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -180,15 +248,37 @@ export function ModelSelectorModal({
       {/* Footer */}
       <div className="p-4 border-t bg-muted/50">
         <div className="flex flex-wrap items-center justify-between">
-          <Button
-            variant="ghost"
-            size="sm"
-            type="button"
-            onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-            className="gap-2"
-          >
-            {showFavoritesOnly ? <>Show all</> : <>Favorites</>}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              type="button"
+              onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+              className="gap-2"
+            >
+              {showFavoritesOnly ? <>Show all</> : <>Favorites</>}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              type="button"
+              onClick={() => setShowPremium(!showPremium)}
+              className={cn("gap-2", !showPremium && "text-muted-foreground")}
+              title={
+                showPremium ? "Hide premium models" : "Show premium models"
+              }
+            >
+              <div className="relative">
+                <Gem className="h-4 w-4" />
+                {!showPremium && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-5 h-[1.5px] bg-red-600 rotate-45 translate-y-[-1px]" />
+                  </div>
+                )}
+              </div>
+              <span className="">{showPremium ? "Premium" : "Low Cost"}</span>
+            </Button>
+          </div>
 
           <div className="sm:flex flex-wrap hidden items-center gap-4 flex-1 justify-end">
             {/* Model details display */}
