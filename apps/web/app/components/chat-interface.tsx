@@ -443,6 +443,31 @@ export function ChatInterface({
   const apiKeyInfo = useApiKeyInfo();
   const navigate = useNavigate();
 
+  // Initialize selectedModel based on context
+  const getInitialModel = () => {
+    // For existing chats, use the model from the last assistant message
+    if (initialMessages.length > 0) {
+      const lastAssistantMessage = [...initialMessages]
+        .reverse()
+        .find((msg) => msg.role === "assistant" && msg.model);
+      if (lastAssistantMessage?.model) {
+        return lastAssistantMessage.model;
+      }
+    }
+
+    // For new chats, use localStorage
+    const savedModel = localStorage.getItem("selectedModel");
+    if (savedModel) {
+      return savedModel;
+    }
+
+    // Default fallback
+    return "openai/gpt-4o-mini";
+  };
+
+  const [selectedModel, setSelectedModel] =
+    React.useState<string>(getInitialModel());
+
   const isNewChat = React.useRef<boolean>(false);
   const resettingOffset = React.useRef<boolean>(false);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -652,91 +677,108 @@ export function ChatInterface({
     }
   }, [settings.ttsEnabled]);
 
-  const handleChatSubMessage = React.useCallback((data: any) => {
-    function msgUpdate(data: any = {}) {
-      //find message
-      const msg = messagesRef.current.find((m) => m.id === data.messageId);
-      if (!msg) return;
-      msg.content = data.content;
-      setMessages((prev) => [...prev]);
-    }
+  const scrollNewMessage = React.useCallback(() => {
+    // Get all elements with the class and take the last one
+    const elements = document.querySelectorAll(".user-message");
+    const lastElement = elements[elements.length - 1];
+    if (!lastElement) return;
+    lastElement.parentElement?.parentElement?.parentElement?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, []);
 
-    function msgDelete(data: any = {}) {
-      const msgIndex = messagesRef.current.findIndex(
-        (m) => m.id === data.messageId,
-      );
--     if (!msgIndex) return;
-+     if (msgIndex === -1) return;
-      messagesRef.current.splice(msgIndex, 1);
-      setMessages((prev) => [...prev]);
-    }
-
-    function msgPost(data: any = {}) {
-      const lastMessageId = data.lastMessage.id;
-      const userMsg = messagesRef.current.find((m) => m.id === lastMessageId);
-      if (!userMsg) {
-        const newUserMessage = {
-          id: lastMessageId,
-          content: data.lastMessage.content,
-          role: data.lastMessage.role,
-          timestamp: data.lastMessage.timestamp,
-        };
-        setMessages((prev) => [...prev, newUserMessage]);
-        setTimeout(scrollNewMessage, 100);
+  const handleChatSubMessage = React.useCallback(
+    (data: any) => {
+      function msgUpdate(data: any = {}) {
+        //find message
+        const msg = messagesRef.current.find((m) => m.id === data.messageId);
+        if (!msg) return;
+        msg.content = data.content;
+        setMessages((prev) => [...prev]);
       }
 
-      if (assistantMessage.current === null) {
-        const newMessageId = data.messageIdToReplace;
-        const existingMessage = messagesRef.current.find(
-          (m) => m.id === newMessageId,
+      function msgDelete(data: any = {}) {
+        const msgIndex = messagesRef.current.findIndex(
+          (m) => m.id === data.messageId,
         );
-        if (existingMessage) {
-          existingMessage.content = "";
-          existingMessage.reasoning = undefined;
-          existingMessage.tool_calls = undefined;
-          assistantMessage.current = existingMessage;
-          setMessages((prev) => [...prev]);
-        } else {
-          assistantMessage.current = {
-            id: newMessageId,
-            content: "",
-            role: "assistant",
-            model: selectedModel,
-            timestamp: Date.now(),
-            timeToFinish: 0,
-          };
-          setMessages((prev) => [...prev, assistantMessage.current as Message]);
-        }
-        setIsLoading(true);
-        updateStreamingMessageId(assistantMessage.current.id);
+
+        if (msgIndex === -1) return;
+        messagesRef.current.splice(msgIndex, 1);
+        setMessages((prev) => [...prev]);
       }
-    }
 
-    async function chatDelete() {
-      await AsyncAlert({
-        title: "Deleted",
-        message: "This chat has been deleted",
-      });
-      const newChatId = crypto.randomUUID();
-      navigate(`/chat/${newChatId}`, { replace: true });
-    }
+      function msgPost(data: any = {}) {
+        const lastMessageId = data.lastMessage.id;
+        const userMsg = messagesRef.current.find((m) => m.id === lastMessageId);
+        if (!userMsg) {
+          const newUserMessage = {
+            id: lastMessageId,
+            content: data.lastMessage.content,
+            role: data.lastMessage.role,
+            timestamp: data.lastMessage.timestamp,
+          };
+          setMessages((prev) => [...prev, newUserMessage]);
+          setTimeout(scrollNewMessage, 100);
+        }
 
-    const handlers = {
-      "msg-update": msgUpdate,
-      "msg-delete": msgDelete,
-      "msg-post": msgPost,
-      "chat-delete": chatDelete,
-    };
+        if (assistantMessage.current === null) {
+          const newMessageId = data.messageIdToReplace;
+          const existingMessage = messagesRef.current.find(
+            (m) => m.id === newMessageId,
+          );
+          if (existingMessage) {
+            existingMessage.content = "";
+            existingMessage.reasoning = undefined;
+            existingMessage.tool_calls = undefined;
+            assistantMessage.current = existingMessage;
+            setMessages((prev) => [...prev]);
+          } else {
+            assistantMessage.current = {
+              id: newMessageId,
+              content: "",
+              role: "assistant",
+              model: selectedModel,
+              timestamp: Date.now(),
+              timeToFinish: 0,
+            };
+            setMessages((prev) => [
+              ...prev,
+              assistantMessage.current as Message,
+            ]);
+          }
+          setIsLoading(true);
+          updateStreamingMessageId(assistantMessage.current.id);
+        }
+      }
 
-    const msgData = data.data;
-    if (!msgData) return;
+      async function chatDelete() {
+        await AsyncAlert({
+          title: "Deleted",
+          message: "This chat has been deleted",
+        });
+        const newChatId = crypto.randomUUID();
+        navigate(`/chat/${newChatId}`, { replace: true });
+      }
 
-    const subType: keyof typeof handlers | undefined = msgData.subType;
-    if (!subType) return;
-    if (!handlers[subType]) return;
+      const handlers = {
+        "msg-update": msgUpdate,
+        "msg-delete": msgDelete,
+        "msg-post": msgPost,
+        "chat-delete": chatDelete,
+      };
 
-    handlers[subType](msgData);
-  }, [selectedModel, navigate, updateStreamingMessageId, scrollNewMessage]);
+      const msgData = data.data;
+      if (!msgData) return;
+
+      const subType: keyof typeof handlers | undefined = msgData.subType;
+      if (!subType) return;
+      if (!handlers[subType]) return;
+
+      handlers[subType](msgData);
+    },
+    [selectedModel, navigate, updateStreamingMessageId, scrollNewMessage],
+  );
 
   const wsStream = React.useCallback(
     (data: any) => {
@@ -954,31 +996,6 @@ export function ChatInterface({
     };
   }, [wsStream]);
 
-  // Initialize selectedModel based on context
-  const getInitialModel = () => {
-    // For existing chats, use the model from the last assistant message
-    if (initialMessages.length > 0) {
-      const lastAssistantMessage = [...initialMessages]
-        .reverse()
-        .find((msg) => msg.role === "assistant" && msg.model);
-      if (lastAssistantMessage?.model) {
-        return lastAssistantMessage.model;
-      }
-    }
-
-    // For new chats, use localStorage
-    const savedModel = localStorage.getItem("selectedModel");
-    if (savedModel) {
-      return savedModel;
-    }
-
-    // Default fallback
-    return "openai/gpt-4o-mini";
-  };
-
-  const [selectedModel, setSelectedModel] =
-    React.useState<string>(getInitialModel());
-
   // Update messages when initialMessages changes (e.g., when switching chats)
   React.useEffect(() => {
     if (assistantMessage.current !== null) return;
@@ -1118,17 +1135,6 @@ export function ChatInterface({
       block: "end",
     });
   };
-
-  const scrollNewMessage = React.useCallback(() => {
-    // Get all elements with the class and take the last one
-    const elements = document.querySelectorAll(".user-message");
-    const lastElement = elements[elements.length - 1];
-    if (!lastElement) return;
-    lastElement.parentElement?.parentElement?.parentElement?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
-  }, []);
 
   React.useEffect(() => {
     setTimeout(() => {
