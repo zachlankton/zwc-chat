@@ -4,8 +4,6 @@ import {
   ChevronDown,
   Sparkles,
   Search,
-  Filter,
-  ChevronLeft,
   X,
   FileText,
   Diamond,
@@ -13,7 +11,6 @@ import {
 import { useState, useRef, useEffect } from "react";
 import type { ModelsResponse } from "./chat-interface";
 import { ModelCard } from "./model-card";
-import { cn } from "~/lib/utils";
 import { AsyncModal } from "./async-modals";
 import { useModalContext } from "./async-modals";
 
@@ -290,7 +287,7 @@ export function ModelSelector({
           {selectedModelInfo?.name || "Select model"}
         </span>
       </div>
-      <ChevronDown className="ml-2 h-4 w-4 flex-shrink-0" />
+      <ChevronDown className="ml-2 h-4 w-4 flex-shrink-0 rotate-180" />
     </Button>
   );
 }
