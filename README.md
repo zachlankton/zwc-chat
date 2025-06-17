@@ -18,6 +18,8 @@ A modern, real-time chat application with AI integration, built with Bun, React,
 - 💡 **Syntax Highlighting** - Beautiful code blocks with syntax highlighting for multiple languages
 - 📎 **Attachment Support** - Upload images and files to include in your conversations
 - 🛠️ **Tool Calling** - Create and manage JavaScript functions that AI can execute locally in your browser
+- 🔑 **BYOK (Bring Your Own Key)** - Use your own OpenRouter API key for unlimited access
+- 🔄 **Sync/Resumeable Streams** - Reconnect and resume AI responses seamlessly after connection interruptions
 
 ## Tech Stack
 
