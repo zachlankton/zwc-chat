@@ -116,7 +116,7 @@ export const ChatInput = React.forwardRef<
   // Calculate usage percentage and determine status
   const getUsageStatus = () => {
     if (!apiKeyInfo) return null;
-    
+
     // Handle unlimited keys
     if (apiKeyInfo.limit === null) {
       return {
@@ -127,7 +127,7 @@ export const ChatInput = React.forwardRef<
         usage: apiKeyInfo.usage,
       };
     }
-    
+
     if (apiKeyInfo.limit === 0) return null;
     const usagePercentage = (apiKeyInfo.usage / apiKeyInfo.limit) * 100;
     const remainingPercentage = Math.max(0, 100 - usagePercentage);
@@ -696,8 +696,8 @@ export const ChatInput = React.forwardRef<
                     {usageStatus.limit === null
                       ? "Unlimited credits remaining"
                       : usageStatus.remaining > 0
-                      ? `$ ${usageStatus.remaining.toFixed(3)} credits remain`
-                      : "No credits remaining"}
+                        ? `$ ${usageStatus.remaining.toFixed(3)} credits remain`
+                        : "No credits remaining"}
                   </span>
                 </div>
               </div>

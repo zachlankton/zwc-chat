@@ -20,7 +20,9 @@ export function useChatSettings() {
   const [enterToSend, setEnterToSend] = useState(true);
   const [ttsEnabled, setTtsEnabled] = useState(false);
   const [selectedVoice, setSelectedVoice] = useState("");
-  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [availableVoices, setAvailableVoices] = useState<
+    SpeechSynthesisVoice[]
+  >([]);
 
   // Load settings from localStorage on mount
   useEffect(() => {

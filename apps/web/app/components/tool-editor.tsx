@@ -54,7 +54,7 @@ export function ToolEditor({
     const properties: Record<string, any> = {};
     const required: string[] = [];
 
-    params.forEach(param => {
+    params.forEach((param) => {
       properties[param.name] = {
         type: param.type,
         description: param.description,
@@ -64,105 +64,127 @@ export function ToolEditor({
       }
     });
 
-    return JSON.stringify({
-      type: 'object',
-      properties,
-      required,
-    }, null, 2);
+    return JSON.stringify(
+      {
+        type: "object",
+        properties,
+        required,
+      },
+      null,
+      2,
+    );
   }, []);
 
   // Convert raw JSON to parameters
-  const rawToParameters = React.useCallback((raw: string): Parameter[] | null => {
-    try {
-      const parsed = JSON.parse(raw);
-      if (!parsed.properties || typeof parsed.properties !== 'object') {
+  const rawToParameters = React.useCallback(
+    (raw: string): Parameter[] | null => {
+      try {
+        const parsed = JSON.parse(raw);
+        if (!parsed.properties || typeof parsed.properties !== "object") {
+          return null;
+        }
+
+        const params: Parameter[] = [];
+        const requiredSet = new Set(parsed.required || []);
+
+        for (const [paramName, paramDef] of Object.entries(parsed.properties)) {
+          if (typeof paramDef === "object" && paramDef !== null) {
+            params.push({
+              name: paramName,
+              type: (paramDef as any).type || "string",
+              description: (paramDef as any).description || "",
+              required: requiredSet.has(paramName),
+            });
+          }
+        }
+
+        return params;
+      } catch (e) {
         return null;
       }
-
-      const params: Parameter[] = [];
-      const requiredSet = new Set(parsed.required || []);
-
-      for (const [paramName, paramDef] of Object.entries(parsed.properties)) {
-        if (typeof paramDef === 'object' && paramDef !== null) {
-          params.push({
-            name: paramName,
-            type: (paramDef as any).type || 'string',
-            description: (paramDef as any).description || '',
-            required: requiredSet.has(paramName),
-          });
-        }
-      }
-
-      return params;
-    } catch (e) {
-      return null;
-    }
-  }, []);
+    },
+    [],
+  );
 
   // Generate test input template based on parameters
   const generateTestInputTemplate = React.useCallback(() => {
     if (parameters.length === 0) return "{}";
-    
+
     const template: Record<string, any> = {};
-    parameters.forEach(param => {
+    parameters.forEach((param) => {
       // Generate more contextual example values based on parameter name
       const nameLower = param.name.toLowerCase();
-      
+
       switch (param.type) {
-        case 'string':
-          if (nameLower.includes('email')) {
+        case "string":
+          if (nameLower.includes("email")) {
             template[param.name] = "user@example.com";
-          } else if (nameLower.includes('url') || nameLower.includes('link')) {
+          } else if (nameLower.includes("url") || nameLower.includes("link")) {
             template[param.name] = "https://example.com";
-          } else if (nameLower.includes('name')) {
+          } else if (nameLower.includes("name")) {
             template[param.name] = "John Doe";
-          } else if (nameLower.includes('message') || nameLower.includes('text')) {
+          } else if (
+            nameLower.includes("message") ||
+            nameLower.includes("text")
+          ) {
             template[param.name] = "Hello, world!";
-          } else if (nameLower.includes('id')) {
+          } else if (nameLower.includes("id")) {
             template[param.name] = "abc123";
-          } else if (nameLower.includes('type')) {
+          } else if (nameLower.includes("type")) {
             template[param.name] = "default";
           } else {
             template[param.name] = param.description || "example string";
           }
           break;
-          
-        case 'number':
-          if (nameLower.includes('age')) {
+
+        case "number":
+          if (nameLower.includes("age")) {
             template[param.name] = 25;
-          } else if (nameLower.includes('price') || nameLower.includes('cost')) {
+          } else if (
+            nameLower.includes("price") ||
+            nameLower.includes("cost")
+          ) {
             template[param.name] = 99.99;
-          } else if (nameLower.includes('count') || nameLower.includes('quantity')) {
+          } else if (
+            nameLower.includes("count") ||
+            nameLower.includes("quantity")
+          ) {
             template[param.name] = 10;
-          } else if (nameLower.includes('year')) {
+          } else if (nameLower.includes("year")) {
             template[param.name] = 2024;
-          } else if (nameLower.includes('percent')) {
+          } else if (nameLower.includes("percent")) {
             template[param.name] = 50;
           } else {
             template[param.name] = 42;
           }
           break;
-          
-        case 'boolean':
-          template[param.name] = nameLower.includes('is') || nameLower.includes('has') || nameLower.includes('enable');
+
+        case "boolean":
+          template[param.name] =
+            nameLower.includes("is") ||
+            nameLower.includes("has") ||
+            nameLower.includes("enable");
           break;
-          
-        case 'object':
-          if (nameLower.includes('config') || nameLower.includes('settings')) {
+
+        case "object":
+          if (nameLower.includes("config") || nameLower.includes("settings")) {
             template[param.name] = { enabled: true, value: "default" };
-          } else if (nameLower.includes('data')) {
+          } else if (nameLower.includes("data")) {
             template[param.name] = { id: 1, name: "example" };
           } else {
             template[param.name] = { key: "value" };
           }
           break;
-          
-        case 'array':
-          if (nameLower.includes('tags')) {
+
+        case "array":
+          if (nameLower.includes("tags")) {
             template[param.name] = ["tag1", "tag2", "tag3"];
-          } else if (nameLower.includes('items') || nameLower.includes('list')) {
+          } else if (
+            nameLower.includes("items") ||
+            nameLower.includes("list")
+          ) {
             template[param.name] = ["item1", "item2", "item3"];
-          } else if (nameLower.includes('numbers')) {
+          } else if (nameLower.includes("numbers")) {
             template[param.name] = [1, 2, 3, 4, 5];
           } else {
             template[param.name] = ["value1", "value2"];
@@ -170,7 +192,7 @@ export function ToolEditor({
           break;
       }
     });
-    
+
     return JSON.stringify(template, null, 2);
   }, [parameters]);
 
@@ -210,22 +232,28 @@ export function ToolEditor({
           type: "string",
           description: "The time of day (morning, afternoon, evening)",
           required: false,
-        }
-      ]);
-      setRawParameters(JSON.stringify({
-        type: 'object',
-        properties: {
-          name: {
-            type: "string",
-            description: "The name of the person to greet"
-          },
-          timeOfDay: {
-            type: "string",
-            description: "The time of day (morning, afternoon, evening)"
-          }
         },
-        required: ["name"],
-      }, null, 2));
+      ]);
+      setRawParameters(
+        JSON.stringify(
+          {
+            type: "object",
+            properties: {
+              name: {
+                type: "string",
+                description: "The name of the person to greet",
+              },
+              timeOfDay: {
+                type: "string",
+                description: "The time of day (morning, afternoon, evening)",
+              },
+            },
+            required: ["name"],
+          },
+          null,
+          2,
+        ),
+      );
       setCode(`// This is a simple example function that greets a user
 // Feel free to modify or replace this with your own logic
 
@@ -246,20 +274,32 @@ return {
   timestamp: new Date().toISOString(),
   message: "Welcome to the AI assistant! How can I help you today?"
 };`);
-      setTestInput(JSON.stringify({
-        name: "Alice",
-        timeOfDay: "morning"
-      }, null, 2));
+      setTestInput(
+        JSON.stringify(
+          {
+            name: "Alice",
+            timeOfDay: "morning",
+          },
+          null,
+          2,
+        ),
+      );
     } else {
       // Reset for new tool from scratch
       setName("");
       setDescription("");
       setParameters([]);
-      setRawParameters(JSON.stringify({
-        type: 'object',
-        properties: {},
-        required: [],
-      }, null, 2));
+      setRawParameters(
+        JSON.stringify(
+          {
+            type: "object",
+            properties: {},
+            required: [],
+          },
+          null,
+          2,
+        ),
+      );
       setCode(`// This function receives parameters and must return a result
 // Example: function(param1, param2) { return param1 + param2; }
 `);
@@ -328,7 +368,10 @@ return {
       // Switching to easy mode - try to parse raw
       const parsed = rawToParameters(rawParameters);
       if (parsed === null) {
-        setErrors({ rawParameters: "Invalid JSON format. Please fix before switching modes." });
+        setErrors({
+          rawParameters:
+            "Invalid JSON format. Please fix before switching modes.",
+        });
         return;
       }
       setParameters(parsed);
@@ -390,13 +433,16 @@ return {
     if (!validateForm()) return;
 
     let parametersObject;
-    
+
     if (advancedMode) {
       // Parse raw parameters
       try {
         parametersObject = JSON.parse(rawParameters);
         if (!parametersObject.type || !parametersObject.properties) {
-          setErrors({ rawParameters: "Parameters must have 'type' and 'properties' fields" });
+          setErrors({
+            rawParameters:
+              "Parameters must have 'type' and 'properties' fields",
+          });
           return;
         }
       } catch (e) {
@@ -448,12 +494,11 @@ return {
         <DialogHeader>
           <DialogTitle>{tool ? "Edit Tool" : "Create New Tool"}</DialogTitle>
           <DialogDescription>
-            {tool 
+            {tool
               ? "Define a JavaScript function that the AI can call. The function will execute in your browser."
               : startWithExample
                 ? "Start with this hello world example and modify it to create your own tool. The function will execute in your browser."
-                : "Define a JavaScript function that the AI can call. The function will execute in your browser."
-            }
+                : "Define a JavaScript function that the AI can call. The function will execute in your browser."}
           </DialogDescription>
         </DialogHeader>
 
@@ -529,25 +574,27 @@ return {
                     rows={12}
                     className={cn(
                       "font-mono text-sm",
-                      errors.rawParameters && "border-destructive"
+                      errors.rawParameters && "border-destructive",
                     )}
                   />
                   {errors.rawParameters && (
-                    <p className="text-sm text-destructive">{errors.rawParameters}</p>
+                    <p className="text-sm text-destructive">
+                      {errors.rawParameters}
+                    </p>
                   )}
                   <p className="text-sm text-muted-foreground">
-                    Define the parameters schema in JSON format. Must include "type", "properties", and "required" fields.
+                    Define the parameters schema in JSON format. Must include
+                    "type", "properties", and "required" fields.
                   </p>
                 </div>
+              ) : parameters.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No parameters defined. Click "Add Parameter" to define inputs
+                  for your function.
+                </p>
               ) : (
-                parameters.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No parameters defined. Click "Add Parameter" to define inputs
-                    for your function.
-                  </p>
-                ) : (
-                  <div className="space-y-4">
-                    {parameters.map((param, index) => (
+                <div className="space-y-4">
+                  {parameters.map((param, index) => (
                     <div
                       key={index}
                       className="p-4 border rounded-lg space-y-3"
@@ -664,7 +711,6 @@ return {
                     </div>
                   ))}
                 </div>
-                )
               )}
             </div>
 
@@ -734,7 +780,8 @@ return {
                 />
                 {parameters.length > 0 && (
                   <p className="text-xs text-muted-foreground">
-                    Template generated based on your parameters. Modify values as needed.
+                    Template generated based on your parameters. Modify values
+                    as needed.
                   </p>
                 )}
               </div>
@@ -774,4 +821,3 @@ return {
     </Dialog>
   );
 }
-

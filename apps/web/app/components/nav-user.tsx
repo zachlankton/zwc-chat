@@ -76,7 +76,8 @@ export function NavUser() {
   const [tempSystemPrompt, setTempSystemPrompt] = useState(
     settings.systemPrompt,
   );
-  
+  const [isLoadingOAuth, setIsLoadingOAuth] = useState(false);
+
   const hasOwnKey = apiKeyInfo?.hasOwnOpenRouterKey ?? false;
 
   return (
@@ -156,14 +157,27 @@ export function NavUser() {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
+                disabled={isLoadingOAuth}
                 onClick={async () => {
-                  // Start OAuth flow
-                  const authUrl = await startOpenRouterOAuth();
-                  window.location.href = authUrl;
+                  if (isLoadingOAuth) return;
+
+                  setIsLoadingOAuth(true);
+                  try {
+                    // Start OAuth flow
+                    const authUrl = await startOpenRouterOAuth();
+                    window.location.href = authUrl;
+                  } catch (error) {
+                    console.error("Failed to start OAuth flow:", error);
+                    setIsLoadingOAuth(false);
+                  }
                 }}
               >
                 <Key className="mr-2 h-4 w-4" />
-                {hasOwnKey ? "Replace OpenRouter Key" : "Use Your Own Key"}
+                {isLoadingOAuth
+                  ? "Loading..."
+                  : hasOwnKey
+                    ? "Replace OpenRouter Key"
+                    : "Use Your Own Key"}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
