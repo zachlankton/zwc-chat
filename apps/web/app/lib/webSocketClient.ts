@@ -459,7 +459,7 @@ class WebSocketClient {
     if (this._isSocketReady()) {
       const messageStr = JSON.stringify(message);
       this.socket!.send(messageStr);
-      if ('body' in message && message.body) {
+      if ("body" in message && message.body) {
         message.body = tryParseJson(message.body) ?? message.body;
       }
       this._log("Message sent:", message);
@@ -664,22 +664,26 @@ class WebSocketClient {
 
   private _startPingInterval(): void {
     this._stopPingInterval(); // Clear any existing interval
-    
+
     this.pingIntervalId = window.setInterval(() => {
       if (this._isSocketReady()) {
         const pingMessage: PingMessage = {
           type: "ping",
           timestamp: Date.now(),
         };
-        
+
         this.send(pingMessage);
         this._debug("Sent ping message");
-        
+
         // Check if we've received a pong within the last 2 ping intervals
         const timeSinceLastPong = Date.now() - this.lastPongTimestamp;
         if (timeSinceLastPong > this.options.pingInterval * 2) {
-          this._debug("No pong received in", timeSinceLastPong, "ms, reconnecting...");
-          this.socket?.close(4000, "Ping timeout");
+          this._debug(
+            "No pong received in",
+            timeSinceLastPong,
+            "ms, reconnecting...",
+          );
+          //this.socket?.close(4000, "Ping timeout");
         }
       }
     }, this.options.pingInterval);

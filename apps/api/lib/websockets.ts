@@ -150,12 +150,17 @@ export const bunWebsocketHandlers: websocketHandlers = {
 				);
 			});
 		} else if (msgObject.type === "ping") {
+			console.log("WS_PING_RECVD", ws.data.session.email, ws.data.id);
 			// Handle ping message by sending pong response
-			ws.send(
+			const test = ws.send(
 				JSON.stringify({
 					type: "pong",
 					timestamp: msgObject.timestamp,
 				})
+			);
+
+			console.log(
+				`Pong test to ${ws.data.session.email} "${test}" ${ws.data.id}`
 			);
 		} else {
 			const session = await getWsSession(ws.data.url, ws.data.token);
@@ -219,9 +224,9 @@ export const bunWebsocketHandlers: websocketHandlers = {
 		console.log("WS_CLOSE", code, message, ws.data?.session?.email);
 	},
 
-	drain() {
+	drain(ws) {
 		// the socket is ready to receive more data
-		console.log("WS_DRAIN");
+		console.log("WS_DRAIN", ws.data.session.email);
 	},
 };
 
