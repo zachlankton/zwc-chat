@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { del, get, put, wsClient } from "../lib/fetchWrapper";
+import { del, get, put } from "../lib/fetchWrapper";
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
 import { Trash2, Pencil, MoreVertical, Pin, PinOff } from "lucide-react";
@@ -12,7 +12,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
-import { useCallback, useEffect } from "react";
 
 interface Chat {
   id: string;
@@ -139,58 +138,6 @@ export function ChatList({ currentChatId, onChatSelect }: ChatListProps) {
     queryKey: ["chats"],
     queryFn: async () => get<ChatListResponse>("/api/chat"),
   });
-
-  const handleChatSubMessage = useCallback((data: any) => {
-    // TODO: handle each message surgically instead of invalidating, just doing this for now to get across the finish line
-    function msgPost(_data: any) {}
-
-    function chatUpdate(_data: any) {
-      queryClient.invalidateQueries({ queryKey: ["chats"] });
-    }
-
-    function chatDelete(_data: any) {
-      queryClient.invalidateQueries({ queryKey: ["chats"] });
-    }
-
-    function chatStreamFinished(data: any) {
-      queryClient.invalidateQueries({
-        queryKey: ["chat", data.headers["x-zwc-chat-id"]],
-      });
-      queryClient.invalidateQueries({ queryKey: ["chats"] });
-    }
-
-    function chatTitleGenerated(_data: any) {
-      queryClient.invalidateQueries({ queryKey: ["chats"] });
-    }
-
-    const handlers = {
-      "msg-post": msgPost,
-      "chat-title-generated": chatTitleGenerated,
-      "chat-update": chatUpdate,
-      "chat-delete": chatDelete,
-      "chat-stream-finished": chatStreamFinished,
-    };
-
-    const msgData = data.data;
-    if (!msgData) return;
-
-    const subType: keyof typeof handlers | undefined = msgData.subType;
-    if (!subType) return;
-    if (!handlers[subType]) return;
-
-    handlers[subType](data);
-  }, []);
-
-  const wsMsg = useCallback((data: any) => {
-    if (data.type === "chat-sub-message") handleChatSubMessage(data);
-  }, []);
-
-  useEffect(() => {
-    wsClient.on("message", wsMsg);
-    return () => {
-      wsClient.off("message", wsMsg);
-    };
-  }, [wsMsg]);
 
   // Delete chat mutation
   const deleteChatMutation = useMutation({

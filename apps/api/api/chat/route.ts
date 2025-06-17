@@ -11,8 +11,8 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 	const url = new URL(req.url);
 
 	// Parse and validate limit
-	const rawLimit = parseInt(url.searchParams.get("limit") || "20");
-	const limit = !isNaN(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 20;
+	const rawLimit = parseInt(url.searchParams.get("limit") || "999");
+	const limit = !isNaN(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 999) : 20;
 
 	// Parse and validate offset
 	const rawOffset = parseInt(url.searchParams.get("offset") || "0");

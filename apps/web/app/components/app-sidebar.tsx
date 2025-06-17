@@ -13,6 +13,8 @@ import {
 } from "~/components/ui/sidebar";
 import { Menu } from "lucide-react";
 import { Button } from "./ui/button";
+import { wsClient } from "~/lib/fetchWrapper";
+import { queryClient } from "~/providers/queryClient";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onNewChat?: () => void;
@@ -82,6 +84,58 @@ export function AppSidebar({ onNewChat, ...props }: AppSidebarProps) {
       };
     }
   }, [isCollapsed]);
+
+  const handleChatSubMessage = React.useCallback((data: any) => {
+    // TODO: handle each message surgically instead of invalidating, just doing this for now to get across the finish line
+    function msgPost(_data: any) {}
+
+    function chatUpdate(_data: any) {
+      queryClient.invalidateQueries({ queryKey: ["chats"] });
+    }
+
+    function chatDelete(_data: any) {
+      queryClient.invalidateQueries({ queryKey: ["chats"] });
+    }
+
+    function chatStreamFinished(data: any) {
+      queryClient.invalidateQueries({
+        queryKey: ["chat", data.headers["x-zwc-chat-id"]],
+      });
+      queryClient.invalidateQueries({ queryKey: ["chats"] });
+    }
+
+    function chatTitleGenerated(_data: any) {
+      queryClient.invalidateQueries({ queryKey: ["chats"] });
+    }
+
+    const handlers = {
+      "msg-post": msgPost,
+      "chat-title-generated": chatTitleGenerated,
+      "chat-update": chatUpdate,
+      "chat-delete": chatDelete,
+      "chat-stream-finished": chatStreamFinished,
+    };
+
+    const msgData = data.data;
+    if (!msgData) return;
+
+    const subType: keyof typeof handlers | undefined = msgData.subType;
+    if (!subType) return;
+    if (!handlers[subType]) return;
+
+    handlers[subType](data);
+  }, []);
+
+  const wsMsg = React.useCallback((data: any) => {
+    if (data.type === "chat-sub-message") handleChatSubMessage(data);
+  }, []);
+
+  React.useEffect(() => {
+    wsClient.on("message", wsMsg);
+    return () => {
+      wsClient.off("message", wsMsg);
+    };
+  }, [wsMsg]);
 
   return (
     <Sidebar collapsible="icon" {...props}>
