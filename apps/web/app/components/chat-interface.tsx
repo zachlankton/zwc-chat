@@ -27,6 +27,7 @@ import { DialogClose } from "~/components/ui/dialog";
 import { Textarea } from "~/components/ui/textarea";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Label } from "~/components/ui/label";
+import { ModelSelectorModal } from "./model-selector";
 
 export function tryParseJson(txt: string) {
   try {
@@ -57,6 +58,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "~/components/ui/dropdown-menu";
 import { useQuery } from "@tanstack/react-query";
 import { useApiKeyInfo } from "~/stores/session";
@@ -195,13 +197,34 @@ function MessageRetryButton({
   messageModel,
   currentModel,
   onRetry,
+  modelsData,
 }: {
   messageIndex: number;
   messageModel: string;
   currentModel: string;
   onRetry: (messageIndex: number, opts?: { newModel?: string }) => void;
+  modelsData?: ModelsResponse;
 }) {
   const modelsAreSame = messageModel === currentModel;
+
+  const openModelSelector = () => {
+    if (!modelsData) return;
+
+    AsyncModal(
+      <ModelSelectorModal
+        selectedModel={currentModel}
+        onModelChange={(modelId) => {
+          onRetry(messageIndex, { newModel: modelId });
+        }}
+        data={modelsData}
+      />,
+      {
+        showCloseButton: false,
+        extraClasses: "min-w-[80dvw] p-0",
+      },
+    );
+  };
+
   return (
     <>
       <DropdownMenu>
@@ -221,21 +244,22 @@ function MessageRetryButton({
             <RotateCcw className="h-4 w-4 mr-2" />
             Retry With {messageModel.split("/")[1] || messageModel}
           </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => onRetry(messageIndex, { newModel: currentModel })}
-            disabled={modelsAreSame}
-          >
-            {modelsAreSame ? (
-              <span className="flex text-muted-foreground">
-                <Sparkles className="h-4 w-4 mr-2" />
-                Change your current model to retry with that
-              </span>
-            ) : (
+          {modelsAreSame ? null : (
+            <DropdownMenuItem
+              onClick={() => onRetry(messageIndex, { newModel: currentModel })}
+              disabled={modelsAreSame}
+            >
               <>
                 <Sparkles className="h-4 w-4 mr-2" />
                 Retry with {currentModel.split("/")[1] || currentModel}
               </>
-            )}
+            </DropdownMenuItem>
+          )}
+
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={openModelSelector}>
+            <Sparkles className="h-4 w-4 mr-2" />
+            Select new model to retry with...
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -1969,6 +1993,7 @@ export function ChatInterface({
                                 messageModel={message.model ?? ""}
                                 currentModel={selectedModel}
                                 onRetry={handleRetry}
+                                modelsData={modelsData}
                               />
                               <MessageBranchButton
                                 messageId={message.id}
