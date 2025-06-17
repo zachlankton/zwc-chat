@@ -85,8 +85,15 @@ const getModelCapabilities = (model: any) => {
     capabilities.push({ icon: Globe, color: "text-blue-500", name: "Web" });
   }
 
-  // File handling
-  if (id.includes("4") || id.includes("claude") || id.includes("gemini")) {
+  // File handling - only specific models that actually support file uploads
+  if (
+    id.includes("gpt-4") || 
+    id.includes("gpt-4o") ||
+    id.includes("claude-3") ||
+    id.includes("gemini-1.5") ||
+    id.includes("gemini-2") ||
+    name.includes("pro") && (id.includes("gemini") || id.includes("claude"))
+  ) {
     capabilities.push({
       icon: FileText,
       color: "text-purple-500",
