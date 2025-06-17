@@ -67,6 +67,7 @@ export interface User {
 	openRouterKeyLimit?: number; // Credit limit
 	openRouterKeyUsage?: number; // Current usage
 	openRouterKeyCreatedAt?: Date; // Provisioning timestamp
+	hasOwnOpenRouterKey?: boolean; // Whether user has their own key (not provisioned)
 	createdAt: Date;
 	updatedAt: Date;
 }
