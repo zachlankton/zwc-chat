@@ -99,7 +99,6 @@ function loadSettings(): ChatSettings {
       // Ensure the parsed value is an array
       if (Array.isArray(parsedTools)) {
         settings.tools = parsedTools;
-        makeSureWebSearchToolIsIncluded(settings.tools);
       } else {
         console.error("Saved tools is not an array, resetting to empty array");
         settings.tools = [];
@@ -109,10 +108,12 @@ function loadSettings(): ChatSettings {
     } catch (e) {
       console.error("Failed to parse saved tools:", e);
       settings.tools = [];
+
       // Clean up the corrupted data
       localStorage.removeItem("chat-tools");
     }
   }
+  makeSureWebSearchToolIsIncluded(settings.tools);
 
   // Load tools enabled preference
   const savedToolsEnabled = localStorage.getItem("toolsEnabled");

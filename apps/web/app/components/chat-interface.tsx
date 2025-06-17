@@ -898,6 +898,7 @@ export function ChatInterface({
           return handleRetry(messageIndex, {
             newModel: assistantMessage.current.model,
             includeWebSearch: true,
+            overrideIsLoading: true,
           });
         }
         // Execute tools
@@ -1401,9 +1402,15 @@ export function ChatInterface({
       newModel?: string;
       newContentForPreviousMessage?: string;
       includeWebSearch?: boolean;
+      overrideIsLoading?: boolean;
     },
   ) => {
-    if (isLoading) return;
+    const overrideIsLoading = opts?.overrideIsLoading
+      ? opts.overrideIsLoading
+      : false;
+
+    if (isLoading && overrideIsLoading === false) return;
+
     const includeWebSearch = opts?.includeWebSearch
       ? opts.includeWebSearch
       : false;
