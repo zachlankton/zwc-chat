@@ -120,7 +120,7 @@ export const ChatInput = React.forwardRef<
     // Handle unlimited keys
     if (apiKeyInfo.limit === null) {
       return {
-        percentage: 100,
+        percentage: 100, // remaining
         status: "good" as const,
         remaining: Infinity,
         limit: null,
@@ -129,7 +129,6 @@ export const ChatInput = React.forwardRef<
     }
     
     if (apiKeyInfo.limit === 0) return null;
-
     const usagePercentage = (apiKeyInfo.usage / apiKeyInfo.limit) * 100;
     const remainingPercentage = Math.max(0, 100 - usagePercentage);
 
