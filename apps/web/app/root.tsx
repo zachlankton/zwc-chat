@@ -51,6 +51,31 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                const storageKey = 'vite-ui-theme';
+                const theme = localStorage.getItem(storageKey);
+                const root = document.documentElement;
+                
+                if (theme === '"dark"' || theme === 'dark') {
+                  root.classList.add('dark');
+                } else if (theme === '"light"' || theme === 'light') {
+                  root.classList.remove('dark');
+                } else {
+                  // System theme
+                  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                  if (prefersDark) {
+                    root.classList.add('dark');
+                  } else {
+                    root.classList.remove('dark');
+                  }
+                }
+              })();
+            `,
+          }}
+        />
       </head>
       <body>
         <PostHogProvider
