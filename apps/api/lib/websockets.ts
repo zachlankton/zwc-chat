@@ -29,7 +29,7 @@ type ZwcChatWebSocketServer = ServerWebSocket<WebSocketData>;
 const userSockets = new Map<string, Map<string, ZwcChatWebSocketServer>>();
 
 //										ws.id
-const skts = new Map<string, ZwcChatWebSocketServer>();
+export const skts = new Map<string, ZwcChatWebSocketServer>();
 
 //															ws.id		chatId
 export const socketSubs = new Map<string, { chatId: string; offset: number }>();
@@ -282,9 +282,11 @@ function createWebSocketMessage(
 	msgObject: any,
 	response: Response,
 	newMessageId: string,
+	newMessageTimestamp: number,
 	chatId: string,
 	value: Uint8Array,
-	offset: number
+	offset: number,
+	thisMessageIsFromTheOriginSocket: boolean
 ): Uint8Array {
 	const header = new TextEncoder().encode(
 		JSON.stringify({
@@ -292,9 +294,11 @@ function createWebSocketMessage(
 			status: response.status,
 			statusText: response.statusText,
 			newMessageId,
+			newMessageTimestamp,
 			chatId,
 			length: value.length,
 			offset,
+			thisMessageIsFromTheOriginSocket,
 		})
 	);
 	const headerLenBytes = new Uint8Array(4); // 32-bit LE
@@ -578,8 +582,10 @@ async function streamedChunks(
 
 			if (!subSocket) continue;
 			let valueToSend = value;
+			let offsetToSend = offset;
 			if (subSocket.offset === 0) {
 				valueToSend = dataChunks as any;
+				offsetToSend = 0;
 			}
 
 			subSocket.offset = valueToSend.length;
@@ -589,9 +595,11 @@ async function streamedChunks(
 				msgObject,
 				response,
 				newMessageId,
+				newMessage.timestamp,
 				ctx.params.chatId,
 				valueToSend,
-				offset
+				offsetToSend,
+				sub === ws.data.id
 			);
 
 			const socketToSendOn = skts.get(sub);
@@ -612,4 +620,41 @@ async function streamedChunks(
 
 	// Save message and update chat
 	await saveMessageAndUpdateChat(newMessage, messageIdToReplace);
+
+	sendMessageToChatSubs(ws.data.id, ctx.params.chatId, {
+		subType: "chat-stream-finished",
+	});
+}
+
+export function sendMessageToChatSubs(
+	thisWsId: string,
+	chatId: string,
+	data: Record<string, any>
+) {
+	const ctx = asyncLocalStorage.getStore();
+	if (!ctx) throw new Error("NEED SOME CONTEXT TO SEND CHAT SUB MESSAGES");
+
+	const subs = userSockets.get(ctx.session.email);
+	for (const [wsId, userSocket] of subs!) {
+		// don't send messages to ourselves
+		if (wsId === thisWsId) continue;
+
+		if (!userSocket) continue;
+
+		const socketToSendOn = userSocket;
+		if (!socketToSendOn) {
+			console.error("socketToSendOn is not defined", userSocket);
+			continue;
+		}
+
+		socketToSendOn.send(
+			JSON.stringify({
+				type: "chat-sub-message",
+				data,
+				status: 200,
+				statusText: "ok",
+				headers: { "x-zwc-chat-id": chatId },
+			})
+		);
+	}
 }

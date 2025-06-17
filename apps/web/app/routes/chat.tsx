@@ -1,10 +1,6 @@
 import { Outlet } from "react-router";
 import { AppSidebar } from "~/components/app-sidebar";
-import {
-  SidebarInset,
-  SidebarProvider,
-  useSidebar,
-} from "~/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "~/components/ui/sidebar";
 
 export default function ChatLayout() {
   return (

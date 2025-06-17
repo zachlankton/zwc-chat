@@ -17,12 +17,6 @@ interface Message {
   timeToFinish?: number;
 }
 
-interface ChatResponse {
-  chatId: string;
-  messages: Message[];
-  hasMore: boolean;
-}
-
 export default function ChatRoute() {
   const { chatId } = useParams();
 
