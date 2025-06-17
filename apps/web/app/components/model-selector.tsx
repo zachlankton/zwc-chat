@@ -179,7 +179,7 @@ export function ModelSelectorModal({
 
       {/* Footer */}
       <div className="p-4 border-t bg-muted/50">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between">
           <Button
             variant="ghost"
             size="sm"
@@ -190,12 +190,12 @@ export function ModelSelectorModal({
             {showFavoritesOnly ? <>Show all</> : <>Favorites</>}
           </Button>
 
-          <div className="flex items-center gap-4 flex-1 justify-end">
+          <div className="sm:flex flex-wrap hidden items-center gap-4 flex-1 justify-end">
             {/* Model details display */}
             {displayedModelInfo && (
-              <div className="flex items-center gap-4 text-sm">
+              <div className="flex flex-wrap items-center gap-4 text-sm">
                 {/* Context length */}
-                <div className="flex items-center gap-1">
+                <div className="flex flex-wrap items-center gap-1">
                   <FileText className="h-4 w-4 text-muted-foreground" />
                   <span className="text-muted-foreground">
                     {displayedModelInfo.context_length >= 1000000

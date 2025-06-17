@@ -87,12 +87,12 @@ const getModelCapabilities = (model: any) => {
 
   // File handling - only specific models that actually support file uploads
   if (
-    id.includes("gpt-4") || 
+    id.includes("gpt-4") ||
     id.includes("gpt-4o") ||
     id.includes("claude-3") ||
     id.includes("gemini-1.5") ||
     id.includes("gemini-2") ||
-    name.includes("pro") && (id.includes("gemini") || id.includes("claude"))
+    (name.includes("pro") && (id.includes("gemini") || id.includes("claude")))
   ) {
     capabilities.push({
       icon: FileText,
