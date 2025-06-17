@@ -12,14 +12,18 @@ A modern, real-time chat application with AI integration, built with Bun, React,
 - 📱 **Responsive Design** - Works seamlessly on desktop and mobile devices
 - 🚀 **High Performance** - Built on Bun runtime for blazing-fast performance
 - 🎙️ **Speech Recognition** - Talk to the LLM instead of typing, say 'send message' to send it
-- 🗣️ **Text To Speech** - Listen to the LLM talk as the text streams in
+- 🗣️ **Text-to-Speech** - Listen to AI responses as they stream in real-time
 - 🎯 **System Prompts** - Customize AI behavior with default and per-chat system prompts
 - ⤵︎ **Chat Branching** - Branch any chat off into another chat to take the conversation in a different direction
 - 💡 **Syntax Highlighting** - Beautiful code blocks with syntax highlighting for multiple languages
 - 📎 **Attachment Support** - Upload images and files to include in your conversations
+- ✏️ **Message Editing** - Edit and delete individual messages in your conversation
+- 🔄 **Message Retry** - Retry AI responses with any model at any point in the conversation
+- 🤖 **AI-Generated Titles** - Automatic chat title generation and summaries
+- 💳 **Credits System** - Track API usage with visual credits remaining indicator
 - 🛠️ **Tool Calling** - Create and manage JavaScript functions that AI can execute locally in your browser
 - 🔑 **BYOK (Bring Your Own Key)** - Use your own OpenRouter API key for unlimited access
-- 🔄 **Sync/Resumeable Streams** - Reconnect and resume AI responses seamlessly after connection interruptions
+- 🔄 **Resumable Streams** - WebSocket state syncing with seamless reconnection
 
 ## Tech Stack
 
@@ -104,15 +108,26 @@ cd apps/api && bun run dev
 cd apps/web && bun run dev
 ```
 
+## Type Checking
+
+```bash
+# API TypeScript checking
+cd apps/api && bun run check
+
+# Web app TypeScript checking + React Router typegen
+cd apps/web && bun run typecheck
+```
+
 ## Building for Production
 
 Build both applications:
 
 ```bash
-# API
-cd apps/api && bun run build
+# From root directory
+bun run build
 
-# Web app
+# Or individually
+cd apps/api && bun run build
 cd apps/web && bun run build
 ```
 
@@ -158,6 +173,8 @@ zwc-chat/
 - `/api/chat/[chatId]` - Individual chat operations
 - `/api/users` - User management
 - `/api/models` - Available AI models
+- `/api/title` - Generate chat titles
+- `/api/ws` - WebSocket endpoint for real-time streaming
 
 ## Contributing
 
@@ -176,6 +193,11 @@ For security concerns, please review our [Security Policy](SECURITY.md).
 - Built with [Bun](https://bun.sh/)
 - UI components from [shadcn/ui](https://ui.shadcn.com/)
 - Icons from [Lucide](https://lucide.dev/)
+
+## Roadmap
+
+- 👥 **Admin Panel** - User management interface for administrators
+- 👤 **User Profile** - Settings page with subscription management
 
 ---
 

@@ -27,13 +27,17 @@
 - [x] leverage openrouter models list to enable multiple model selection
 - [x] allow switching models in the middle of a chat
 - [x] copy buttons for entire messages (grab markdown)
-- [ ] create admin page to manage users
-- [ ] leverage openrouter byok, allow users to add more credits via stripe or auth with openrouter to byok
-- [ ] support speech recognition
-- [ ] support tool calling???? not sure the best way to do this but would be super cool
+- [x] leverage openrouter byok, allow users to add more credits via stripe or auth with openrouter to byok
+- [x] support speech recognition
+- [x] text-to-speech
+- [x] attachment support
+- [x] support tool calling???? not sure the best way to do this but would be super cool
 - [x] ability to edit/delete individual messages
 - [x] ability to retry a single individual assistant response that includes up to that point in history context (with any model)
 - [x] ability to split/branch off of a conversation at any point (create new chat from that point in history?)
-- [ ] user profile/settings page with subscription management and billing history
 - [x] implement AI generated chat titles/summaries
 - [x] implement user credits remaining health bar
+- [x] resumeable streams and websocket state syncing
+- [ ] create admin page to manage users
+- [ ] user profile/settings page
+
