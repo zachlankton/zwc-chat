@@ -9,7 +9,7 @@ import {
 	deleteSession as deleteSessionFromStorage,
 } from "lib/sessionStorage";
 
-export const userDefaultRateLimit = "5:1";
+export const userDefaultRateLimit = "50:10";
 
 export async function createSession(user: any) {
 	const userSession: SessionData = {
@@ -82,7 +82,10 @@ export async function getCurrentSession(req: RequestWithSession) {
 	if (reqCtx && !reqCtx.rateLogged && process.env.DEV !== "TRUE") {
 		reqCtx.rateLogged = true;
 
-		if (userRateLimit(req)) throw rateLimitError();
+		if (userRateLimit(req))
+			throw rateLimitError(
+				`Too Many Requests. Rate Limit Exceeded for user ${reqCtx.session.email}`
+			);
 	}
 
 	return req.session;
