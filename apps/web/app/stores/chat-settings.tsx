@@ -60,6 +60,37 @@ function loadSettings(): ChatSettings {
     settings.systemPrompt = savedSystemPrompt;
   }
 
+  const websearchTool: Tool = {
+    id: "web_search",
+    type: "function",
+    code: "",
+    enabled: true,
+    createdAt: new Date(2025, 1, 1).toISOString(),
+    updatedAt: new Date(2025, 1, 1).toISOString(),
+    builtin: true,
+    function: {
+      name: "web_search",
+      description: "Search the web for current information",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "The search query",
+          },
+        },
+        required: ["query"],
+      },
+    },
+  };
+
+  function makeSureWebSearchToolIsIncluded(tools: Tool[]) {
+    const hasWebSearch = tools.find((t) => t.id === websearchTool.id);
+    if (hasWebSearch) return;
+    tools.unshift(websearchTool);
+    localStorage.setItem("chat-tools", JSON.stringify(tools));
+  }
+
   // Load tools
   const savedTools = localStorage.getItem("chat-tools");
   if (savedTools) {
@@ -68,6 +99,7 @@ function loadSettings(): ChatSettings {
       // Ensure the parsed value is an array
       if (Array.isArray(parsedTools)) {
         settings.tools = parsedTools;
+        makeSureWebSearchToolIsIncluded(settings.tools);
       } else {
         console.error("Saved tools is not an array, resetting to empty array");
         settings.tools = [];

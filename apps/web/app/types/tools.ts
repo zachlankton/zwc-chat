@@ -26,6 +26,7 @@ export interface Tool {
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
+  builtin?: boolean;
 }
 
 // Tool execution types

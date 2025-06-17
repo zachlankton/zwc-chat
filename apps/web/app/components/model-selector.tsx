@@ -176,7 +176,7 @@ export function ModelSelectorModal({
             <h3 className="flex items-center gap-2 text-sm font-medium mb-3">
               <span className="text-lg">⚡</span> Favorites
             </h3>
-            <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {filteredFavorites.map((model) => (
                 <ModelCard
                   key={model.id}
@@ -203,7 +203,7 @@ export function ModelSelectorModal({
                   <h3 className="text-sm font-medium mb-3">
                     {providerNames[provider]}
                   </h3>
-                  <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                     {models.map((model) => (
                       <ModelCard
                         key={model.id}
@@ -222,7 +222,7 @@ export function ModelSelectorModal({
 
         {/* Favorites only view */}
         {showFavoritesOnly && (
-          <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {filteredFavorites.map((model) => (
               <ModelCard
                 key={model.id}

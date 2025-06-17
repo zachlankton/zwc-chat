@@ -29,6 +29,8 @@ import { Checkbox } from "~/components/ui/checkbox";
 import { Label } from "~/components/ui/label";
 import { ModelSelectorModal } from "./model-selector";
 
+let i = 0;
+
 export function tryParseJson(txt: string) {
   try {
     return JSON.parse(txt);
@@ -101,6 +103,7 @@ interface Message {
   tool_calls?: ToolCall[];
   tool_call_id?: string;
   name?: string; // Tool name for tool messages
+  annotations?: any;
 }
 
 interface ChatInterfaceProps {
@@ -472,6 +475,33 @@ export function ChatInterface({
   const apiKeyInfo = useApiKeyInfo();
   const navigate = useNavigate();
 
+  // Shared ReactMarkdown components configuration
+  const markdownComponents = {
+    a: ({ href, children }: any) => (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary hover:underline"
+      >
+        {children}
+      </a>
+    ),
+    code: ({ children, className }: any) => {
+      const childrenStr = typeof children === "string";
+      const multiLine = childrenStr ? children.includes("\n") : false;
+      const isInline = !className?.includes("language-") && !multiLine;
+      if (isInline) {
+        return (
+          <code className="px-1 py-0.5 bg-primary text-primary-foreground rounded text-sm">
+            {children}
+          </code>
+        );
+      }
+      return <CodeBlock>{children}</CodeBlock>;
+    },
+  };
+
   // Initialize selectedModel based on context
   const getInitialModel = () => {
     // For existing chats, use the model from the last assistant message
@@ -494,8 +524,24 @@ export function ChatInterface({
     return "openai/gpt-4o-mini";
   };
 
+  const {
+    data: modelsData,
+    isLoading: modelsLoading,
+    error: modelsError,
+  } = useQuery<ModelsResponse>({
+    queryKey: ["models"],
+    queryFn: () => get("/api/models"),
+    staleTime: 60 * 60 * 1000, // 1 hour
+  });
+
   const [selectedModel, setSelectedModel] =
     React.useState<string>(getInitialModel());
+
+  const model = React.useMemo(() => {
+    return modelsData
+      ? modelsData.all.find((m) => m.id === selectedModel)
+      : null;
+  }, [selectedModel, modelsData]);
 
   const isNewChat = React.useRef<boolean>(false);
   const resettingOffset = React.useRef<boolean>(false);
@@ -1015,7 +1061,7 @@ export function ChatInterface({
         isNewChat.current = false;
       }
     },
-    [settings.ttsEnabled, processTtsQueue, flushTtsBuffer],
+    [settings.ttsEnabled, processTtsQueue, flushTtsBuffer, modelsData],
   );
 
   React.useEffect(() => {
@@ -1046,107 +1092,6 @@ export function ChatInterface({
     localStorage.setItem("selectedModel", selectedModel);
   }, [selectedModel]);
 
-  // Handle tool execution
-  const executeToolsAndContinue = React.useCallback(
-    async (toolCalls: ToolCall[]) => {
-      if (!settings.toolsEnabled || !toolCalls || toolCalls.length === 0) {
-        return;
-      }
-
-      setIsLoading(true);
-
-      try {
-        // Execute tools
-        const toolResults = await executeToolCalls(toolCalls, settings.tools);
-
-        // Create tool result messages
-        const toolMessages: Message[] = toolResults.map((result) => ({
-          id: crypto.randomUUID(),
-          role: "tool",
-          tool_call_id: result.tool_call_id,
-          name: result.name,
-          content: result.content,
-          timestamp: Date.now(),
-        }));
-
-        const currentMsgIdx = messagesRef.current.findIndex(
-          (x) => x.id === assistantMessage?.current?.id,
-        );
-
-        const messagesUpToRetry = messagesRef.current.slice(
-          0,
-          currentMsgIdx + 1,
-        );
-        const msgTime = assistantMessage?.current?.timestamp ?? Date.now();
-
-        toolMessages.forEach((t) => (t.timestamp = msgTime + 10));
-
-        const remainingMessages = messagesRef.current.slice(currentMsgIdx + 1);
-
-        if (assistantMessage.current?.tool_calls?.length === 0) {
-          assistantMessage.current.tool_calls = undefined;
-        }
-
-        // Send a new request with the tool results
-        const requestBody: any = {
-          messages: [...messagesUpToRetry, ...toolMessages],
-          model: selectedModel,
-          overrideAssistantTimestamp: msgTime + 20,
-        };
-
-        if (settings.toolsEnabled && settings.tools.length > 0) {
-          requestBody.tools = formatToolsForAPI(settings.tools);
-        }
-
-        // Create a new assistant message for the final response
-        assistantMessage.current = {
-          id: crypto.randomUUID(),
-          content: "",
-          role: "assistant",
-          model: selectedModel,
-          timestamp: msgTime + 20,
-          timeToFinish: 0,
-        };
-
-        setMessages([
-          ...messagesUpToRetry,
-          ...toolMessages,
-          assistantMessage.current,
-          ...remainingMessages,
-        ]);
-
-        updateStreamingMessageId(assistantMessage.current.id);
-
-        post<StreamResponse | Response>(`/chat/${chatId}`, requestBody, {
-          resolveImmediately: true,
-        });
-      } catch (error) {
-        console.error("Error executing tools:", error);
-
-        // Show error to user
-        const errorMessage =
-          error instanceof Error
-            ? error.message
-            : "An unknown error occurred while executing tools";
-        AsyncAlert({
-          title: "Tool Execution Error",
-          message: errorMessage,
-        });
-
-        // Reset assistant message state and pending tool calls
-        assistantMessage.current = null;
-        updateStreamingMessageId(null);
-        pendingToolCallsRef.current = null;
-      } finally {
-        // Always reset loading state, but only if no streaming is happening
-        if (!streamingMessageIdRef.current) {
-          setIsLoading(false);
-        }
-      }
-    },
-    [chatId, selectedModel, settings.toolsEnabled, settings.tools],
-  );
-
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({
       behavior: "auto",
@@ -1175,7 +1120,11 @@ export function ChatInterface({
     }, 100);
   }, [chatId]);
 
-  const handleSubmit = async (input: string, attachments: File[]) => {
+  const handleSubmit = async (
+    input: string,
+    attachments: File[],
+    includeWebSearch: boolean = false,
+  ) => {
     if (!input.trim() || isLoading) return;
     const stashMessageLength = messages.length;
     isNewChat.current =
@@ -1267,8 +1216,18 @@ export function ChatInterface({
       messages: [...messagesRef.current],
       model: selectedModel,
     };
-    if (settings.toolsEnabled && settings.tools.length > 0) {
+
+    if (
+      includeWebSearch === false &&
+      model?.supported_parameters?.includes("tools") &&
+      settings.toolsEnabled &&
+      settings.tools.length > 0
+    ) {
       requestBody.tools = formatToolsForAPI(settings.tools);
+    }
+
+    if (includeWebSearch) {
+      requestBody.websearch = true;
     }
 
     // Create empty assistant message to start streaming
@@ -1290,14 +1249,25 @@ export function ChatInterface({
     });
   };
 
+  i++;
+  console.log(i, modelsData);
   const handleRetry = async (
     messageIndex: number,
-    opts?: { newModel?: string; newContentForPreviousMessage?: string },
+    opts?: {
+      newModel?: string;
+      newContentForPreviousMessage?: string;
+      includeWebSearch?: boolean;
+    },
   ) => {
+    const test = i;
+    console.log("FUCK", test, modelsData);
     if (isLoading) return;
+    const includeWebSearch = opts?.includeWebSearch
+      ? opts.includeWebSearch
+      : false;
 
     // Get the message to retry and ensure it's an assistant message
-    assistantMessage.current = messages[messageIndex];
+    assistantMessage.current = messagesRef.current[messageIndex];
 
     if (assistantMessage.current.role !== "assistant") {
       console.error(
@@ -1318,6 +1288,7 @@ export function ChatInterface({
     const prevUserMsg = messagesUpToRetry.at(-1);
     let nextMsg = messagesRef.current[messageIndex + 1];
 
+    // remove tools from the retry
     let lastToolIndex = messageIndex;
     if (nextMsg && nextMsg.role === "tool") {
       lastToolIndex++;
@@ -1332,15 +1303,23 @@ export function ChatInterface({
 
     const remainingMessages = messagesRef.current.slice(lastToolIndex);
 
-    // Add tool messages to the conversation
     setMessages([...messagesUpToRetry, ...remainingMessages]);
 
     if (opts?.newContentForPreviousMessage && prevUserMsg)
       prevUserMsg.content = opts?.newContentForPreviousMessage;
 
     // Update the model if a new one was selected
-    const modelToUse =
+    const _modelToUse =
       opts?.newModel || selectedModel || assistantMessage.current.model;
+
+    const modelToUse = modelsData
+      ? modelsData.all.find((m) => m.id === _modelToUse)
+      : null;
+
+    if (!modelToUse) {
+      AsyncAlert({ title: "Error", message: "Could not find model" });
+      return console.error({ _modelToUse, modelToUse, modelsData });
+    }
 
     setIsLoading(true);
 
@@ -1351,26 +1330,172 @@ export function ChatInterface({
     setMessages((prev) =>
       prev.map((msg, idx) =>
         idx === messageIndex
-          ? { ...msg, content: "", reasoning: undefined, model: modelToUse }
+          ? { ...msg, content: "", reasoning: undefined, model: _modelToUse }
           : msg,
       ),
     );
 
-    // Include tools if enabled
     const retryRequestBody: any = {
       messages: messagesUpToRetry,
-      model: modelToUse,
+      model: _modelToUse,
       messageIdToReplace: assistantMessage.current.id,
     };
 
-    if (settings.toolsEnabled && settings.tools.length > 0) {
+    if (
+      includeWebSearch === false &&
+      modelToUse?.supported_parameters?.includes("tools") &&
+      settings.toolsEnabled &&
+      settings.tools.length > 0
+    ) {
       retryRequestBody.tools = formatToolsForAPI(settings.tools);
+    }
+
+    if (includeWebSearch) {
+      retryRequestBody.websearch = true;
     }
 
     post<StreamResponse | Response>(`/chat/${chatId}`, retryRequestBody, {
       resolveImmediately: true,
     });
   };
+
+  // Handle tool execution
+  const executeToolsAndContinue = React.useCallback(
+    async (toolCalls: ToolCall[]) => {
+      if (!settings.toolsEnabled || !toolCalls || toolCalls.length === 0) {
+        return;
+      }
+
+      setIsLoading(true);
+
+      try {
+        const hasWebSearch = toolCalls.some(
+          (t) => t.function.name === "web_search",
+        );
+
+        if (hasWebSearch) {
+          if (assistantMessage.current === null) {
+            AsyncAlert({
+              title: "Error",
+              message:
+                "There was an issue trying to perform a web search tool call: assistantMessage is null",
+            });
+            return;
+          }
+
+          const messageIndex = messagesRef.current.findIndex(
+            (msg) => msg.id === assistantMessage?.current?.id,
+          );
+
+          if (messageIndex === -1) {
+            console.error({
+              hasWebSearch,
+              toolCalls,
+              messagesRef,
+            });
+            AsyncAlert({
+              title: "Error",
+              message:
+                "There was an issue trying to perform a web search tool call: Could not find message index",
+            });
+            return;
+          }
+
+          return handleRetry(messageIndex, {
+            newModel: assistantMessage.current.model,
+            includeWebSearch: true,
+          });
+        }
+        // Execute tools
+        const toolResults = await executeToolCalls(toolCalls, settings.tools);
+
+        // Create tool result messages
+        const toolMessages: Message[] = toolResults.map((result) => ({
+          id: crypto.randomUUID(),
+          role: "tool",
+          tool_call_id: result.tool_call_id,
+          name: result.name,
+          content: result.content,
+          timestamp: Date.now(),
+        }));
+
+        const currentMsgIdx = messagesRef.current.findIndex(
+          (x) => x.id === assistantMessage?.current?.id,
+        );
+
+        const messagesUpToRetry = messagesRef.current.slice(
+          0,
+          currentMsgIdx + 1,
+        );
+        const msgTime = assistantMessage?.current?.timestamp ?? Date.now();
+
+        toolMessages.forEach((t) => (t.timestamp = msgTime + 10));
+
+        const remainingMessages = messagesRef.current.slice(currentMsgIdx + 1);
+
+        if (assistantMessage.current?.tool_calls?.length === 0) {
+          assistantMessage.current.tool_calls = undefined;
+        }
+
+        // Send a new request with the tool results
+        const requestBody: any = {
+          messages: [...messagesUpToRetry, ...toolMessages],
+          model: selectedModel,
+          overrideAssistantTimestamp: msgTime + 20,
+        };
+
+        if (settings.toolsEnabled && settings.tools.length > 0) {
+          requestBody.tools = formatToolsForAPI(settings.tools);
+        }
+
+        // Create a new assistant message for the final response
+        assistantMessage.current = {
+          id: crypto.randomUUID(),
+          content: "",
+          role: "assistant",
+          model: selectedModel,
+          timestamp: msgTime + 20,
+          timeToFinish: 0,
+        };
+
+        setMessages([
+          ...messagesUpToRetry,
+          ...toolMessages,
+          assistantMessage.current,
+          ...remainingMessages,
+        ]);
+
+        updateStreamingMessageId(assistantMessage.current.id);
+
+        post<StreamResponse | Response>(`/chat/${chatId}`, requestBody, {
+          resolveImmediately: true,
+        });
+      } catch (error) {
+        console.error("Error executing tools:", error);
+
+        // Show error to user
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "An unknown error occurred while executing tools";
+        AsyncAlert({
+          title: "Tool Execution Error",
+          message: errorMessage,
+        });
+
+        // Reset assistant message state and pending tool calls
+        assistantMessage.current = null;
+        updateStreamingMessageId(null);
+        pendingToolCallsRef.current = null;
+      } finally {
+        // Always reset loading state, but only if no streaming is happening
+        if (!streamingMessageIdRef.current) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [chatId, selectedModel, settings.toolsEnabled, settings.tools, modelsData],
+  );
 
   const handleBranch = async (messageId: string, messageIndex: number) => {
     try {
@@ -1597,18 +1722,6 @@ export function ChatInterface({
     }
   };
 
-  const {
-    data: modelsData,
-    isLoading: modelsLoading,
-    error: modelsError,
-  } = useQuery<ModelsResponse>({
-    queryKey: ["models"],
-    queryFn: () => get("/api/models"),
-    staleTime: 60 * 60 * 1000, // 1 hour
-  });
-
-  console.log(modelsData);
-
   return (
     <>
       <div className="flex flex-col h-full">
@@ -1715,6 +1828,10 @@ export function ChatInterface({
                           </CodeBlock>
                         </pre>
                       </div>
+                      <MessageDeleteButton
+                        messageId={message.id}
+                        onDelete={handleDelete}
+                      />
                     </div>
                   );
                 }
@@ -1771,28 +1888,7 @@ export function ChatInterface({
                               <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
                                 rehypePlugins={[rehypeHighlight]}
-                                components={{
-                                  code: ({ children, className }) => {
-                                    const childrenStr =
-                                      typeof children === "string";
-                                    const multiLine = childrenStr
-                                      ? children.includes("\n")
-                                      : false;
-                                    const isInline =
-                                      !className?.includes("language-") &&
-                                      !multiLine;
-
-                                    if (isInline) {
-                                      return (
-                                        <code className="px-1 py-0.5 bg-primary text-primary-foreground rounded text-sm">
-                                          {children}
-                                        </code>
-                                      );
-                                    }
-
-                                    return <CodeBlock>{children}</CodeBlock>;
-                                  },
-                                }}
+                                components={markdownComponents}
                               >
                                 {message.content}
                               </ReactMarkdown>
@@ -1805,31 +1901,7 @@ export function ChatInterface({
                                         key={index}
                                         remarkPlugins={[remarkGfm]}
                                         rehypePlugins={[rehypeHighlight]}
-                                        components={{
-                                          code: ({ children, className }) => {
-                                            const childrenStr =
-                                              typeof children === "string";
-                                            const multiLine = childrenStr
-                                              ? children.includes("\n")
-                                              : false;
-                                            const isInline =
-                                              !className?.includes(
-                                                "language-",
-                                              ) && !multiLine;
-
-                                            if (isInline) {
-                                              return (
-                                                <code className="px-1 py-0.5 bg-primary text-primary-foreground rounded text-sm">
-                                                  {children}
-                                                </code>
-                                              );
-                                            }
-
-                                            return (
-                                              <CodeBlock>{children}</CodeBlock>
-                                            );
-                                          },
-                                        }}
+                                        components={markdownComponents}
                                       >
                                         {item.text || ""}
                                       </ReactMarkdown>
@@ -1868,28 +1940,7 @@ export function ChatInterface({
                                 <ReactMarkdown
                                   remarkPlugins={[remarkGfm]}
                                   rehypePlugins={[rehypeHighlight]}
-                                  components={{
-                                    code: ({ children, className }) => {
-                                      const childrenStr =
-                                        typeof children === "string";
-                                      const multiLine = childrenStr
-                                        ? children.includes("\n")
-                                        : false;
-                                      const isInline =
-                                        !className?.includes("language-") &&
-                                        !multiLine;
-
-                                      if (isInline) {
-                                        return (
-                                          <code className="px-1 py-0.5 bg-primary text-primary-foreground rounded text-sm">
-                                            {children}
-                                          </code>
-                                        );
-                                      }
-
-                                      return <CodeBlock>{children}</CodeBlock>;
-                                    },
-                                  }}
+                                  components={markdownComponents}
                                 >
                                   {message.reasoning}
                                 </ReactMarkdown>
@@ -1900,28 +1951,7 @@ export function ChatInterface({
                             <ReactMarkdown
                               remarkPlugins={[remarkGfm]}
                               rehypePlugins={[rehypeHighlight]}
-                              components={{
-                                code: ({ children, className }) => {
-                                  const childrenStr =
-                                    typeof children === "string";
-                                  const multiLine = childrenStr
-                                    ? children.includes("\n")
-                                    : false;
-                                  const isInline =
-                                    !className?.includes("language-") &&
-                                    !multiLine;
-
-                                  if (isInline) {
-                                    return (
-                                      <code className="px-1 py-0.5 bg-primary text-primary-foreground rounded text-sm">
-                                        {children}
-                                      </code>
-                                    );
-                                  }
-
-                                  return <CodeBlock>{children}</CodeBlock>;
-                                },
-                              }}
+                              components={markdownComponents}
                             >
                               {typeof message.content === "string"
                                 ? message.content
@@ -1930,33 +1960,38 @@ export function ChatInterface({
 
                             {/* Display tool calls if present */}
                             {message.tool_calls &&
+                              !message.content &&
                               message.tool_calls.length > 0 && (
                                 <div className="mt-4 space-y-2">
                                   <div className="flex items-center gap-2 text-sm font-medium">
                                     <Hammer className="h-4 w-4" />
                                     <span>Using tools:</span>
                                   </div>
-                                  {message.tool_calls.map((toolCall) => (
-                                    <div
-                                      key={toolCall.id}
-                                      className="bg-muted/50 rounded-lg p-3 text-sm"
-                                    >
-                                      <div className="font-medium mb-1">
-                                        {toolCall.function.name}
+                                  {message.tool_calls
+                                    .filter((t) =>
+                                      ["web_search"].includes(t.function.name),
+                                    )
+                                    .map((toolCall) => (
+                                      <div
+                                        key={toolCall.id}
+                                        className="bg-muted/50 rounded-lg p-3 text-sm"
+                                      >
+                                        <div className="font-medium mb-1">
+                                          {toolCall.function.name}
+                                        </div>
+                                        <pre>
+                                          <CodeBlock>
+                                            {JSON.stringify(
+                                              tryParseJson(
+                                                toolCall.function.arguments,
+                                              ),
+                                              null,
+                                              2,
+                                            )}
+                                          </CodeBlock>
+                                        </pre>
                                       </div>
-                                      <pre>
-                                        <CodeBlock>
-                                          {JSON.stringify(
-                                            tryParseJson(
-                                              toolCall.function.arguments,
-                                            ),
-                                            null,
-                                            2,
-                                          )}
-                                        </CodeBlock>
-                                      </pre>
-                                    </div>
-                                  ))}
+                                    ))}
                                 </div>
                               )}
 
@@ -2123,6 +2158,7 @@ function handleChunk({
         msg.id === assistantMessage.id
           ? {
               ...msg,
+              tool_calls: undefined, //tool calls and content are mutually exclusive
               [msgKey]: (msg[msgKey] ?? "") + newContent,
             }
           : msg,
@@ -2133,6 +2169,10 @@ function handleChunk({
     if (newContent && onNewContent) {
       onNewContent(newContent);
     }
+  }
+
+  if (delta.annotations) {
+    assistantMessage.annotations = delta.annotations;
   }
 
   // Handle tool calls streaming

@@ -20,6 +20,10 @@
   margin-top: 0;
 }
 
+.prose a {
+  color: var(--color-primary);
+}
+
 .prose p {
   margin-top: 0.75em;
   margin-bottom: 0.75em;

@@ -239,6 +239,7 @@ export const POST = apiHandler(
 			},
 			body: JSON.stringify({
 				model: model, // Use dynamic model
+				plugins: body.websearch ? [{ id: "web" }] : undefined,
 				stream: true,
 				transforms: ["middle-out"], // silicon valley fo lyfe
 				user: req.session.email,

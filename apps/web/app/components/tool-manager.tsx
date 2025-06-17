@@ -152,40 +152,40 @@ export function ToolManager({ open, onOpenChange }: ToolManagerProps) {
         </DialogHeader>
 
         {/* Tools Settings */}
-        <div className="space-y-3">
-          {/* Tools Enabled Toggle */}
-          <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
-            <div>
-              <h3 className="font-medium">Enable Tools</h3>
-              <p className="text-sm text-muted-foreground">
-                Allow the AI to call your custom tools during conversations
-              </p>
-            </div>
-            <Switch
-              checked={settings.toolsEnabled}
-              onCheckedChange={updateToolsEnabled}
-            />
-          </div>
-
-          {/* Hide Tool Call Messages Toggle */}
-          {settings.toolsEnabled && (
+        <ScrollArea className="flex-1 -mx-6 px-6">
+          <div className="space-y-3 mb-3">
+            {/* Tools Enabled Toggle */}
             <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
               <div>
-                <h3 className="font-medium">Hide Tool Call Messages</h3>
+                <h3 className="font-medium">Enable Tools</h3>
                 <p className="text-sm text-muted-foreground">
-                  Hide the tool calls and responses from the chat interface
+                  Allow the AI to call your custom tools during conversations
                 </p>
               </div>
               <Switch
-                checked={settings.hideToolCallMessages}
-                onCheckedChange={updateHideToolCallMessages}
+                checked={settings.toolsEnabled}
+                onCheckedChange={updateToolsEnabled}
               />
             </div>
-          )}
-        </div>
 
-        {/* Tools List */}
-        <ScrollArea className="flex-1 -mx-6 px-6">
+            {/* Hide Tool Call Messages Toggle */}
+            {settings.toolsEnabled && (
+              <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
+                <div>
+                  <h3 className="font-medium">Hide Tool Call Messages</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Hide the tool calls and responses from the chat interface
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.hideToolCallMessages}
+                  onCheckedChange={updateHideToolCallMessages}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Tools List */}
           {settings.tools.length === 0 ? (
             <div className="space-y-6">
               <div className="text-center py-12 text-muted-foreground">
@@ -240,20 +240,27 @@ export function ToolManager({ open, onOpenChange }: ToolManagerProps) {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setEditingTool(tool)}
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteTool(tool.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {tool.builtin ? (
+                      <p>Built-In</p>
+                    ) : (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setEditingTool(tool)}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteTool(tool.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
