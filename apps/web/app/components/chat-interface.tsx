@@ -670,7 +670,6 @@ export function ChatInterface({
       messagesRef.current.splice(msgIndex, 1);
       setMessages((prev) => [...prev]);
     }
-    }
 
     function msgPost(data: any = {}) {
       const lastMessageId = data.lastMessage.id;
