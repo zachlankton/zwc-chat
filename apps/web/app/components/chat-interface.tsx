@@ -737,7 +737,7 @@ export function ChatInterface({
     if (!handlers[subType]) return;
 
     handlers[subType](msgData);
-  }, []);
+  }, [selectedModel, navigate, updateStreamingMessageId, scrollNewMessage]);
 
   const wsStream = React.useCallback(
     (data: any) => {
@@ -1120,7 +1120,7 @@ export function ChatInterface({
     });
   };
 
-  const scrollNewMessage = () => {
+  const scrollNewMessage = React.useCallback(() => {
     // Get all elements with the class and take the last one
     const elements = document.querySelectorAll(".user-message");
     const lastElement = elements[elements.length - 1];
@@ -1129,7 +1129,7 @@ export function ChatInterface({
       behavior: "smooth",
       block: "start",
     });
-  };
+  }, []);
 
   React.useEffect(() => {
     setTimeout(() => {
