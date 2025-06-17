@@ -156,6 +156,13 @@ class OpenRouterProvisioningService {
 		return result;
 	}
 
+	async encryptKey(key: string) {
+		if (!this.encryptionService) {
+			throw new Error("Encryption service not available");
+		}
+		return this.encryptionService.encrypt(key);
+	}
+
 	async decryptKey(encryptedKey: string) {
 		if (!this.encryptionService) {
 			throw new Error("Encryption service not available");

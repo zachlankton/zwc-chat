@@ -170,6 +170,7 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 				requestPerSecondLimit: userDefaultRateLimit,
 				requestTimestampHistory: [],
 				openRouterApiKey: decryptedApiKey, // Store decrypted key for cache
+				hasOwnOpenRouterKey: user?.hasOwnOpenRouterKey ?? false,
 			};
 
 			// We need a special method that stores decrypted in cache but encrypted in DB

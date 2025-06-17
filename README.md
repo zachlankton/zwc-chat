@@ -14,10 +14,12 @@ A modern, real-time chat application with AI integration, built with Bun, React,
 - 🎙️ **Speech Recognition** - Talk to the LLM instead of typing, say 'send message' to send it
 - 🗣️ **Text To Speech** - Listen to the LLM talk as the text streams in
 - 🎯 **System Prompts** - Customize AI behavior with default and per-chat system prompts
-- ⤵︎  **Chat Branching** - Branch any chat off into another chat to take the conversation in a different direction
+- ⤵︎ **Chat Branching** - Branch any chat off into another chat to take the conversation in a different direction
 - 💡 **Syntax Highlighting** - Beautiful code blocks with syntax highlighting for multiple languages
 - 📎 **Attachment Support** - Upload images and files to include in your conversations
 - 🛠️ **Tool Calling** - Create and manage JavaScript functions that AI can execute locally in your browser
+- 🔑 **BYOK (Bring Your Own Key)** - Use your own OpenRouter API key for unlimited access
+- 🔄 **Sync/Resumeable Streams** - Reconnect and resume AI responses seamlessly after connection interruptions
 
 ## Tech Stack
 

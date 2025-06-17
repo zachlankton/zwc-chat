@@ -11,6 +11,7 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 	if (!req.session.openRouterApiKey) {
 		return Response.json({
 			hasApiKey: false,
+			hasOwnOpenRouterKey: req.session.hasOwnOpenRouterKey ?? false,
 			message: "No personal API key configured",
 		});
 	}
@@ -32,6 +33,7 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 
 			return Response.json({
 				hasApiKey: true,
+				hasOwnOpenRouterKey: req.session.hasOwnOpenRouterKey ?? false,
 				valid: false,
 				error: "Invalid API key",
 			});
@@ -43,6 +45,7 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 		// Return the key status information
 		return Response.json({
 			hasApiKey: true,
+			hasOwnOpenRouterKey: req.session.hasOwnOpenRouterKey ?? false,
 			valid: true,
 			data: keyData.data,
 		});

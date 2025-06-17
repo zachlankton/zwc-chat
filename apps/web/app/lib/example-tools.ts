@@ -12,7 +12,8 @@ export const exampleTools: Tool[] = [
         properties: {
           expression: {
             type: "string",
-            description: "Mathematical expression to evaluate (e.g., '2 + 2', 'Math.sqrt(16)')",
+            description:
+              "Mathematical expression to evaluate (e.g., '2 + 2', 'Math.sqrt(16)')",
           },
         },
         required: ["expression"],
@@ -46,11 +47,13 @@ try {
         properties: {
           date: {
             type: "string",
-            description: "Date string to format (e.g., '2024-01-01', 'now', 'tomorrow')",
+            description:
+              "Date string to format (e.g., '2024-01-01', 'now', 'tomorrow')",
           },
           format: {
             type: "string",
-            description: "Output format: 'iso', 'local', 'date', 'time', 'relative'",
+            description:
+              "Output format: 'iso', 'local', 'date', 'time', 'relative'",
             enum: ["iso", "local", "date", "time", "relative"],
           },
         },

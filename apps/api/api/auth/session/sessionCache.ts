@@ -20,6 +20,7 @@ export interface SessionData {
 	requestTimestampHistory: number[];
 	requestPerSecondLimit: string;
 	openRouterApiKey?: string;
+	hasOwnOpenRouterKey?: boolean;
 }
 
 export function userIsSuperAdmin(req: RequestWithSession) {

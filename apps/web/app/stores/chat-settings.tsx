@@ -89,7 +89,9 @@ function loadSettings(): ChatSettings {
   }
 
   // Load hide tool call messages preference
-  const savedHideToolCallMessages = localStorage.getItem("hideToolCallMessages");
+  const savedHideToolCallMessages = localStorage.getItem(
+    "hideToolCallMessages",
+  );
   if (savedHideToolCallMessages !== null) {
     settings.hideToolCallMessages = savedHideToolCallMessages === "true";
   }

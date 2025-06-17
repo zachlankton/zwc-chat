@@ -12,6 +12,7 @@ import {
   VolumeX,
   Check,
   FileText,
+  Key,
 } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
@@ -35,11 +36,14 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "~/components/ui/sidebar";
-import { post } from "~/lib/fetchWrapper";
+import { post, del } from "~/lib/fetchWrapper";
 import { useTheme } from "~/providers/theme-provider";
 import { useSession } from "~/stores/session";
+import { useApiKeyInfo } from "~/stores/session";
 import { useChatSettings, defaultSystemPrompt } from "~/stores/chat-settings";
 import { useState } from "react";
+import { startOpenRouterOAuth } from "~/lib/openrouter-pkce";
+import { queryClient } from "~/providers/queryClient";
 import {
   Dialog,
   DialogContent,
@@ -55,6 +59,7 @@ export function NavUser() {
   const { isMobile } = useSidebar();
   const { theme, setTheme } = useTheme();
   const session = useSession();
+  const apiKeyInfo = useApiKeyInfo();
   const sessionUser = session
     ? { name: session.name, email: session.email, avatar: session.imgSrc }
     : { name: "", email: "", avatar: "" };
@@ -71,6 +76,9 @@ export function NavUser() {
   const [tempSystemPrompt, setTempSystemPrompt] = useState(
     settings.systemPrompt,
   );
+  const [isLoadingOAuth, setIsLoadingOAuth] = useState(false);
+
+  const hasOwnKey = apiKeyInfo?.hasOwnOpenRouterKey ?? false;
 
   return (
     <>
@@ -146,6 +154,30 @@ export function NavUser() {
               >
                 <FileText className="mr-2 h-4 w-4" />
                 System prompt
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                disabled={isLoadingOAuth}
+                onClick={async () => {
+                  if (isLoadingOAuth) return;
+
+                  setIsLoadingOAuth(true);
+                  try {
+                    // Start OAuth flow
+                    const authUrl = await startOpenRouterOAuth();
+                    window.location.href = authUrl;
+                  } catch (error) {
+                    console.error("Failed to start OAuth flow:", error);
+                    setIsLoadingOAuth(false);
+                  }
+                }}
+              >
+                <Key className="mr-2 h-4 w-4" />
+                {isLoadingOAuth
+                  ? "Loading..."
+                  : hasOwnKey
+                    ? "Replace OpenRouter Key"
+                    : "Use Your Own Key"}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>

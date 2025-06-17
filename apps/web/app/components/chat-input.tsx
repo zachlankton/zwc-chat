@@ -38,7 +38,7 @@ import { useChatSettings } from "~/stores/chat-settings";
 
 interface ApiKeyInfo {
   label: string;
-  limit: number;
+  limit: number | null;
   usage: number;
   is_provisioning_key: boolean;
   limit_remaining: number;
@@ -115,8 +115,20 @@ export const ChatInput = React.forwardRef<
 
   // Calculate usage percentage and determine status
   const getUsageStatus = () => {
-    if (!apiKeyInfo || apiKeyInfo.limit === 0) return null;
+    if (!apiKeyInfo) return null;
 
+    // Handle unlimited keys
+    if (apiKeyInfo.limit === null) {
+      return {
+        percentage: 100, // remaining
+        status: "good" as const,
+        remaining: Infinity,
+        limit: null,
+        usage: apiKeyInfo.usage,
+      };
+    }
+
+    if (apiKeyInfo.limit === 0) return null;
     const usagePercentage = (apiKeyInfo.usage / apiKeyInfo.limit) * 100;
     const remainingPercentage = Math.max(0, 100 - usagePercentage);
 
@@ -681,9 +693,11 @@ export const ChatInput = React.forwardRef<
                       usageStatus.status === "good" && "text-green-500",
                     )}
                   >
-                    {usageStatus.remaining > 0
-                      ? `$ ${usageStatus.remaining.toFixed(3)} credits remain`
-                      : "No credits remaining"}
+                    {usageStatus.limit === null
+                      ? "Unlimited credits remaining"
+                      : usageStatus.remaining > 0
+                        ? `$ ${usageStatus.remaining.toFixed(3)} credits remain`
+                        : "No credits remaining"}
                   </span>
                 </div>
               </div>
