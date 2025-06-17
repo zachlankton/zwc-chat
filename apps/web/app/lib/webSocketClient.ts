@@ -5,7 +5,9 @@ type WebSocketMessageType =
   | "response"
   | "response-chunked"
   | "update"
-  | "notification";
+  | "notification"
+  | "ping"
+  | "pong";
 type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
 // Base message interface
@@ -58,13 +60,26 @@ interface UpdateMessage extends WebSocketMessage {
   body?: Record<string, any>;
 }
 
+// Ping/Pong message interfaces
+interface PingMessage extends WebSocketMessage {
+  type: "ping";
+  timestamp: number;
+}
+
+interface PongMessage extends WebSocketMessage {
+  type: "pong";
+  timestamp: number;
+}
+
 // Union type for all message types
 type Message =
   | RequestMessage
   | ResponseMessage
   | ResponseChunkedMessage
   | UpdateMessage
-  | NotificationMessage;
+  | NotificationMessage
+  | PingMessage
+  | PongMessage;
 
 // Client configuration options
 interface WebSocketClientOptions {
@@ -77,6 +92,7 @@ interface WebSocketClientOptions {
   log: boolean;
   requestTimeout: number;
   API_URL: string | null;
+  pingInterval: number;
 }
 
 // Event handler types
@@ -154,6 +170,8 @@ class WebSocketClient {
   private eventHandlers: EventHandlers;
   private requestMap: Map<string, PendingRequest>;
   private responseMap: Map<string, PendingResponse>;
+  private pingIntervalId: number | null;
+  private lastPongTimestamp: number;
 
   constructor(url: string, options: Partial<WebSocketClientOptions> = {}) {
     this.url = url;
@@ -167,6 +185,7 @@ class WebSocketClient {
       requestTimeout: 30000,
       token: null,
       API_URL: null,
+      pingInterval: 30000, // 30 seconds
       ...options,
     };
     this.token = options.token;
@@ -184,6 +203,8 @@ class WebSocketClient {
     };
     this.requestMap = new Map<string, PendingRequest>();
     this.responseMap = new Map<string, PendingResponse>();
+    this.pingIntervalId = null;
+    this.lastPongTimestamp = Date.now();
 
     this.connect();
   }
@@ -260,6 +281,9 @@ class WebSocketClient {
         this._debug("Connection established");
         this.reconnectAttempts = 0;
         this.isReconnecting = false;
+
+        // Start ping interval
+        this._startPingInterval();
 
         // Process any queued messages
         this._processQueue();
@@ -378,6 +402,13 @@ class WebSocketClient {
           const data = JSON.parse(event.data) as Message;
           this._log("Received message:", data);
 
+          // Handle pong responses
+          if (data.type === "pong") {
+            this.lastPongTimestamp = Date.now();
+            this._debug("Received pong response");
+            return;
+          }
+
           // Handle responses to specific requests
           if (data.type === "response" && data.id) {
             const pendingRequest = this.requestMap.get(data.id);
@@ -403,6 +434,7 @@ class WebSocketClient {
 
       this.socket.onclose = (event: CloseEvent) => {
         this._debug("Connection closed:", event.code, event.reason);
+        this._stopPingInterval();
         this._triggerEvent("close", event);
 
         if (this.options.autoReconnect && !this.isReconnecting) {
@@ -427,7 +459,9 @@ class WebSocketClient {
     if (this._isSocketReady()) {
       const messageStr = JSON.stringify(message);
       this.socket!.send(messageStr);
-      message.body = tryParseJson(message.body) ?? message.body;
+      if ('body' in message && message.body) {
+        message.body = tryParseJson(message.body) ?? message.body;
+      }
       this._log("Message sent:", message);
       return true;
     } else {
@@ -506,6 +540,7 @@ class WebSocketClient {
   public close(code: number = 1000, reason: string = "Normal closure"): void {
     if (this.socket) {
       this.options.autoReconnect = false; // Prevent auto reconnect
+      this._stopPingInterval();
       this.socket.close(code, reason);
     }
   }
@@ -626,6 +661,36 @@ class WebSocketClient {
       console.log("[WebSocketClient]", ...args);
     }
   }
+
+  private _startPingInterval(): void {
+    this._stopPingInterval(); // Clear any existing interval
+    
+    this.pingIntervalId = window.setInterval(() => {
+      if (this._isSocketReady()) {
+        const pingMessage: PingMessage = {
+          type: "ping",
+          timestamp: Date.now(),
+        };
+        
+        this.send(pingMessage);
+        this._debug("Sent ping message");
+        
+        // Check if we've received a pong within the last 2 ping intervals
+        const timeSinceLastPong = Date.now() - this.lastPongTimestamp;
+        if (timeSinceLastPong > this.options.pingInterval * 2) {
+          this._debug("No pong received in", timeSinceLastPong, "ms, reconnecting...");
+          this.socket?.close(4000, "Ping timeout");
+        }
+      }
+    }, this.options.pingInterval);
+  }
+
+  private _stopPingInterval(): void {
+    if (this.pingIntervalId !== null) {
+      window.clearInterval(this.pingIntervalId);
+      this.pingIntervalId = null;
+    }
+  }
 }
 
 // Export types and class
@@ -636,6 +701,8 @@ export {
   type ResponseMessage,
   type ResponseChunkedMessage,
   type UpdateMessage,
+  type PingMessage,
+  type PongMessage,
   type Message,
   type WebSocketClientOptions,
   type WebSocketMessageType,

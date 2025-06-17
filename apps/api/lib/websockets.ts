@@ -149,6 +149,14 @@ export const bunWebsocketHandlers: websocketHandlers = {
 					).toFixed(2)}ms`
 				);
 			});
+		} else if (msgObject.type === "ping") {
+			// Handle ping message by sending pong response
+			ws.send(
+				JSON.stringify({
+					type: "pong",
+					timestamp: msgObject.timestamp,
+				})
+			);
 		} else {
 			const session = await getWsSession(ws.data.url, ws.data.token);
 			if (!session) return ws.close(4401, "Not Authorized");
