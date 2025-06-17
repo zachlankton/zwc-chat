@@ -150,7 +150,6 @@ export const bunWebsocketHandlers: websocketHandlers = {
 				);
 			});
 		} else if (msgObject.type === "ping") {
-			console.log("WS_PING_RECVD", ws.data.session.email, ws.data.id);
 			// Handle ping message by sending pong response
 			const test = ws.send(
 				JSON.stringify({
@@ -159,9 +158,11 @@ export const bunWebsocketHandlers: websocketHandlers = {
 				})
 			);
 
-			console.log(
-				`Pong test to ${ws.data.session.email} "${test}" ${ws.data.id}`
-			);
+			if (test < 1) {
+				console.error(
+					`Failed to send pong message to ${ws.data.session.email}`
+				);
+			}
 		} else {
 			const session = await getWsSession(ws.data.url, ws.data.token);
 			if (!session) return ws.close(4401, "Not Authorized");
@@ -224,9 +225,9 @@ export const bunWebsocketHandlers: websocketHandlers = {
 		console.log("WS_CLOSE", code, message, ws.data?.session?.email);
 	},
 
-	drain(ws) {
+	drain() {
 		// the socket is ready to receive more data
-		console.log("WS_DRAIN", ws.data.session.email);
+		//console.log("WS_DRAIN", ws.data.session.email);
 	},
 };
 
