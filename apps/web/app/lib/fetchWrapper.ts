@@ -11,8 +11,8 @@ const ws_proto = https ? "wss://" : "ws://";
 const host = urlObject.host;
 const WS_API_URL = `${ws_proto}${host}`;
 export const wsClient = new WebSocketClient(WS_API_URL, {
-  debug: true,
-  log: true, //(API_URL as string).includes("localhost") ? true : false,
+  debug: false,
+  log: (API_URL as string).includes("localhost") ? true : false,
   API_URL,
 });
 

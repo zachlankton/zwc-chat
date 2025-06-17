@@ -1,6 +1,6 @@
 import { randomBytes } from "crypto";
 import type { RequestWithSession, SessionData } from "./sessionCache";
-import { updateSessionExpiry, sessionCache } from "./sessionCache";
+import { updateSessionExpiry } from "./sessionCache";
 import { internalServerError, notAuthorized, rateLimitError } from "lib/utils";
 import { asyncLocalStorage } from "lib/asyncLocalStore";
 import {

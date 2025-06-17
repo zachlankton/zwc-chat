@@ -63,6 +63,7 @@ interface UpdateMessage extends WebSocketMessage {
 // Ping/Pong message interfaces
 interface PingMessage extends WebSocketMessage {
   type: "ping";
+  location: string;
   timestamp: number;
 }
 
@@ -171,7 +172,6 @@ class WebSocketClient {
   private requestMap: Map<string, PendingRequest>;
   private responseMap: Map<string, PendingResponse>;
   private pingIntervalId: number | null;
-  private lastPongTimestamp: number;
 
   constructor(url: string, options: Partial<WebSocketClientOptions> = {}) {
     this.url = url;
@@ -204,7 +204,6 @@ class WebSocketClient {
     this.requestMap = new Map<string, PendingRequest>();
     this.responseMap = new Map<string, PendingResponse>();
     this.pingIntervalId = null;
-    this.lastPongTimestamp = Date.now();
 
     this.connect();
   }
@@ -404,7 +403,6 @@ class WebSocketClient {
 
           // Handle pong responses
           if (data.type === "pong") {
-            this.lastPongTimestamp = Date.now();
             this._debug("Received pong response");
             return;
           }
@@ -669,22 +667,12 @@ class WebSocketClient {
       if (this._isSocketReady()) {
         const pingMessage: PingMessage = {
           type: "ping",
+          location: location.href,
           timestamp: Date.now(),
         };
 
         this.send(pingMessage);
         this._debug("Sent ping message");
-
-        // Check if we've received a pong within the last 2 ping intervals
-        const timeSinceLastPong = Date.now() - this.lastPongTimestamp;
-        if (timeSinceLastPong > this.options.pingInterval * 2) {
-          this._debug(
-            "No pong received in",
-            timeSinceLastPong,
-            "ms, reconnecting...",
-          );
-          //this.socket?.close(4000, "Ping timeout");
-        }
       }
     }, this.options.pingInterval);
   }

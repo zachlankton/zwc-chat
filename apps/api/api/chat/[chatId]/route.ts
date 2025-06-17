@@ -57,6 +57,8 @@ export const POST = apiHandler(
 			throw badRequest("Invalid chat ID format");
 		}
 
+		subDance(wsId, userChatId);
+
 		// Save messages before processing (only if not retrying)
 		try {
 			const messages = body.messages;
@@ -298,23 +300,7 @@ export const GET = apiHandler(
 		const offset = !isNaN(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
 
 		try {
-			// a  little sub unsub dance for the current socket
-			const prevSubChatId = socketSubs.get(wsId);
-			if (prevSubChatId) {
-				let prevChatSubSocketIds = chatSubs.get(prevSubChatId.chatId);
-				if (prevChatSubSocketIds) {
-					prevChatSubSocketIds.delete(wsId);
-				}
-			}
-
-			let newChatSubSocketIds = chatSubs.get(chatId);
-			if (!newChatSubSocketIds) {
-				newChatSubSocketIds = new Set();
-				chatSubs.set(chatId, newChatSubSocketIds);
-			}
-			newChatSubSocketIds.add(wsId);
-			socketSubs.set(wsId, { chatId, offset: 0 });
-
+			subDance(wsId, chatId);
 			// First verify the user owns this chat
 			const chatsCollection = await getChatsCollection();
 			const chat = await chatsCollection.findOne({
@@ -498,3 +484,22 @@ export const PUT = apiHandler(
 		}
 	}
 );
+
+function subDance(wsId: string, chatId: string) {
+	// a  little sub unsub dance for the current socket
+	const prevSubChatId = socketSubs.get(wsId);
+	if (prevSubChatId) {
+		let prevChatSubSocketIds = chatSubs.get(prevSubChatId.chatId);
+		if (prevChatSubSocketIds) {
+			prevChatSubSocketIds.delete(wsId);
+		}
+	}
+
+	let newChatSubSocketIds = chatSubs.get(chatId);
+	if (!newChatSubSocketIds) {
+		newChatSubSocketIds = new Set();
+		chatSubs.set(chatId, newChatSubSocketIds);
+	}
+	newChatSubSocketIds.add(wsId);
+	socketSubs.set(wsId, { chatId, offset: 0 });
+}

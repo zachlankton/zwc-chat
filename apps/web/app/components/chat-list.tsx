@@ -142,21 +142,24 @@ export function ChatList({ currentChatId, onChatSelect }: ChatListProps) {
 
   const handleChatSubMessage = useCallback((data: any) => {
     // TODO: handle each message surgically instead of invalidating, just doing this for now to get across the finish line
-    function msgPost() {}
+    function msgPost(_data: any) {}
 
-    function chatUpdate() {
+    function chatUpdate(_data: any) {
       queryClient.invalidateQueries({ queryKey: ["chats"] });
     }
 
-    function chatDelete() {
+    function chatDelete(_data: any) {
       queryClient.invalidateQueries({ queryKey: ["chats"] });
     }
 
-    function chatStreamFinished() {
+    function chatStreamFinished(data: any) {
+      queryClient.invalidateQueries({
+        queryKey: ["chat", data.headers["x-zwc-chat-id"]],
+      });
       queryClient.invalidateQueries({ queryKey: ["chats"] });
     }
 
-    function chatTitleGenerated() {
+    function chatTitleGenerated(_data: any) {
       queryClient.invalidateQueries({ queryKey: ["chats"] });
     }
 
@@ -175,7 +178,7 @@ export function ChatList({ currentChatId, onChatSelect }: ChatListProps) {
     if (!subType) return;
     if (!handlers[subType]) return;
 
-    handlers[subType]();
+    handlers[subType](data);
   }, []);
 
   const wsMsg = useCallback((data: any) => {
