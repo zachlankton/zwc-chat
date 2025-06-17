@@ -1047,6 +1047,18 @@ export function ChatInterface({
 
         for (const chunk of parseSSEEvents(text, buffer)) {
           if (chunk.type === "data" && assistantMessage.current) {
+            if (
+              chunk.parsed.error &&
+              chunk.parsed.error.metadata &&
+              chunk.parsed.error.metadata.raw
+            ) {
+              const err = JSON.parse(chunk.parsed.error.metadata.raw);
+              AsyncAlert({ title: "Error", message: err.error.message });
+              setIsLoading(false);
+              updateStreamingMessageId(null);
+              return;
+            }
+
             handleChunk({
               value: chunk.parsed,
               setMessages,
