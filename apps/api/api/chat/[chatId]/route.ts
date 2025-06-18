@@ -59,12 +59,13 @@ export const POST = apiHandler(
 			userEmail: req.session.email,
 		});
 
-		if (!chat) {
+		const url = new URL(req.url);
+		const abortRequested = url.searchParams.has("abort");
+
+		if (abortRequested && !chat) {
 			return Response.json({ error: "Chat not found" }, { status: 404 });
 		}
 
-		const url = new URL(req.url);
-		const abortRequested = url.searchParams.has("abort");
 		if (abortRequested) {
 			const ctrl = abortMap.get(userChatId);
 			if (ctrl) {
