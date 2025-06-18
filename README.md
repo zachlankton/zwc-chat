@@ -196,6 +196,7 @@ zwc-chat/
 - `/api/models` - Available AI models
 - `/api/title` - Generate chat titles
 - `/api/ws` - WebSocket endpoint for real-time streaming
+- `/api/ph` - PostHog analytics proxy (forwards events to PostHog)
 
 ## Contributing
 
@@ -218,7 +219,7 @@ For security concerns, please review our [Security Policy](SECURITY.md).
 ## Roadmap
 
 - 👥 **Admin Panel** - User management interface for administrators
-- 👤 **User Profile** - Settings page with subscription management
+- 👤 **User Profile** - User settings and customizations
 
 ---
 
