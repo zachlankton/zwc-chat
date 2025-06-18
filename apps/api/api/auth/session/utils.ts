@@ -41,10 +41,10 @@ export async function deleteSession(sessionId: string) {
 	await deleteSessionFromStorage(sessionId);
 }
 
-const adminKey = process.env.ADMIN_KEY;
-if (!adminKey) throw "ADMIN_KEY env var is not set";
-
 export function validateAdminKeyHeader(req: RequestWithSession) {
+	const adminKey = process.env.ADMIN_KEY;
+	if (!adminKey) throw notAuthorized("ADMIN_KEY env var is not set");
+
 	const authHeader = req.headers.get("authorization");
 	if (!authHeader) {
 		return null;
