@@ -98,6 +98,7 @@ interface Message {
   totalTokens?: number;
   timeToFirstToken?: number;
   timeToFinish?: number;
+  stoppedByUser?: boolean;
   // Tool-related fields
   tool_calls?: ToolCall[];
   tool_call_id?: string;
@@ -1421,7 +1422,7 @@ export function ChatInterface({
     updateStreamingMessageId(assistantMessage.current.id);
     setTimeout(scrollNewMessage, 100);
 
-    await post<StreamResponse | Response>(`/chat/${chatId}`, requestBody, {
+    post<StreamResponse | Response>(`/chat/${chatId}`, requestBody, {
       resolveImmediately: true,
     });
   };
@@ -1472,6 +1473,7 @@ export function ChatInterface({
     });
 
     assistantMessage.current.tool_calls = undefined;
+    assistantMessage.current.stoppedByUser = false;
 
     // Find all messages up to and including the user message before this assistant message
     const messagesUpToRetry = messagesRef.current.slice(0, messageIndex);
@@ -1545,7 +1547,7 @@ export function ChatInterface({
       retryRequestBody.websearch = true;
     }
 
-    await post<StreamResponse | Response>(`/chat/${chatId}`, retryRequestBody, {
+    post<StreamResponse | Response>(`/chat/${chatId}`, retryRequestBody, {
       resolveImmediately: true,
     });
   };
@@ -2010,6 +2012,12 @@ export function ChatInterface({
                                 ? message.content
                                 : "Assistant response"}
                             </ReactMarkdown>
+
+                            {message.stoppedByUser ? (
+                              <div className="bg-primary rounded p-2">
+                                Stopped by user
+                              </div>
+                            ) : null}
 
                             {/* Display tool calls if present */}
                             {message.tool_calls &&

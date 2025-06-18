@@ -131,6 +131,11 @@ export const bunWebsocketHandlers: websocketHandlers = {
 						await streamedChunks(response, ws, msgObject);
 					} catch (err: any) {
 						console.error("STREAMED_CHUNKS_ERROR", err.name);
+
+						const ctx = asyncLocalStorage.getStore();
+						if (!ctx) return;
+
+						abortMap.delete(ctx.params.chatId);
 					}
 				} else {
 					const bodyTxt = await response.text();

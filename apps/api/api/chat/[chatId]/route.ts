@@ -52,6 +52,17 @@ export const POST = apiHandler(
 			throw badRequest("Invalid chat ID format");
 		}
 
+		//verify this chat belongs to the user first
+		const chatsCollection = await getChatsCollection();
+		const chat = await chatsCollection.findOne({
+			id: userChatId,
+			userEmail: req.session.email,
+		});
+
+		if (!chat) {
+			return Response.json({ error: "Chat not found" }, { status: 404 });
+		}
+
 		const url = new URL(req.url);
 		const abortRequested = url.searchParams.has("abort");
 		if (abortRequested) {
@@ -366,6 +377,7 @@ export const GET = apiHandler(
 				timeToFirstToken: msg.timeToFirstToken,
 				timeToFinish: msg.timeToFinish,
 				annotations: msg.annotations,
+				stoppedByUser: msg.stoppedByUser,
 				// Include tool-related fields
 				tool_calls: msg.tool_calls?.length === 0 ? undefined : msg.tool_calls,
 				tool_call_id: msg.tool_call_id,
