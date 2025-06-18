@@ -565,9 +565,6 @@ async function streamedChunks(
 	const ctx = asyncLocalStorage.getStore();
 	if (!ctx) throw new Error("NEED SOME CONTEXT TO STREAM CHUNKS");
 
-	const ctrl = abortMap.get(ctx.params.chatId);
-	if (!ctrl) throw new Error("WE SHOULD HAVE AN ABORT CONTROLLER BY NOW");
-
 	if (response.body === null) return;
 	const reader = response.body.getReader();
 
@@ -604,7 +601,9 @@ async function streamedChunks(
 			dataChunks.push(...value);
 
 			const subs = chatSubs.get(ctx.params.chatId);
-			for (const sub of subs!) {
+			if (!subs) continue;
+			
+			for (const sub of subs) {
 				const subSocket = socketSubs.get(sub);
 
 				if (!subSocket) continue;
