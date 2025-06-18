@@ -2240,6 +2240,7 @@ function handleChunk({
           ? {
               ...msg,
               tool_calls: undefined, //tool calls and content are mutually exclusive
+              stoppedByUser: false, // cant be stopped if we a pushing newContent
               [msgKey]: (msg[msgKey] ?? "") + newContent,
             }
           : msg,
