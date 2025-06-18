@@ -172,7 +172,7 @@ docker build -t zwc-chat-web .
 zwc-chat/
 ├── apps/
 │   ├── api/              # Backend API server
-│   │   ├── src/          # Source code
+│   │   ├── api/          # Source code
 │   │   ├── lib/          # Shared utilities
 │   │   └── Dockerfile    # API container configuration
 │   └── web/              # React frontend
@@ -186,17 +186,33 @@ zwc-chat/
 
 ## API Endpoints
 
-- `/api/auth/login` - WorkOS authentication
-- `/api/auth/callback` - OAuth callback handler
-- `/api/auth/logout` - Session cleanup
-- `/api/auth/session` - Current user session
-- `/api/chat` - Chat management (CRUD operations)
-- `/api/chat/[chatId]` - Individual chat operations
-- `/api/users` - User management
-- `/api/models` - Available AI models
-- `/api/title` - Generate chat titles
-- `/api/ws` - WebSocket endpoint for real-time streaming
-- `/api/ph` - PostHog analytics proxy (forwards events to PostHog)
+### Authentication
+- `GET /api/auth/callback` - OAuth callback handler for WorkOS
+- `GET /api/auth/session` - Get current user session
+- `POST /api/auth/logout` - Log out current user
+- `GET /api/auth/key-status` - Check OpenRouter API key status
+
+### Chat Management
+- `GET /api/chat` - List all user chats (supports pagination)
+- `POST /api/chat/[chatId]` - Send message and stream AI response
+- `GET /api/chat/[chatId]` - Get messages for a specific chat
+- `PUT /api/chat/[chatId]` - Update chat metadata (title, pinned status)
+- `DELETE /api/chat/[chatId]` - Delete a chat and all its messages
+- `POST /api/chat/[chatId]/branch` - Create a new chat branching from a message
+- `POST /api/chat/[chatId]/generate-title` - Generate title for a chat
+
+### Message Management
+- `PUT /api/chat/[chatId]/message/[messageId]` - Edit message content
+- `DELETE /api/chat/[chatId]/message/[messageId]` - Delete a specific message
+
+### User & Settings
+- `PUT /api/user/openrouter-key` - Set custom OpenRouter API key
+- `GET /api/models` - Get available AI models from OpenRouter
+
+### System
+- `GET /api/healthcheck` - Simple health check
+- `/api/ph/*` - PostHog analytics proxy
+- WebSocket: `ws(s)://[domain]/[token]` - Real-time chat streaming
 
 ## Contributing
 

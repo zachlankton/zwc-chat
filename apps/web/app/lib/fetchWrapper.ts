@@ -19,7 +19,6 @@ export const wsClient = new WebSocketClient(WS_API_URL, {
 interface FetchOptions extends RequestInit {
   params?: Record<string, string>;
   baseUrl?: string;
-  autoHandleStates?: boolean;
   resolveImmediately?: boolean;
 }
 
@@ -45,7 +44,7 @@ export async function fetchWrapper(
   endpoint: string,
   options: FetchOptions = {},
 ) {
-  let { params, baseUrl, autoHandleStates, ...fetchOptions } = options;
+  let { params, baseUrl, ...fetchOptions } = options;
   baseUrl = baseUrl || API_URL;
 
   const url = new URL(`${baseUrl}${endpoint}`);
@@ -98,7 +97,7 @@ export async function fetchWrapper(
       data = await response.text();
     }
 
-    if (!response.ok && !autoHandleStates) {
+    if (!response.ok) {
       throw new HttpError(response.status, response.statusText, data);
     }
 
