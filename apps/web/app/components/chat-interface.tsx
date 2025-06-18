@@ -1906,7 +1906,7 @@ export function ChatInterface({
                     key={message.id}
                     id={message.id}
                     className={cn(
-                      "flex gap-3 py-6 border-b border-border/50 last:border-0",
+                      "flex gap-3 py-6 border-border/50 last:border-0",
                       message.role === "user" ? "flex-row-reverse" : "",
                     )}
                   >
