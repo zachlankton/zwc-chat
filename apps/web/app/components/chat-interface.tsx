@@ -1421,7 +1421,7 @@ export function ChatInterface({
     updateStreamingMessageId(assistantMessage.current.id);
     setTimeout(scrollNewMessage, 100);
 
-    post<StreamResponse | Response>(`/chat/${chatId}`, requestBody, {
+    await post<StreamResponse | Response>(`/chat/${chatId}`, requestBody, {
       resolveImmediately: true,
     });
   };
@@ -1545,7 +1545,7 @@ export function ChatInterface({
       retryRequestBody.websearch = true;
     }
 
-    post<StreamResponse | Response>(`/chat/${chatId}`, retryRequestBody, {
+    await post<StreamResponse | Response>(`/chat/${chatId}`, retryRequestBody, {
       resolveImmediately: true,
     });
   };
@@ -2140,6 +2140,26 @@ export function ChatInterface({
         <ChatInput
           ref={chatInputRef}
           onSubmit={handleSubmit}
+          onStop={async () => {
+            try {
+              const results = await post<{ ok: boolean }>(
+                `/api/chat/${chatId}?abort`,
+                {},
+              );
+              if (!results.ok) {
+                AsyncAlert({
+                  title: "Unable to stop at this time",
+                  message: "Sorry, was not able to stop the stream",
+                });
+                return console.error(results);
+              }
+              setIsLoading(false);
+              updateStreamingMessageId(null);
+              assistantMessage.current = null;
+            } catch (error) {
+              console.error("Failed to abort generation:", error);
+            }
+          }}
           isLoading={isLoading}
           selectedModel={selectedModel}
           onModelChange={setSelectedModel}

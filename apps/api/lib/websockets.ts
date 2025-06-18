@@ -10,6 +10,7 @@ import crypto from "crypto";
 import { asyncLocalStorage } from "./asyncLocalStore";
 import type { OpenRouterMessage } from "./database";
 import { getMessagesCollection, getChatsCollection } from "./database";
+import { abortMap } from "./streamAbortControllers";
 //import { appendFile } from "node:fs/promises";
 
 type WebSocketData = {
@@ -126,7 +127,11 @@ export const bunWebsocketHandlers: websocketHandlers = {
 
 				const cType = response.headers.get("Content-Type") ?? "";
 				if (cType.startsWith("text/event-stream")) {
-					await streamedChunks(response, ws, msgObject);
+					try {
+						await streamedChunks(response, ws, msgObject);
+					} catch (err: any) {
+						console.error("STREAMED_CHUNKS_ERROR", err.name);
+					}
 				} else {
 					const bodyTxt = await response.text();
 					const body = tryParseJson(bodyTxt);
@@ -545,8 +550,6 @@ async function saveMessageAndUpdateChat(
 		},
 		{ upsert: true }
 	);
-
-	console.log(`Message saved to database for chat ${chatId}`);
 }
 
 async function streamedChunks(
@@ -556,6 +559,9 @@ async function streamedChunks(
 ) {
 	const ctx = asyncLocalStorage.getStore();
 	if (!ctx) throw new Error("NEED SOME CONTEXT TO STREAM CHUNKS");
+
+	const ctrl = abortMap.get(ctx.params.chatId);
+	if (!ctrl) throw new Error("WE SHOULD HAVE AN ABORT CONTROLLER BY NOW");
 
 	if (response.body === null) return;
 	const reader = response.body.getReader();
@@ -578,53 +584,61 @@ async function streamedChunks(
 	// Stream and collect data chunks
 	const dataChunks: number[] = [];
 
-	while (true) {
-		const { done, value } = await reader.read();
-		if (done) break;
+	try {
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) break;
 
-		// Detect first token for timing
-		if (!newMessage.timeToFirstToken && detectFirstToken(value)) {
-			newMessage.timeToFirstToken = Date.now() - newMessage.timestamp;
-		}
-
-		const offset = dataChunks.length;
-
-		dataChunks.push(...value);
-
-		const subs = chatSubs.get(ctx.params.chatId);
-		for (const sub of subs!) {
-			const subSocket = socketSubs.get(sub);
-
-			if (!subSocket) continue;
-			let valueToSend = value;
-			let offsetToSend = offset;
-			if (subSocket.offset === 0) {
-				valueToSend = dataChunks as any;
-				offsetToSend = 0;
+			// Detect first token for timing
+			if (!newMessage.timeToFirstToken && detectFirstToken(value)) {
+				newMessage.timeToFirstToken = Date.now() - newMessage.timestamp;
 			}
 
-			subSocket.offset = valueToSend.length;
+			const offset = dataChunks.length;
 
-			// Create and send WebSocket message
-			const message = createWebSocketMessage(
-				msgObject,
-				response,
-				newMessageId,
-				newMessage.timestamp,
-				ctx.params.chatId,
-				valueToSend,
-				offsetToSend,
-				sub === ws.data.id
-			);
+			dataChunks.push(...value);
 
-			const socketToSendOn = skts.get(sub);
-			if (!socketToSendOn) {
-				console.error("socketToSendOn is not defined", sub);
-				continue;
+			const subs = chatSubs.get(ctx.params.chatId);
+			for (const sub of subs!) {
+				const subSocket = socketSubs.get(sub);
+
+				if (!subSocket) continue;
+				let valueToSend = value;
+				let offsetToSend = offset;
+				if (subSocket.offset === 0) {
+					valueToSend = dataChunks as any;
+					offsetToSend = 0;
+				}
+
+				subSocket.offset = valueToSend.length;
+
+				// Create and send WebSocket message
+				const message = createWebSocketMessage(
+					msgObject,
+					response,
+					newMessageId,
+					newMessage.timestamp,
+					ctx.params.chatId,
+					valueToSend,
+					offsetToSend,
+					sub === ws.data.id
+				);
+
+				const socketToSendOn = skts.get(sub);
+				if (!socketToSendOn) {
+					console.error("socketToSendOn is not defined", sub);
+					continue;
+				}
+
+				socketToSendOn.send(message);
 			}
-
-			socketToSendOn.send(message);
 		}
+	} catch (e: any) {
+		if (e.name !== "AbortError") {
+			return console.error("STREAMED CHUNKS WHILE LOOP", e);
+		}
+
+		newMessage.stoppedByUser = true;
 	}
 
 	// Record completion time
@@ -635,6 +649,9 @@ async function streamedChunks(
 
 	// Save message and update chat
 	await saveMessageAndUpdateChat(newMessage, messageIdToReplace);
+
+	console.log("DELETING ABORT CONTROLLER", ctx.params.chatId);
+	abortMap.delete(ctx.params.chatId);
 
 	sendMessageToChatSubs(
 		ws.data.id,

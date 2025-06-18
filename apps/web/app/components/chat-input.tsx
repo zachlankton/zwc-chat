@@ -15,6 +15,7 @@ import {
   ArrowBigUp,
   AudioLines,
   Hammer,
+  Square,
 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
@@ -51,6 +52,7 @@ interface ApiKeyInfo {
 
 interface ChatInputProps {
   onSubmit: (message: string, attachments: File[]) => void;
+  onStop?: () => void;
   isLoading?: boolean;
   placeholder?: string;
   selectedModel?: string;
@@ -73,6 +75,7 @@ export const ChatInput = React.forwardRef<
 >(function ChatInput(
   {
     onSubmit,
+    onStop,
     isLoading = false,
     placeholder = "Message AI assistant...",
     selectedModel,
@@ -374,7 +377,6 @@ export const ChatInput = React.forwardRef<
               isFocused
                 ? "border-primary shadow-lg shadow-primary/20 scale-[1.01]"
                 : "border-muted hover:border-muted-foreground/50 shadow-md",
-              isLoading && "opacity-70",
             )}
           >
             {/* Attachment Button */}
@@ -508,19 +510,22 @@ export const ChatInput = React.forwardRef<
                 </span>
               )}
 
-              {/* Send Button */}
+              {/* Send/Stop Button */}
               <Button
                 type="button"
                 size="icon"
-                disabled={isLoading}
-                onClick={handleSubmit}
+                onClick={isLoading ? onStop : handleSubmit}
                 className={cn(
                   "h-8 w-8 rounded-lg transition-all duration-200",
                   pendingSubmit && "bg-primary hover:bg-primary/90",
                 )}
+                title={isLoading ? "Stop generation" : "Send message"}
               >
                 {isLoading ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent" />
+                  <div className="relative flex items-center justify-center">
+                    <div className="absolute h-7 w-7 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    <Square className="h-3 w-3 fill-current" />
+                  </div>
                 ) : (
                   <Send className={cn("h-4 w-4 transition-transform")} />
                 )}

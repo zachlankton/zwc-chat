@@ -24,6 +24,7 @@ export interface OpenRouterMessage {
 	totalTokens?: number;
 	timeToFirstToken?: number;
 	timeToFinish?: number;
+	stoppedByUser?: boolean; // if a stream was cancelled this will be true
 	annotations?: any; // For storing PDF annotations
 	// Tool-related fields
 	tool_calls?: Array<{
