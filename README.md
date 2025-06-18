@@ -1,5 +1,7 @@
 # ZWC Chat
 
+> **📢 Important Notice**: The code in the `main` branch is very much a first draft with massive single-file components. For significantly more readable and maintainable code, please check out the [`make-uncle-bob-proud`](https://github.com/zachlankton/zwc-chat/tree/make-uncle-bob-proud) branch and [PR #15](https://github.com/zachlankton/zwc-chat/pull/15)
+
 A modern, real-time chat application with AI integration, built with Bun, React, and WebSockets.
 
 ## Features
