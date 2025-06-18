@@ -1,8 +1,15 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { del, get, put } from "../lib/fetchWrapper";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { del, put } from "../lib/fetchWrapper";
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
-import { Trash2, Pencil, MoreVertical, Pin, PinOff } from "lucide-react";
+import {
+  Trash2,
+  Pencil,
+  MoreVertical,
+  Pin,
+  PinOff,
+  Loader2,
+} from "lucide-react";
 import { useNavigate } from "react-router";
 import { AsyncConfirm, AsyncPrompt } from "./async-modals";
 import {
@@ -20,9 +27,10 @@ interface Chat {
   updatedAt: string;
   messageCount: number;
   pinnedAt?: string | null;
+  generating?: boolean;
 }
 
-interface ChatListResponse {
+export interface ChatListResponse {
   chats: Chat[];
   total: number;
   limit: number;
@@ -33,6 +41,9 @@ interface ChatListProps {
   currentChatId?: string;
   onChatSelect: (chatId: string) => void;
   onNewChat: () => void;
+  data?: ChatListResponse;
+  isLoading: boolean;
+  error: any;
 }
 
 // Separate ChatItem component
@@ -61,9 +72,12 @@ function ChatItem({
     >
       <div className="flex items-center gap-3">
         <div className="flex-1 min-w-0 flex items-center gap-2">
-          {chat.pinnedAt && (
+          {chat.pinnedAt && !chat.generating ? (
             <Pin className="h-3 w-3 text-muted-foreground shrink-0" />
-          )}
+          ) : null}
+          {chat.generating ? (
+            <Loader2 className="h-3 w-3 text-muted-foreground shrink-0 animate-spin" />
+          ) : null}
           <h4 className="text-sm font-medium truncate">{chat.title}</h4>
         </div>
         <DropdownMenu>
@@ -129,15 +143,15 @@ function ChatItem({
   );
 }
 
-export function ChatList({ currentChatId, onChatSelect }: ChatListProps) {
+export function ChatList({
+  currentChatId,
+  onChatSelect,
+  data,
+  isLoading,
+  error,
+}: ChatListProps) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-
-  // Fetch user's chats
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["chats"],
-    queryFn: async () => get<ChatListResponse>("/api/chat"),
-  });
 
   // Delete chat mutation
   const deleteChatMutation = useMutation({

@@ -42,6 +42,7 @@ export const GET = apiHandler(async (req: RequestWithSession) => {
 			updatedAt: chat.updatedAt.toISOString(),
 			messageCount: chat.messageCount,
 			pinnedAt: chat.pinnedAt?.toISOString() || null,
+			generating: chat.generating,
 		}));
 
 		return Response.json({

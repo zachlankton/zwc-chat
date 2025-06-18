@@ -36,7 +36,7 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
-      staleTime: 5000,
+      staleTime: 500,
       retry: (failureCount, error: any) => {
         if (failureCount > MAX_RETRIES) {
           return false;

@@ -77,6 +77,7 @@ import { ToolManager } from "./tool-manager";
 import { formatToolsForAPI, executeToolCalls } from "~/lib/tool-executor";
 import type { ToolCall } from "~/types/tools";
 import { useNavigate } from "react-router";
+import type { ChatListResponse } from "./chat-list";
 
 interface Message {
   id: string;
@@ -1017,6 +1018,8 @@ export function ChatInterface({
           }
 
           resettingOffset.current = false;
+          setIsLoading(true);
+          updateStreamingMessageId(header.newMessageId);
           const newMessageId = header.newMessageId;
           const existingMessage = messagesRef.current.find(
             (m) => m.id === newMessageId,
@@ -1232,8 +1235,10 @@ export function ChatInterface({
 
   // Update messages when initialMessages changes (e.g., when switching chats)
   React.useEffect(() => {
-    if (assistantMessage.current !== null) return;
+    assistantMessage.current = null;
     setMessages(initialMessages);
+    setIsLoading(false);
+    updateStreamingMessageId(null);
 
     // Also update the selected model based on the new chat's messages
     if (initialMessages.length > 0) {
@@ -1284,6 +1289,7 @@ export function ChatInterface({
     attachments: File[],
     includeWebSearch: boolean = false,
   ) => {
+    if (isLoading) return;
     if (!input.trim() || isLoading) return;
     const stashMessageLength = messages.length;
     isNewChat.current =
@@ -1333,6 +1339,7 @@ export function ChatInterface({
         const placeholderChat = {
           id: chatId,
           title: "Generating...",
+          generating: true,
           lastMessage:
             typeof content === "string"
               ? content.slice(0, 50)
@@ -1345,6 +1352,17 @@ export function ChatInterface({
           ...oldData,
           chats: [placeholderChat, ...oldData.chats],
           total: oldData.total + 1,
+        };
+      });
+    } else {
+      queryClient.setQueryData(["chats"], (oldData: ChatListResponse) => {
+        if (!oldData) return oldData;
+
+        return {
+          ...oldData,
+          chats: oldData.chats.map((c) =>
+            c.id === chatId ? { ...c, generating: true } : { ...c },
+          ),
         };
       });
     }
@@ -1441,6 +1459,17 @@ export function ChatInterface({
       });
       return;
     }
+
+    queryClient.setQueryData(["chats"], (oldData: ChatListResponse) => {
+      if (!oldData) return oldData;
+
+      return {
+        ...oldData,
+        chats: oldData.chats.map((c) =>
+          c.id === chatId ? { ...c, generating: true } : { ...c },
+        ),
+      };
+    });
 
     assistantMessage.current.tool_calls = undefined;
 

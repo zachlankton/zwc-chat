@@ -532,6 +532,7 @@ async function saveMessageAndUpdateChat(
 						? newMessage.content.substring(0, 100) +
 							(newMessage.content.length > 100 ? "..." : "")
 						: "Assistant response",
+				generating: false,
 				updatedAt: new Date(),
 			},
 			$setOnInsert: {
@@ -635,23 +636,30 @@ async function streamedChunks(
 	// Save message and update chat
 	await saveMessageAndUpdateChat(newMessage, messageIdToReplace);
 
-	sendMessageToChatSubs(ws.data.id, ctx.params.chatId, {
-		subType: "chat-stream-finished",
-	});
+	sendMessageToChatSubs(
+		ws.data.id,
+		ctx.params.chatId,
+		{
+			subType: "chat-stream-finished",
+		},
+		{ sendToAll: true }
+	);
 }
 
 export function sendMessageToChatSubs(
 	thisWsId: string,
 	chatId: string,
-	data: Record<string, any>
+	data: Record<string, any>,
+	opts?: { sendToAll: boolean }
 ) {
 	const ctx = asyncLocalStorage.getStore();
 	if (!ctx) throw new Error("NEED SOME CONTEXT TO SEND CHAT SUB MESSAGES");
 
 	const subs = userSockets.get(ctx.session.email);
-	for (const [wsId, userSocket] of subs!) {
+	if (!subs) return;
+	for (const [wsId, userSocket] of subs) {
 		// don't send messages to ourselves
-		if (wsId === thisWsId) continue;
+		if (!opts?.sendToAll && wsId === thisWsId) continue;
 
 		if (!userSocket) continue;
 
