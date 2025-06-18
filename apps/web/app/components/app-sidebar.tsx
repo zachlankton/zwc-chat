@@ -100,7 +100,7 @@ export function AppSidebar({ onNewChat, ...props }: AppSidebarProps) {
       queryClient.setQueryData(["chats"], (oldData: ChatListResponse) => {
         if (!oldData) return oldData;
         const chat = oldData.chats.find((c) => c.id === chatId);
-        const content = data.data.lastMessage.content;
+        const content = data.data?.lastMessage?.content ?? "Assistant response";
 
         if (!chat) {
           const placeholderChat = {

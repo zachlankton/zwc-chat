@@ -1011,8 +1011,6 @@ export function ChatInterface({
 
         if (assistantMessage.current === null) {
           if (header.offset > 0) {
-            console.log(header.offset);
-
             if (resettingOffset.current) return;
             resettingOffset.current = true;
             get(`/api/chat/${chatId}`);

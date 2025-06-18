@@ -656,7 +656,8 @@ export function sendMessageToChatSubs(
 	if (!ctx) throw new Error("NEED SOME CONTEXT TO SEND CHAT SUB MESSAGES");
 
 	const subs = userSockets.get(ctx.session.email);
-	for (const [wsId, userSocket] of subs!) {
+	if (!subs) return;
+	for (const [wsId, userSocket] of subs) {
 		// don't send messages to ourselves
 		if (!opts?.sendToAll && wsId === thisWsId) continue;
 
