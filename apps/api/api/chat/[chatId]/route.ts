@@ -35,7 +35,6 @@ export const POST = apiHandler(
 		req: RequestWithSession,
 		{ params }: { params: { chatId: string } }
 	) => {
-		console.log("CHATID", params);
 		await getCurrentSession(req);
 		if (!req.session) throw notAuthorized();
 		if (!req.session.email) throw notAuthorized();
@@ -96,9 +95,6 @@ export const POST = apiHandler(
 							timestamp: Date.now() - 100000, // Slightly before user message
 						};
 						await messagesCollection.insertOne(systemMessage);
-						console.log(
-							`System message saved to database for chat ${userChatId}`
-						);
 					}
 				}
 
@@ -142,53 +138,51 @@ export const POST = apiHandler(
 
 					const messagesCollection = await getMessagesCollection();
 					await messagesCollection.insertOne(userMessage);
-					console.log(`User message saved to database for chat ${chatId}`);
-
-					// Update chat with user message using atomic upsert
-					const chatsCollection = await getChatsCollection();
-					const now = new Date();
-
-					// Extract text content for title/lastMessage
-					let textContent = "";
-					if (typeof lastMessage.content === "string") {
-						textContent = lastMessage.content;
-					} else if (Array.isArray(lastMessage.content)) {
-						// Extract text from content array
-						const textPart = lastMessage.content.find(
-							(item: any) => item.type === "text"
-						) as any;
-						textContent = textPart?.text || "Sent attachments";
-					}
-
-					const chatTitle =
-						textContent.substring(0, 50) +
-						(textContent.length > 50 ? "..." : "");
-					const chatLastMessage =
-						textContent.substring(0, 100) +
-						(textContent.length > 100 ? "..." : "");
-
-					await chatsCollection.updateOne(
-						{ id: chatId, userEmail: req.session.email },
-						{
-							$set: {
-								lastMessage: chatLastMessage,
-								updatedAt: now,
-							},
-							$setOnInsert: {
-								id: chatId,
-								userEmail: req.session.email,
-								title: chatTitle,
-								createdAt: now,
-							},
-							$inc: { messageCount: hasSystemPrompt ? 2 : 1 }, // Count system message if present
-						},
-						{ upsert: true }
-					);
 
 					currentMessageIndex++;
 					lastMessage = messages[currentMessageIndex];
 				}
 			}
+			// Update chat with user message using atomic upsert
+			const chatsCollection = await getChatsCollection();
+			const now = new Date();
+
+			// Extract text content for title/lastMessage
+			let textContent = "";
+			const lastMessage = messages.at(-1);
+			if (typeof lastMessage.content === "string") {
+				textContent = lastMessage.content;
+			} else if (Array.isArray(lastMessage.content)) {
+				// Extract text from content array
+				const textPart = lastMessage.content.find(
+					(item: any) => item.type === "text"
+				) as any;
+				textContent = textPart?.text || "Sent attachments";
+			}
+
+			const chatTitle =
+				textContent.substring(0, 50) + (textContent.length > 50 ? "..." : "");
+			const chatLastMessage =
+				textContent.substring(0, 100) + (textContent.length > 100 ? "..." : "");
+
+			await chatsCollection.updateOne(
+				{ id: userChatId, userEmail: req.session.email },
+				{
+					$set: {
+						lastMessage: chatLastMessage,
+						generating: true,
+						updatedAt: now,
+						messageCount: messages.length,
+					},
+					$setOnInsert: {
+						id: userChatId,
+						userEmail: req.session.email,
+						title: chatTitle,
+						createdAt: now,
+					},
+				},
+				{ upsert: true }
+			);
 		} catch (error) {
 			console.error("Failed to save messages:", error);
 			const errorMessage =

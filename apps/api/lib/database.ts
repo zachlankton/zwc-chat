@@ -52,6 +52,7 @@ export interface Chat {
 	lastMessage?: string;
 	messageCount: number;
 	pinnedAt?: Date | null; // When the chat was pinned
+	generating?: boolean;
 	branchedFrom?: {
 		chatId: string;
 		messageId: string;

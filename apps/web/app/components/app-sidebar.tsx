@@ -1,7 +1,7 @@
 import * as React from "react";
 
 import { NavUser } from "~/components/nav-user";
-import { ChatList } from "~/components/chat-list";
+import { ChatList, type ChatListResponse } from "~/components/chat-list";
 import { useNavigate, useParams } from "react-router";
 import {
   Sidebar,
@@ -13,8 +13,9 @@ import {
 } from "~/components/ui/sidebar";
 import { Menu } from "lucide-react";
 import { Button } from "./ui/button";
-import { wsClient } from "~/lib/fetchWrapper";
+import { get, wsClient } from "~/lib/fetchWrapper";
 import { queryClient } from "~/providers/queryClient";
+import { useQuery } from "@tanstack/react-query";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onNewChat?: () => void;
@@ -36,6 +37,12 @@ export function AppSidebar({ onNewChat, ...props }: AppSidebarProps) {
   const toggleSidebar = sb.toggleSidebar;
 
   const [titleFading, setTitleFading] = React.useState(false);
+
+  // Fetch user's chats
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["chats"],
+    queryFn: async () => get<ChatListResponse>("/api/chat"),
+  });
 
   const handleChatSelect = (chatId: string) => {
     if (isMobile) toggleSidebar();
@@ -87,7 +94,42 @@ export function AppSidebar({ onNewChat, ...props }: AppSidebarProps) {
 
   const handleChatSubMessage = React.useCallback((data: any) => {
     // TODO: handle each message surgically instead of invalidating, just doing this for now to get across the finish line
-    function msgPost(_data: any) {}
+    function msgPost(data: any) {
+      console.log(data);
+      const chatId = data.headers["x-zwc-chat-id"];
+      queryClient.setQueryData(["chats"], (oldData: ChatListResponse) => {
+        if (!oldData) return oldData;
+        const chat = oldData.chats.find((c) => c.id === chatId);
+        const content = data.data.lastMessage.content;
+
+        if (!chat) {
+          const placeholderChat = {
+            id: chatId,
+            title: "Generating...",
+            generating: true,
+            lastMessage:
+              typeof content === "string"
+                ? content.slice(0, 50)
+                : "New conversation",
+            updatedAt: new Date().toISOString(),
+            messageCount: 1,
+          };
+
+          return {
+            ...oldData,
+            chats: [placeholderChat, ...oldData.chats],
+            total: oldData.total + 1,
+          };
+        } else {
+          return {
+            ...oldData,
+            chats: oldData.chats.map((c) =>
+              c.id === chatId ? { ...c, generating: true } : { ...c },
+            ),
+          };
+        }
+      });
+    }
 
     function chatUpdate(_data: any) {
       queryClient.invalidateQueries({ queryKey: ["chats"] });
@@ -182,6 +224,9 @@ export function AppSidebar({ onNewChat, ...props }: AppSidebarProps) {
               currentChatId={currentChatId}
               onChatSelect={handleChatSelect}
               onNewChat={handleNewChat}
+              data={data}
+              isLoading={isLoading}
+              error={error}
             />
           </div>
         )}

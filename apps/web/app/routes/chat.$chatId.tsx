@@ -29,9 +29,8 @@ export default function ChatRoute() {
 
   const queryClient = useQueryClient();
 
-  // Update chat list when we navigate to a new chat
+  // Update chat data when we navigate to a new chat
   useEffect(() => {
-    // Invalidate the chats list to refresh it
     if (chatId) {
       queryClient.invalidateQueries({ queryKey: ["chat", chatId] });
     }
