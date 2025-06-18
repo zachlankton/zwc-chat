@@ -803,6 +803,7 @@ export function ChatInterface({
             (m) => m.id === newMessageId,
           );
           if (existingMessage) {
+            existingMessage.stoppedByUser = false;
             existingMessage.content = "";
             existingMessage.reasoning = undefined;
             existingMessage.tool_calls = undefined;
