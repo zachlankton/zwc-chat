@@ -18,7 +18,6 @@ export interface ExtendedRequest extends RequestWithSession {
 	eventData?: any;
 	eventErrorAlreadyLogged?: boolean;
 	session: SessionData;
-	accountId: string;
 	rateLogged: boolean;
 	timestamp: number;
 	messageIdToReplace?: string; // For message retry functionality

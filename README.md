@@ -35,7 +35,6 @@ A modern, real-time chat application with AI integration, built with Bun, React,
 - **Authentication**: WorkOS for secure, enterprise-ready auth
 - **AI Integration**: OpenRouter API for multiple model support
 - **Real-time**: Native Bun WebSocket server
-- **Email**: SendGrid for transactional emails
 
 ### Frontend
 
@@ -51,7 +50,6 @@ A modern, real-time chat application with AI integration, built with Bun, React,
 - MongoDB (local or cloud instance)
 - WorkOS account and API keys
 - OpenRouter API key
-- SendGrid API key (for email functionality)
 
 ## Installation
 
@@ -70,25 +68,44 @@ bun install
 
 3. Set up environment variables:
 
-Create `.env.development` files in both `apps/api` and `apps/web` directories:
+Copy the example environment files and configure them with your values:
 
-**apps/api/.env.development**
+```bash
+# API configuration
+cp apps/api/.env.example apps/api/.env.development
+# Edit apps/api/.env.development with your values
 
-```env
-PORT=3000
-MONGODB_URI=mongodb://localhost:27017/zwcchat
-WORKOS_API_KEY=your_workos_api_key
-WORKOS_CLIENT_ID=your_workos_client_id
-WORKOS_REDIRECT_URI=https://localhost:3000/api/auth/callback
-SENDGRID_API_KEY=your_sendgrid_api_key
-OPENROUTER_API_KEY=your_openrouter_api_key
+# Web configuration
+cp apps/web/.env.example apps/web/.env.development
+# Edit apps/web/.env.development with your values
 ```
 
-**apps/web/.env.development**
+### Required Environment Variables
 
-```env
-VITE_API_URL=https://localhost:3000
-```
+**Backend (apps/api/.env.development):**
+
+- **MongoDB:**
+  - `MONGODB_URI` - Your MongoDB connection string
+  - `MONGODB_DB_NAME` - Database name (e.g., "zwcchat")
+
+- **WorkOS Authentication:**
+  - `WORKOS_API_KEY` - Get from [WorkOS Dashboard](https://dashboard.workos.com)
+  - `WORKOS_CLIENT_ID` - Get from WorkOS Dashboard
+  - `WORKOS_REDIRECT_URI` - Set to `https://localhost:3000/api/auth/callback`
+  - `WORKOS_COOKIE_PW` - Generate a secure password (min 32 chars)
+
+- **OpenRouter:**
+  - `OPENROUTER_KEY` - Get from [OpenRouter](https://openrouter.ai/keys)
+  - `OPENROUTER_PROVISIONING_KEY` - For provisioning user API keys
+
+- **Security:**
+  - `MASTER_KEY` - Generate with: `openssl rand -hex 32`
+
+**Frontend (apps/web/.env.development):**
+
+- `VITE_API_URL` - Set to `https://localhost:3000` for local development
+
+See the `.env.example` files in each directory for all available options and detailed descriptions.
 
 4. Start MongoDB (for local development):
 

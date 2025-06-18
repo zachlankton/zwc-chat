@@ -95,8 +95,7 @@ function getLogContext(req: any) {
 	const request_id = req.id ?? "_";
 	const session_id = req.session?.token?.slice(0, 8) ?? "_";
 	const email = req.session?.email ?? "_";
-	const accountId = req.account ?? "_";
-	return `[${time} ${server_id} rid:${request_id}:${req.logCount} sid:${session_id} ${accountId} ${email}]`;
+	return `[${time} ${server_id} rid:${request_id}:${req.logCount} sid:${session_id} ${email}]`;
 }
 
 global.console.log = (...args) => {
