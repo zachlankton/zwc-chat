@@ -218,12 +218,23 @@ export function updateChatSetting<K extends keyof ChatSettings>(
   queryClient.invalidateQueries({ queryKey: [CHAT_SETTINGS_KEY] });
 }
 
+export interface ChatSettingsHook {
+  chatSettings: ChatSettings;
+  updateEnterToSend: (value: boolean) => void;
+  updateTtsEnabled: (value: boolean) => void;
+  updateSelectedVoice: (value: string) => void;
+  updateSystemPrompt: (value: string) => void;
+  updateTools: (value: Tool[]) => void;
+  updateToolsEnabled: (value: boolean) => void;
+  updateHideToolCallMessages: (value: boolean) => void;
+}
+
 // Hook to use chat settings
-export function useChatSettings() {
+export function useChatSettings(): ChatSettingsHook {
   const { data } = useQuery(chatSettingsQuery);
 
   return {
-    settings: data || defaultSettings,
+    chatSettings: data || defaultSettings,
     updateEnterToSend: (value: boolean) =>
       updateChatSetting("enterToSend", value),
     updateTtsEnabled: (value: boolean) =>

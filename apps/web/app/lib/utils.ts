@@ -17,3 +17,11 @@ export function basedOnLabel(label: string) {
     .trim() // remove leading and trailing whitespaces
     .replaceAll(" ", "-"); // replaces spaces with dashes
 }
+
+export function tryParseJson(txt: string) {
+  try {
+    return JSON.parse(txt);
+  } catch (error) {
+    return txt;
+  }
+}

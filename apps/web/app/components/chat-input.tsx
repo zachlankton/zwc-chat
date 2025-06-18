@@ -34,8 +34,8 @@ import { cn } from "~/lib/utils";
 import { useRef, useState, useEffect } from "react";
 import { useSidebar } from "./ui/sidebar";
 import { ModelSelector } from "./model-selector";
-import type { ModelsResponse } from "./chat-interface";
 import { useChatSettings } from "~/stores/chat-settings";
+import type { ModelsResponse } from "~/lib/chat/types";
 
 interface ApiKeyInfo {
   label: string;
@@ -99,7 +99,7 @@ export const ChatInput = React.forwardRef<
   const [speechSupported, setSpeechSupported] = useState(false);
   const [pendingSubmit, setPendingSubmit] = useState(false);
   const [showVoiceHint, setShowVoiceHint] = useState(false);
-  const { settings, updateEnterToSend } = useChatSettings();
+  const { chatSettings, updateEnterToSend } = useChatSettings();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const textareaScrollHeightRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -301,10 +301,10 @@ export const ChatInput = React.forwardRef<
     }
 
     if (e.key === "Enter") {
-      if (settings.enterToSend && !e.shiftKey) {
+      if (chatSettings.enterToSend && !e.shiftKey) {
         e.preventDefault();
         handleSubmit();
-      } else if (!settings.enterToSend && e.shiftKey) {
+      } else if (!chatSettings.enterToSend && e.shiftKey) {
         e.preventDefault();
         handleSubmit();
       }
@@ -546,10 +546,12 @@ export const ChatInput = React.forwardRef<
                         type="button"
                         variant="ghost"
                         size="icon"
-                        onClick={() => updateEnterToSend(!settings.enterToSend)}
+                        onClick={() =>
+                          updateEnterToSend(!chatSettings.enterToSend)
+                        }
                         className="h-7 w-7 text-muted-foreground hover:text-foreground"
                       >
-                        {settings.enterToSend ? (
+                        {chatSettings.enterToSend ? (
                           <CornerDownLeft className="h-3.5 w-3.5" />
                         ) : (
                           <ArrowBigUp className="h-3.5 w-3.5" />
@@ -557,7 +559,7 @@ export const ChatInput = React.forwardRef<
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      {settings.enterToSend
+                      {chatSettings.enterToSend
                         ? "Enter sends message"
                         : "Shift+Enter sends message"}
                     </TooltipContent>
@@ -611,13 +613,13 @@ export const ChatInput = React.forwardRef<
                         align="end"
                         className="w-56 max-h-80 overflow-y-auto"
                       >
-                        {settings.availableVoices.length === 0 ? (
+                        {chatSettings.availableVoices.length === 0 ? (
                           <DropdownMenuItem disabled>
                             No voices available
                           </DropdownMenuItem>
                         ) : (
                           <>
-                            {settings.availableVoices.map((voice) => (
+                            {chatSettings.availableVoices.map((voice) => (
                               <DropdownMenuItem
                                 key={voice.voiceURI}
                                 onClick={() =>

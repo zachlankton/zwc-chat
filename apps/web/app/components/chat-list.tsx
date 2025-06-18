@@ -19,32 +19,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
-
-interface Chat {
-  id: string;
-  title: string;
-  lastMessage?: string;
-  updatedAt: string;
-  messageCount: number;
-  pinnedAt?: string | null;
-  generating?: boolean;
-}
-
-export interface ChatListResponse {
-  chats: Chat[];
-  total: number;
-  limit: number;
-  offset: number;
-}
-
-interface ChatListProps {
-  currentChatId?: string;
-  onChatSelect: (chatId: string) => void;
-  onNewChat: () => void;
-  data?: ChatListResponse;
-  isLoading: boolean;
-  error: any;
-}
+import type { Chat, ChatListProps } from "~/lib/chat/types";
 
 // Separate ChatItem component
 function ChatItem({

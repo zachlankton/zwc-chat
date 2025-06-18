@@ -10,12 +10,12 @@ import {
   Gem,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
-import type { ModelsResponse } from "./chat-interface";
 import { ModelCard } from "./model-card";
 import { AsyncModal } from "./async-modals";
 import { useModalContext } from "./async-modals";
 import { cn } from "~/lib/utils";
 import { DialogTitle } from "@radix-ui/react-dialog";
+import type { ModelsResponse } from "~/lib/chat/types";
 
 interface ModelSelectorProps {
   selectedModel: string;

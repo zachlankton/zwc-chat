@@ -37,7 +37,7 @@ interface ToolManagerProps {
 
 export function ToolManager({ open, onOpenChange }: ToolManagerProps) {
   const {
-    settings,
+    chatSettings,
     updateTools,
     updateToolsEnabled,
     updateHideToolCallMessages,
@@ -47,23 +47,25 @@ export function ToolManager({ open, onOpenChange }: ToolManagerProps) {
   const [createWithExample, setCreateWithExample] = useState(false);
 
   const handleToggleTool = (toolId: string) => {
-    const updatedTools = settings.tools.map((tool) =>
+    const updatedTools = chatSettings.tools.map((tool) =>
       tool.id === toolId ? { ...tool, enabled: !tool.enabled } : tool,
     );
     updateTools(updatedTools);
   };
 
   const handleDeleteTool = (toolId: string) => {
-    const updatedTools = settings.tools.filter((tool) => tool.id !== toolId);
+    const updatedTools = chatSettings.tools.filter(
+      (tool) => tool.id !== toolId,
+    );
     updateTools(updatedTools);
   };
 
   const handleSaveTool = (tool: Tool) => {
-    const existingIndex = settings.tools.findIndex((t) => t.id === tool.id);
+    const existingIndex = chatSettings.tools.findIndex((t) => t.id === tool.id);
     const updatedTools =
       existingIndex >= 0
-        ? settings.tools.map((t) => (t.id === tool.id ? tool : t))
-        : [...settings.tools, tool];
+        ? chatSettings.tools.map((t) => (t.id === tool.id ? tool : t))
+        : [...chatSettings.tools, tool];
 
     updateTools(updatedTools);
     setEditingTool(null);
@@ -71,7 +73,7 @@ export function ToolManager({ open, onOpenChange }: ToolManagerProps) {
   };
 
   const handleExport = () => {
-    const dataStr = JSON.stringify(settings.tools, null, 2);
+    const dataStr = JSON.stringify(chatSettings.tools, null, 2);
     const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(dataStr)}`;
 
     const exportFileDefaultName = "chat-tools.json";
@@ -92,12 +94,12 @@ export function ToolManager({ open, onOpenChange }: ToolManagerProps) {
         const importedTools = JSON.parse(e.target?.result as string) as Tool[];
         // Merge imported tools, avoiding duplicates by name
         const existingNames = new Set(
-          settings.tools.map((t) => t.function.name),
+          chatSettings.tools.map((t) => t.function.name),
         );
         const newTools = importedTools.filter(
           (t) => !existingNames.has(t.function.name),
         );
-        updateTools([...settings.tools, ...newTools]);
+        updateTools([...chatSettings.tools, ...newTools]);
       } catch (error) {
         console.error("Failed to import tools:", error);
         // TODO: Show error toast
@@ -108,7 +110,9 @@ export function ToolManager({ open, onOpenChange }: ToolManagerProps) {
 
   const handleAddExampleTools = () => {
     // Filter out tools that already exist
-    const existingNames = new Set(settings.tools.map((t) => t.function.name));
+    const existingNames = new Set(
+      chatSettings.tools.map((t) => t.function.name),
+    );
     const newExampleTools = exampleTools.filter(
       (t) => !existingNames.has(t.function.name),
     );
@@ -118,7 +122,7 @@ export function ToolManager({ open, onOpenChange }: ToolManagerProps) {
       return;
     }
 
-    updateTools([...settings.tools, ...newExampleTools]);
+    updateTools([...chatSettings.tools, ...newExampleTools]);
   };
 
   if (editingTool || isCreating) {
@@ -163,13 +167,13 @@ export function ToolManager({ open, onOpenChange }: ToolManagerProps) {
                 </p>
               </div>
               <Switch
-                checked={settings.toolsEnabled}
+                checked={chatSettings.toolsEnabled}
                 onCheckedChange={updateToolsEnabled}
               />
             </div>
 
             {/* Hide Tool Call Messages Toggle */}
-            {settings.toolsEnabled && (
+            {chatSettings.toolsEnabled && (
               <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
                 <div>
                   <h3 className="font-medium">Hide Tool Call Messages</h3>
@@ -178,7 +182,7 @@ export function ToolManager({ open, onOpenChange }: ToolManagerProps) {
                   </p>
                 </div>
                 <Switch
-                  checked={settings.hideToolCallMessages}
+                  checked={chatSettings.hideToolCallMessages}
                   onCheckedChange={updateHideToolCallMessages}
                 />
               </div>
@@ -186,7 +190,7 @@ export function ToolManager({ open, onOpenChange }: ToolManagerProps) {
           </div>
 
           {/* Tools List */}
-          {settings.tools.length === 0 ? (
+          {chatSettings.tools.length === 0 ? (
             <div className="space-y-6">
               <div className="text-center py-12 text-muted-foreground">
                 <p>No tools created yet.</p>
@@ -219,7 +223,7 @@ export function ToolManager({ open, onOpenChange }: ToolManagerProps) {
             </div>
           ) : (
             <div className="space-y-2">
-              {settings.tools.map((tool) => (
+              {chatSettings.tools.map((tool) => (
                 <div
                   key={tool.id}
                   className={cn(
@@ -275,7 +279,7 @@ export function ToolManager({ open, onOpenChange }: ToolManagerProps) {
               variant="outline"
               size="sm"
               onClick={handleExport}
-              disabled={settings.tools.length === 0}
+              disabled={chatSettings.tools.length === 0}
             >
               <Download className="h-4 w-4 mr-2" />
               Export
