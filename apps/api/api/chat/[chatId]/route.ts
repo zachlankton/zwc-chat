@@ -1,6 +1,12 @@
 import type { RequestWithSession } from "api/auth/session/sessionCache";
 import { getCurrentSession } from "api/auth/session/utils";
-import { apiHandler, badRequest, notAuthorized } from "lib/utils";
+import {
+	apiHandler,
+	badRequest,
+	conflict,
+	notAuthorized,
+	notFound,
+} from "lib/utils";
 import {
 	getMessagesCollection,
 	getChatsCollection,
@@ -9,6 +15,7 @@ import {
 import { DEFAULT_MODEL } from "lib/modelConfig";
 import type { ExtendedRequest } from "lib/server-types";
 import { chatSubs, sendMessageToChatSubs, socketSubs } from "lib/websockets";
+import { abortMap } from "lib/streamAbortControllers";
 
 // UUID v4 validation regex
 const UUID_V4_REGEX =
@@ -40,6 +47,41 @@ export const POST = apiHandler(
 		if (!req.session.email) throw notAuthorized();
 		const wsId = (req as ExtendedRequest).wsId;
 
+		const userChatId = params.chatId;
+		if (!validateUUID(userChatId)) {
+			throw badRequest("Invalid chat ID format");
+		}
+
+		//verify this chat belongs to the user first
+		const chatsCollection = await getChatsCollection();
+		const chat = await chatsCollection.findOne({
+			id: userChatId,
+			userEmail: req.session.email,
+		});
+
+		if (!chat) {
+			return Response.json({ error: "Chat not found" }, { status: 404 });
+		}
+
+		const url = new URL(req.url);
+		const abortRequested = url.searchParams.has("abort");
+		if (abortRequested) {
+			const ctrl = abortMap.get(userChatId);
+			if (ctrl) {
+				abortMap.delete(userChatId);
+				ctrl.abort();
+				return Response.json({ ok: true });
+			} else {
+				throw notFound("No abort controller found");
+			}
+		}
+
+		if (abortMap.has(userChatId))
+			throw conflict("A stream is in progress for this chat already");
+
+		const abortCtrl = new AbortController();
+		abortMap.set(userChatId, abortCtrl);
+
 		const body = await req.json().catch(() => null);
 		if (body === null) throw badRequest("Could not parse the body");
 		if (!body.messages) throw badRequest("messages[] key is required");
@@ -50,11 +92,6 @@ export const POST = apiHandler(
 		// Extract messageIdToReplace if this is a retry
 		const messageIdToReplace = body.messageIdToReplace;
 		const overrideAssistantTimestamp = body.overrideAssistantTimestamp;
-
-		const userChatId = params.chatId;
-		if (!validateUUID(userChatId)) {
-			throw badRequest("Invalid chat ID format");
-		}
 
 		subDance(wsId, userChatId);
 
@@ -226,6 +263,7 @@ export const POST = apiHandler(
 		}
 
 		return fetch("https://openrouter.ai/api/v1/chat/completions", {
+			signal: abortCtrl.signal,
 			method: "POST",
 			headers: {
 				Authorization: `Bearer ${req.session.openRouterApiKey ?? openRouterApiKey}`,
@@ -339,6 +377,7 @@ export const GET = apiHandler(
 				timeToFirstToken: msg.timeToFirstToken,
 				timeToFinish: msg.timeToFinish,
 				annotations: msg.annotations,
+				stoppedByUser: msg.stoppedByUser,
 				// Include tool-related fields
 				tool_calls: msg.tool_calls?.length === 0 ? undefined : msg.tool_calls,
 				tool_call_id: msg.tool_call_id,

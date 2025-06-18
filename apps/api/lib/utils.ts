@@ -104,12 +104,12 @@ function luhnCheck(numWithSpaces: string) {
 	return sum && sum % 10 === 0;
 }
 
-export class CRMAPIError extends Error {
+export class APIError extends Error {
 	statusCode: number;
 	extraData?: any;
 	constructor(statusCode: number, message: string, extraData?: any) {
 		super(message);
-		this.name = "CRMAPIError";
+		this.name = "APIError";
 		this.statusCode = statusCode;
 		this.extraData = extraData ?? {};
 		console.error({ error: message, ...extraData });
@@ -117,40 +117,44 @@ export class CRMAPIError extends Error {
 }
 
 export function notFound(msg: string = "Not Found", extraData?: any) {
-	return new CRMAPIError(404, msg, extraData);
+	return new APIError(404, msg, extraData);
 }
 
 export function badRequest(msg: string = "Bad Request", extraData?: any) {
-	return new CRMAPIError(400, msg, extraData);
+	return new APIError(400, msg, extraData);
+}
+
+export function conflict(msg: string = "Conflict", extraData?: any) {
+	return new APIError(409, msg, extraData);
 }
 
 export function notAuthorized(msg: string = "Not Authorized", extraData?: any) {
-	return new CRMAPIError(401, msg, extraData);
+	return new APIError(401, msg, extraData);
 }
 
 export function forbidden(msg: string = "Forbidden", extraData?: any) {
-	return new CRMAPIError(403, msg, extraData);
+	return new APIError(403, msg, extraData);
 }
 
 export function noPermission(
 	msg: string = "User does not have permission to perform this action",
 	extraData?: any
 ) {
-	return new CRMAPIError(403, msg, extraData);
+	return new APIError(403, msg, extraData);
 }
 
 export function rateLimitError(
 	msg: string = "Too Many Requests. Rate Limit Exceeded",
 	extraData?: any
 ) {
-	return new CRMAPIError(429, msg, extraData);
+	return new APIError(429, msg, extraData);
 }
 
 export function internalServerError(
 	msg: string = "Internal Server Error",
 	extraData?: any
 ) {
-	return new CRMAPIError(500, msg, extraData);
+	return new APIError(500, msg, extraData);
 }
 
 export function apiHandler(
@@ -160,8 +164,8 @@ export function apiHandler(
 		try {
 			return await handler(request, params);
 		} catch (error: any) {
-			// If the error is a CRMAPIError, return an appropriate response
-			if (error instanceof CRMAPIError) {
+			// If the error is a APIError, return an appropriate response
+			if (error instanceof APIError) {
 				return Response.json(
 					{ error: error.message, ...error.extraData },
 					{ status: error.statusCode }

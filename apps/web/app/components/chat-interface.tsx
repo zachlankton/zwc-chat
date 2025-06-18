@@ -98,6 +98,7 @@ interface Message {
   totalTokens?: number;
   timeToFirstToken?: number;
   timeToFinish?: number;
+  stoppedByUser?: boolean;
   // Tool-related fields
   tool_calls?: ToolCall[];
   tool_call_id?: string;
@@ -1472,6 +1473,7 @@ export function ChatInterface({
     });
 
     assistantMessage.current.tool_calls = undefined;
+    assistantMessage.current.stoppedByUser = false;
 
     // Find all messages up to and including the user message before this assistant message
     const messagesUpToRetry = messagesRef.current.slice(0, messageIndex);
@@ -2011,6 +2013,12 @@ export function ChatInterface({
                                 : "Assistant response"}
                             </ReactMarkdown>
 
+                            {message.stoppedByUser ? (
+                              <div className="bg-primary rounded p-2">
+                                Stopped by user
+                              </div>
+                            ) : null}
+
                             {/* Display tool calls if present */}
                             {message.tool_calls &&
                               !message.tool_calls.some((t) =>
@@ -2140,6 +2148,26 @@ export function ChatInterface({
         <ChatInput
           ref={chatInputRef}
           onSubmit={handleSubmit}
+          onStop={async () => {
+            try {
+              const results = await post<{ ok: boolean }>(
+                `/api/chat/${chatId}?abort`,
+                {},
+              );
+              if (!results.ok) {
+                AsyncAlert({
+                  title: "Unable to stop at this time",
+                  message: "Sorry, was not able to stop the stream",
+                });
+                return console.error(results);
+              }
+              setIsLoading(false);
+              updateStreamingMessageId(null);
+              assistantMessage.current = null;
+            } catch (error) {
+              console.error("Failed to abort generation:", error);
+            }
+          }}
           isLoading={isLoading}
           selectedModel={selectedModel}
           onModelChange={setSelectedModel}
