@@ -72,12 +72,12 @@ Copy the example environment files and configure them with your values:
 
 ```bash
 # API configuration
-cp apps/api/.env.example apps/api/.env.development
-# Edit apps/api/.env.development with your values
+cp apps/api/.env.example apps/api/.env
+# Edit apps/api/.env with your values
 
 # Web configuration
-cp apps/web/.env.example apps/web/.env.development
-# Edit apps/web/.env.development with your values
+cp apps/web/.env.example apps/web/.env
+# Edit apps/web/.env with your values
 ```
 
 ### Required Environment Variables
