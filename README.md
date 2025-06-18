@@ -85,16 +85,19 @@ cp apps/web/.env.example apps/web/.env.development
 **Backend (apps/api/.env.development):**
 
 - **MongoDB:**
+
   - `MONGODB_URI` - Your MongoDB connection string
   - `MONGODB_DB_NAME` - Database name (e.g., "zwcchat")
 
 - **WorkOS Authentication:**
+
   - `WORKOS_API_KEY` - Get from [WorkOS Dashboard](https://dashboard.workos.com)
   - `WORKOS_CLIENT_ID` - Get from WorkOS Dashboard
   - `WORKOS_REDIRECT_URI` - Set to `https://localhost:3000/api/auth/callback`
   - `WORKOS_COOKIE_PW` - Generate a secure password (min 32 chars)
 
 - **OpenRouter:**
+
   - `OPENROUTER_KEY` - Get from [OpenRouter](https://openrouter.ai/keys)
   - `OPENROUTER_PROVISIONING_KEY` - For provisioning user API keys
 

@@ -40,4 +40,3 @@
 - [x] resumeable streams and websocket state syncing
 - [ ] create admin page to manage users
 - [ ] user profile/settings page
-

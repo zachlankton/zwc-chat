@@ -602,7 +602,7 @@ async function streamedChunks(
 
 			const subs = chatSubs.get(ctx.params.chatId);
 			if (!subs) continue;
-			
+
 			for (const sub of subs) {
 				const subSocket = socketSubs.get(sub);
 
