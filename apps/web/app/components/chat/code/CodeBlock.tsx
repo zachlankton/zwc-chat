@@ -18,15 +18,22 @@ export function CodeBlock({ children }: { children: React.ReactNode }) {
         /* noop – could toast */
       }
     } else {
+    } else {
       // fallback for http / older browsers
-      const textarea = document.createElement("textarea");
-      textarea.value = codeRef?.current?.textContent ?? "";
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textarea);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      try {
+        const textarea = document.createElement("textarea");
+        textarea.value = codeRef?.current?.textContent ?? "";
+        document.body.appendChild(textarea);
+        textarea.select();
+        const success = document.execCommand("copy");
+        document.body.removeChild(textarea);
+        if (success) {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        }
+      } catch (error) {
+        console.warn("Fallback copy failed:", error);
+      }
     }
   };
 
