@@ -88,3 +88,16 @@ export interface ChatListResponse {
   limit: number;
   offset: number;
 }
+
+export interface ApiKeyInfo {
+  label: string;
+  limit: number | null;
+  usage: number;
+  is_provisioning_key: boolean;
+  limit_remaining: number;
+  is_free_tier: boolean;
+  rate_limit: {
+    requests: number;
+    interval: string;
+  };
+}

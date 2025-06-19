@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import type { ApiKeyInfo } from "./chat/types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -25,3 +26,37 @@ export function tryParseJson(txt: string) {
     return txt;
   }
 }
+
+export const getUsageStatus = (apiKeyInfo?: ApiKeyInfo | null) => {
+  if (!apiKeyInfo) return null;
+
+  // Handle unlimited keys
+  if (apiKeyInfo.limit === null) {
+    return {
+      percentage: 100, // remaining
+      status: "good" as const,
+      remaining: Infinity,
+      limit: null,
+      usage: apiKeyInfo.usage,
+    };
+  }
+
+  if (apiKeyInfo.limit === 0) return null;
+  const usagePercentage = (apiKeyInfo.usage / apiKeyInfo.limit) * 100;
+  const remainingPercentage = Math.max(0, 100 - usagePercentage);
+
+  let status: "good" | "warning" | "critical" = "good";
+  if (usagePercentage >= 90) {
+    status = "critical";
+  } else if (usagePercentage >= 80) {
+    status = "warning";
+  }
+
+  return {
+    percentage: remainingPercentage,
+    status,
+    remaining: apiKeyInfo.limit_remaining,
+    limit: apiKeyInfo.limit,
+    usage: apiKeyInfo.usage,
+  };
+};

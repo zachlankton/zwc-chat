@@ -2,10 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import type { Message, ModelsResponse } from "~/lib/chat/types";
-import { get } from "~/lib/fetchWrapper";
+import { get, post } from "~/lib/fetchWrapper";
 import { useApiKeyInfo } from "~/stores/session";
 import type { ToolCall } from "~/types/tools";
 import { useChatSettings } from "~/stores/chat-settings";
+import { AsyncAlert } from "~/components/async-modals";
 
 interface UseChatMessagesProps {
   initialMessages: Message[];
@@ -158,6 +159,27 @@ export function useChatMessages({
     }, 100);
   }, [chatId]);
 
+  const onStop = useCallback(async () => {
+    try {
+      const results = await post<{ ok: boolean }>(
+        `/api/chat/${chatId}?abort`,
+        {},
+      );
+      if (!results.ok) {
+        AsyncAlert({
+          title: "Unable to stop at this time",
+          message: "Sorry, was not able to stop the stream",
+        });
+        return console.error(results);
+      }
+      setIsLoading(false);
+      updateStreamingMessageId(null);
+      assistantMessage.current = null;
+    } catch (error) {
+      console.error("Failed to abort generation:", error);
+    }
+  }, [setIsLoading, updateStreamingMessageId, chatId]);
+
   return {
     showToolManager,
     setShowToolManager,
@@ -184,5 +206,6 @@ export function useChatMessages({
     chatInputRef,
     chatSettings,
     scrollNewMessage,
+    onStop,
   };
 }

@@ -1,6 +1,4 @@
 import "highlight.js/styles/github-dark.css";
-import { post } from "~/lib/fetchWrapper";
-import { AsyncAlert } from "./async-modals";
 import { ChatInput } from "./chat-input";
 
 import { ToolManager } from "./tool-manager";
@@ -49,6 +47,7 @@ export function ChatInterface({
     chatSettings: _chatSettings,
     scrollNewMessage,
     messagesEndRef,
+    onStop,
   } = useChatMessages({ initialMessages, chatId });
 
   const { chatSettings, updateTtsEnabled, updateSelectedVoice } = _chatSettings;
@@ -163,7 +162,6 @@ export function ChatInterface({
   return (
     <>
       <div className="flex flex-col h-full">
-        {/* Messages Area */}
         <div className="@container flex-1 overflow-y-auto pb-32">
           <div className="max-w-[1000px] mx-auto px-4 @max-[560px]:px-1 mt-10 mb-[70vh]">
             {messages.length === 0 && <EmptyChat handleSubmit={handleSubmit} />}
@@ -188,30 +186,10 @@ export function ChatInterface({
           </div>
         </div>
 
-        {/* Modern Chat Input */}
         <ChatInput
           ref={chatInputRef}
           onSubmit={handleSubmit}
-          onStop={async () => {
-            try {
-              const results = await post<{ ok: boolean }>(
-                `/api/chat/${chatId}?abort`,
-                {},
-              );
-              if (!results.ok) {
-                AsyncAlert({
-                  title: "Unable to stop at this time",
-                  message: "Sorry, was not able to stop the stream",
-                });
-                return console.error(results);
-              }
-              setIsLoading(false);
-              updateStreamingMessageId(null);
-              assistantMessage.current = null;
-            } catch (error) {
-              console.error("Failed to abort generation:", error);
-            }
-          }}
+          onStop={onStop}
           isLoading={isLoading}
           selectedModel={selectedModel}
           onModelChange={setSelectedModel}
@@ -227,7 +205,6 @@ export function ChatInterface({
           onToolsClick={() => setShowToolManager(true)}
         />
 
-        {/* Tool Manager Dialog */}
         <ToolManager open={showToolManager} onOpenChange={setShowToolManager} />
       </div>
     </>

@@ -3,8 +3,8 @@ import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
 import { markdownComponents } from "~/lib/chat/markdown-components";
 import type { Message } from "~/lib/chat/types";
-import { Avatar, AvatarFallback } from "@radix-ui/react-avatar";
 import { ToolMessage } from "./ToolMessage";
+import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 
 export function MessageAvatar({ message }: { message: Message }) {
   return (
@@ -22,31 +22,28 @@ export function MessageAvatar({ message }: { message: Message }) {
   );
 }
 
+function Markdown({ children }: { children: string | null }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      rehypePlugins={[rehypeHighlight]}
+      components={markdownComponents}
+    >
+      {children}
+    </ReactMarkdown>
+  );
+}
+
 export function UserMessage({ message }: { message: Message }) {
   return (
     <div className="prose prose-sm text-sm user-message max-w-full max-h-[40vh] overflow-y-auto">
       {typeof message.content === "string" ? (
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          rehypePlugins={[rehypeHighlight]}
-          components={markdownComponents}
-        >
-          {message.content}
-        </ReactMarkdown>
+        <Markdown>{message.content}</Markdown>
       ) : (
         <div className="space-y-2">
           {message.content.map((item, index) => {
             if (item.type === "text") {
-              return (
-                <ReactMarkdown
-                  key={index}
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeHighlight]}
-                  components={markdownComponents}
-                >
-                  {item.text || ""}
-                </ReactMarkdown>
-              );
+              return <Markdown key={index}>{item.text || ""}</Markdown>;
             } else if (item.type === "image_url") {
               return (
                 <img
@@ -88,26 +85,16 @@ export function AssistantMessage({
       {message.reasoning ? (
         <>
           <h1>Reasoning</h1>
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeHighlight]}
-            components={markdownComponents}
-          >
-            {message.reasoning}
-          </ReactMarkdown>
+          <Markdown>{message.reasoning}</Markdown>
           <hr />
         </>
       ) : null}
 
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
-        components={markdownComponents}
-      >
+      <Markdown>
         {typeof message.content === "string"
           ? message.content
           : "Assistant response"}
-      </ReactMarkdown>
+      </Markdown>
 
       {message.stoppedByUser ? (
         <div className="bg-primary rounded p-2">Stopped by user</div>
