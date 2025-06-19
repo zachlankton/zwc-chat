@@ -7,8 +7,6 @@ export function MessageSpeakButton({
   onToggleSpeak,
 }: {
   messageId: string;
-  content: string | any[];
-  reasoning?: string;
   isPlaying: boolean;
   onToggleSpeak: (messageId: string) => void;
 }) {
