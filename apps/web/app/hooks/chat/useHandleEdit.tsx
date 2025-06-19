@@ -33,6 +33,7 @@ export function useHandleEdit({
       if (messageIndex === -1) return;
 
       const originalMessage = messagesRef.current[messageIndex];
+      const originalContent = originalMessage.content;
       const isSystem = originalMessage.role === "system";
       const isFirst = messagesRef.current.length === 1;
 
@@ -86,7 +87,16 @@ export function useHandleEdit({
         console.error("Failed to edit message:", error);
 
         // Revert the optimistic update on error
-        setMessages((prev) => [...prev]);
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === messageId
+              ? {
+                  ...msg,
+                  content: originalContent,
+                }
+              : msg,
+          ),
+        );
 
         AsyncAlert({
           title: "Error",
