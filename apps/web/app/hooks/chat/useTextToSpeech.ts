@@ -22,7 +22,9 @@ export function useTextToSpeech({
   const isSpeakingRef = useRef(false);
   const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
   const ttsBufferRef = useRef<string>("");
-  const ttsBufferTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const ttsBufferTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   // TTS queue processor
   const processTtsQueue = useCallback(() => {
