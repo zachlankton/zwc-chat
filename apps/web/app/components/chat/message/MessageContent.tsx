@@ -135,8 +135,6 @@ export function MessageContent({
                   />
                   <MessageSpeakButton
                     messageId={message.id}
-                    content={message.content}
-                    reasoning={message.reasoning}
                     isPlaying={speakingMessageId === message.id}
                     onToggleSpeak={toggleSpeakMessage}
                   />

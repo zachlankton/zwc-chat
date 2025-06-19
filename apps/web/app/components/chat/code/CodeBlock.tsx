@@ -18,7 +18,6 @@ export function CodeBlock({ children }: { children: React.ReactNode }) {
         /* noop – could toast */
       }
     } else {
-    } else {
       // fallback for http / older browsers
       try {
         const textarea = document.createElement("textarea");
