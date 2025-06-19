@@ -1,7 +1,7 @@
 import * as React from "react";
 
 import { NavUser } from "~/components/nav-user";
-import { ChatList, type ChatListResponse } from "~/components/chat-list";
+import { ChatList } from "~/components/chat-list";
 import { useNavigate, useParams } from "react-router";
 import {
   Sidebar,
@@ -16,6 +16,7 @@ import { Button } from "./ui/button";
 import { get, wsClient } from "~/lib/fetchWrapper";
 import { queryClient } from "~/providers/queryClient";
 import { useQuery } from "@tanstack/react-query";
+import type { ChatListResponse } from "~/lib/chat/types";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onNewChat?: () => void;

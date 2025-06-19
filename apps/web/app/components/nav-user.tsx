@@ -1,12 +1,7 @@
 import {
-  BadgeCheck,
-  Bell,
   ChevronsUpDown,
-  CreditCard,
   LogOut,
   PaintBucket,
-  Settings,
-  Sparkles,
   Keyboard,
   Volume2,
   VolumeX,
@@ -21,7 +16,6 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuPortal,
   DropdownMenuSeparator,
   DropdownMenuSub,
@@ -36,14 +30,12 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "~/components/ui/sidebar";
-import { post, del } from "~/lib/fetchWrapper";
+import { post } from "~/lib/fetchWrapper";
 import { useTheme } from "~/providers/theme-provider";
 import { useSession } from "~/stores/session";
 import { useApiKeyInfo } from "~/stores/session";
 import { useChatSettings, defaultSystemPrompt } from "~/stores/chat-settings";
 import { useState } from "react";
-import { startOpenRouterOAuth } from "~/lib/openrouter-pkce";
-import { queryClient } from "~/providers/queryClient";
 import {
   Dialog,
   DialogContent,
@@ -54,6 +46,7 @@ import {
 } from "~/components/ui/dialog";
 import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
+import { startOpenRouterOAuth } from "~/lib/openrouter-pkce";
 
 export function NavUser() {
   const { isMobile } = useSidebar();
@@ -66,7 +59,7 @@ export function NavUser() {
 
   // Settings state
   const {
-    settings,
+    chatSettings,
     updateEnterToSend,
     updateTtsEnabled,
     updateSelectedVoice,
@@ -74,7 +67,7 @@ export function NavUser() {
   } = useChatSettings();
   const [systemPromptOpen, setSystemPromptOpen] = useState(false);
   const [tempSystemPrompt, setTempSystemPrompt] = useState(
-    settings.systemPrompt,
+    chatSettings.systemPrompt,
   );
   const [isLoadingOAuth, setIsLoadingOAuth] = useState(false);
 
@@ -148,7 +141,7 @@ export function NavUser() {
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => {
-                  setTempSystemPrompt(settings.systemPrompt);
+                  setTempSystemPrompt(chatSettings.systemPrompt);
                   setSystemPromptOpen(true);
                 }}
               >
@@ -182,24 +175,24 @@ export function NavUser() {
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
                 <DropdownMenuCheckboxItem
-                  checked={settings.enterToSend}
+                  checked={chatSettings.enterToSend}
                   onCheckedChange={updateEnterToSend}
                 >
                   <Keyboard className="mr-2 h-4 w-4" />
                   Enter to send
                 </DropdownMenuCheckboxItem>
                 <DropdownMenuCheckboxItem
-                  checked={settings.ttsEnabled}
+                  checked={chatSettings.ttsEnabled}
                   onCheckedChange={updateTtsEnabled}
                 >
-                  {settings.ttsEnabled ? (
+                  {chatSettings.ttsEnabled ? (
                     <Volume2 className="mr-2 h-4 w-4" />
                   ) : (
                     <VolumeX className="mr-2 h-4 w-4" />
                   )}
                   Text-to-speech
                 </DropdownMenuCheckboxItem>
-                {settings.availableVoices.length > 0 && (
+                {chatSettings.availableVoices.length > 0 && (
                   <DropdownMenuSub>
                     <DropdownMenuSubTrigger>
                       <Volume2 className="mr-2 h-4 w-4" />
@@ -210,7 +203,7 @@ export function NavUser() {
                         sideOffset={-120}
                         className="max-h-80 overflow-y-auto"
                       >
-                        {settings.availableVoices.map((voice) => (
+                        {chatSettings.availableVoices.map((voice) => (
                           <DropdownMenuItem
                             key={voice.voiceURI}
                             onClick={() => updateSelectedVoice(voice.voiceURI)}
@@ -219,7 +212,7 @@ export function NavUser() {
                             <span className="flex-1">
                               {voice.name?.slice(0, 10)}
                             </span>
-                            {settings.selectedVoice === voice.voiceURI && (
+                            {chatSettings.selectedVoice === voice.voiceURI && (
                               <Check className="h-3 w-3" />
                             )}
                           </DropdownMenuItem>
