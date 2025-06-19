@@ -33,33 +33,10 @@ export function useHandleSystemPromptEdit({
     if (systemMessage) {
       // Create a temporary visible message for editing
       const result = await AsyncModal(
-        <>
-          <DialogTitle className="mb-4 text-xl font-bold">
-            Edit System Prompt
-          </DialogTitle>
-          <DialogDescription className="mb-4">
-            Customize the system prompt for this chat:
-          </DialogDescription>
-          <div className="mb-4">
-            <Textarea
-              name="content"
-              defaultValue={systemMessage.content as string}
-              className="min-h-[200px] w-full resize-y"
-              placeholder="Enter system prompt..."
-              autoFocus
-            />
-          </div>
-          <div className="grid grid-flow-row-dense grid-cols-2 gap-3">
-            <DialogClose asChild>
-              <Button type="button" variant="outline">
-                Cancel
-              </Button>
-            </DialogClose>
-            <Button type="submit" variant="default">
-              Save
-            </Button>
-          </div>
-        </>,
+        <SysModal
+          title="Edit System Prompt"
+          desc="Customize the system prompt for this chat:"
+        />,
         {
           style: { maxWidth: "80vw" },
           initialData: {
@@ -74,33 +51,10 @@ export function useHandleSystemPromptEdit({
     } else {
       // Add new system message
       const result = await AsyncModal(
-        <>
-          <DialogTitle className="mb-4 text-xl font-bold">
-            Add System Prompt
-          </DialogTitle>
-          <DialogDescription className="mb-4">
-            Add a system prompt to guide the AI's behavior in this chat:
-          </DialogDescription>
-          <div className="mb-4">
-            <Textarea
-              name="content"
-              defaultValue={chatSettings.systemPrompt}
-              className="min-h-[200px] w-full resize-y"
-              placeholder="Enter system prompt..."
-              autoFocus
-            />
-          </div>
-          <div className="grid grid-flow-row-dense grid-cols-2 gap-3">
-            <DialogClose asChild>
-              <Button type="button" variant="outline">
-                Cancel
-              </Button>
-            </DialogClose>
-            <Button type="submit" variant="default">
-              Save
-            </Button>
-          </div>
-        </>,
+        <SysModal
+          title="Add System Prompt"
+          desc="Add a system prompt to guide the AI's behavior in this chat:"
+        />,
         {
           style: { maxWidth: "80vw" },
           initialData: {
@@ -120,4 +74,31 @@ export function useHandleSystemPromptEdit({
       }
     }
   }, [setMessages, chatSettings.systemPrompt, handleEdit]);
+}
+
+function SysModal({ title, desc }: { title: string; desc: string }) {
+  return (
+    <>
+      <DialogTitle className="mb-4 text-xl font-bold">{title}</DialogTitle>
+      <DialogDescription className="mb-4">{desc}</DialogDescription>
+      <div className="mb-4">
+        <Textarea
+          name="content"
+          className="min-h-[200px] w-full resize-y"
+          placeholder="Enter system prompt..."
+          autoFocus
+        />
+      </div>
+      <div className="grid grid-flow-row-dense grid-cols-2 gap-3">
+        <DialogClose asChild>
+          <Button type="button" variant="outline">
+            Cancel
+          </Button>
+        </DialogClose>
+        <Button type="submit" variant="default">
+          Save
+        </Button>
+      </div>
+    </>
+  );
 }
